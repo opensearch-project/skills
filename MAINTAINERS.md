@@ -6,7 +6,6 @@
 | Charlie Yang         | [model-collapse](https://github.com/model-collapse) | Amazon      |
 | Dhrubo Saha          | [dhrubo-os](https://github.com/dhrubo-os)          | Amazon      |
 | Jing Zhang           | [jngz-es](https://github.com/jngz-es)              | Amazon      |
-| Junshen Wu           | [wujunshen](https://github.com/wujunshen)          | Amazon      |
 | Sicheng Song         | [b4sjoo](https://github.com/b4sjoo)                | Amazon      |
 | Xun Zhang            | [Zhangxunmt](https://github.com/Zhangxunmt)        | Amazon      |
 | Yaliang Wu           | [ylwu-amzn](https://github.com/ylwu-amzn)          | Amazon      |
