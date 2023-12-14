@@ -9,9 +9,27 @@ on:
 
 jobs:
   Get-CI-Image-Tag:
-    uses: opensearch-project/opensearch-build/.github/workflows/get-ci-image-tag.yml@main
-    with:
-      product: opensearch
+    runs-on: ubuntu-latest
+    outputs:
+      ci-image-version-linux: ${{ steps.step-ci-image-version-linux.outputs.ci-image-version-linux }}
+    steps:
+      - name: Install crane
+        uses: iarekylew00t/crane-installer@v1
+        with:
+          crane-release: v0.15.2
+      - name: Checkout opensearch-build repository
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/opensearch-build'
+          ref: 'main'
+          path: 'opensearch-build'
+      - name: Get ci image version from opensearch-build repository scripts
+        id: step-ci-image-version-linux
+        run: |
+          crane version
+          CI_IMAGE_VERSION=`opensearch-build/docker/ci/get-ci-images.sh -p centos7 -u opensearch -t build | head -1`
+          echo $CI_IMAGE_VERSION
+          echo "ci-image-version-linux=$CI_IMAGE_VERSION" >> $GITHUB_OUTPUT 
 
   build-linux:
     needs: Get-CI-Image-Tag
@@ -21,7 +39,7 @@ jobs:
           - 11
           - 17
           - 21
-    name: Build and Test
+    name: Build and Test skills plugin on Linux
     runs-on: ubuntu-latest
     container:
       # using the same image which is used by opensearch-build team to build the OpenSearch Distribution
@@ -50,6 +68,30 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  build-MacOS:
+    strategy:
+      matrix:
+        java: [ 11, 17 ]
+
+    name: Build and Test skills Plugin on MacOS
+    needs: Get-CI-Image-Tag
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout skills
+        uses: actions/checkout@v1
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: Install dependencies on macos
+        run: |
+          brew reinstall gcc
+          export FC=/usr/local/Cellar/gcc/12.2.0/bin/gfortran
+      - name: Run build
+        run: |
+          ./gradlew build
+
   build-windows:
     strategy:
       matrix:
@@ -57,7 +99,8 @@ jobs:
           - 11
           - 17
           - 21
-    name: Build and Test
+    name: Build and Test skills plugin on Windows
+    needs: Get-CI-Image-Tag
     runs-on: windows-latest
 
     steps:
