@@ -43,7 +43,6 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
-import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
@@ -51,6 +50,7 @@ import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 
 import lombok.Getter;
@@ -108,7 +108,8 @@ public class PPLTool implements Tool {
                     .build();
                 ActionRequest request = new MLPredictionTaskRequest(
                     modelId,
-                    MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+                    MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
+                    null
                 );
                 client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.<MLTaskResponse>wrap(mlTaskResponse -> {
                     ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
@@ -317,10 +318,8 @@ public class PPLTool implements Tool {
 
     }
 
-    private Map<String, String> extractFromChatParameters(Map<String, String> parameters)
-    {
-        if (parameters.containsKey("input"))
-        {
+    private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
+        if (parameters.containsKey("input")) {
             try {
                 Map<String, String> chatParameters = gson.fromJson(parameters.get("input"), Map.class);
                 parameters.putAll(chatParameters);

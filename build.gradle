@@ -6,7 +6,7 @@
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "2.11.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
     }
@@ -26,7 +26,11 @@ buildscript {
 plugins {
     id 'java-library'
     id 'com.diffplug.spotless' version '6.23.0'
-    id "io.freefair.lombok" version "8.0.1"
+    id "io.freefair.lombok" version "8.4"
+}
+
+lombok {
+    version = "1.18.30"
 }
 
 repositories {
@@ -82,6 +86,12 @@ task addJarsToClasspath(type: Copy) {
 dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.19.0"
+    compileOnly group: 'org.json', name: 'json', version: '20231013'
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
+    implementation("com.google.guava:guava:32.0.1-jre")
+    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
+    compileOnly "org.opensearch:common-utils:${version}"
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.mockito:mockito-core:3.10.0"
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
@@ -90,10 +100,6 @@ dependencies {
     testImplementation "com.cronutils:cron-utils:9.1.6"
     testImplementation "commons-validator:commons-validator:1.7"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
-    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.19.0"
-    compileOnly group: 'org.json', name: 'json', version: '20231013'
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
-    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
 }
 
 task extractSqlJar(type: Copy) {
@@ -110,6 +116,7 @@ tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
 dependencyLicenses.enabled = false
 loggerUsageCheck.enabled = false
 testingConventions.enabled = false
+thirdPartyAudit.enabled = false
 
 test {
     useJUnitPlatform()
