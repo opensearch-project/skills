@@ -318,10 +318,8 @@ public class PPLTool implements Tool {
 
     }
 
-    private Map<String, String> extractFromChatParameters(Map<String, String> parameters)
-    {
-        if (parameters.containsKey("input"))
-        {
+    private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
+        if (parameters.containsKey("input")) {
             try {
                 Map<String, String> chatParameters = gson.fromJson(parameters.get("input"), Map.class);
                 parameters.putAll(chatParameters);
