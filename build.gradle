@@ -97,7 +97,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:3.10.0'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
-    testImplementation "com.cronutils:cron-utils:9.1.6"
+    testImplementation "com.cronutils:cron-utils:9.2.1"
     testImplementation "commons-validator:commons-validator:1.7"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
 }
