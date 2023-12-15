@@ -11,7 +11,7 @@ jobs:
   build-and-publish-snapshots:
     strategy:
       fail-fast: false
-    if: github.repository == 'opensearch-project/agent-tools'
+    if: github.repository == 'opensearch-project/skills'
     runs-on: ubuntu-latest
 
     permissions:

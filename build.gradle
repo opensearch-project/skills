@@ -61,6 +61,7 @@ apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
+def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 
 configurations {
     zipArchive
@@ -69,7 +70,14 @@ configurations {
     }
 }
 
-def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+task addJarsToClasspath(type: Copy) {
+    from(fileTree(dir: sqlJarDirectory)) {
+        include "opensearch-sql-${version}.jar"
+        include "ppl-${version}.jar"
+        include "protocol-${version}.jar"
+    }
+    into("$buildDir/classes")
+}
 
 dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
@@ -94,7 +102,8 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
-project.tasks.delombok.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
 
@@ -133,9 +142,9 @@ compileTestJava {
 
 
 opensearchplugin {
-    name 'agent-tools'
-    description 'OpenSearch Agent Tools'
-    classname 'org.opensearch.agent_tool.ToolPlugin'
+    name 'skills'
+    description 'OpenSearch Skills'
+    classname 'org.opensearch.agent.ToolPlugin'
     extendedPlugins = ['opensearch-ml']
     licenseFile rootProject.file("LICENSE.txt")
     noticeFile rootProject.file("NOTICE")
@@ -159,8 +168,8 @@ publishing {
     publications {
         pluginZip(MavenPublication) { publication ->
             pom {
-                name = "OpenSearch Agent Tools"
-                description = "OpenSearch Agent Tools"
+                name = "OpenSearch Skills"
+                description = "OpenSearch Skills"
                 groupId = "org.opensearch.plugin"
                 licenses {
                     license {
@@ -171,7 +180,7 @@ publishing {
                 developers {
                     developer {
                         name = "OpenSearch"
-                        url = "https://github.com/opensearch-project/agent-tools"
+                        url = "https://github.com/opensearch-project/skills"
                     }
                 }
             }
