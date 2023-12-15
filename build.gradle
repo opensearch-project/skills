@@ -89,7 +89,7 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.19.0"
     compileOnly group: 'org.json', name: 'json', version: '20231013'
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
-    implementation("com.google.guava:guava:32.0.1-jre")
+    implementation("com.google.guava:guava:32.1.3-jre")
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
