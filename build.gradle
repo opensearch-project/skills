@@ -25,7 +25,7 @@ buildscript {
 
 plugins {
     id 'java-library'
-    id 'com.diffplug.spotless' version '6.23.0'
+    id 'com.diffplug.spotless' version '6.23.3'
     id "io.freefair.lombok" version "8.4"
 }
 
