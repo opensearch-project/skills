@@ -132,12 +132,16 @@ test {
 }
 
 spotless {
-    java {
-        removeUnusedImports()
-        importOrder 'java', 'javax', 'org', 'com'
-        licenseHeaderFile 'spotless.license.java'
-
-        eclipse().configFile rootProject.file('.eclipseformat.xml')
+    if (JavaVersion.current() >= JavaVersion.VERSION_17) {
+        // Spotless configuration for Java files
+        java {
+            removeUnusedImports()
+            importOrder 'java', 'javax', 'org', 'com'
+            licenseHeaderFile 'spotless.license.java'
+            eclipse().configFile rootProject.file('.eclipseformat.xml')
+        }
+    } else {
+        logger.lifecycle("Spotless plugin requires Java 17 or higher. Skipping Spotless tasks.")
     }
 }
 
