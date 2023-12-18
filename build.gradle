@@ -3,12 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import org.opensearch.gradle.test.RestIntegTestTask
+import java.util.concurrent.Callable
+
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
         opensearch_version = System.getProperty("opensearch.version", "2.11.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        if (buildVersionQualifier) {
+            opensearch_build += "-${buildVersionQualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
     }
 
     repositories {
@@ -25,8 +36,12 @@ buildscript {
 
 plugins {
     id 'java-library'
-    id 'com.diffplug.spotless' version '6.22.0'
-    id "io.freefair.lombok" version "8.0.1"
+    id 'com.diffplug.spotless' version '6.23.0'
+    id "io.freefair.lombok" version "8.4"
+}
+
+lombok {
+    version = "1.18.30"
 }
 
 repositories {
@@ -61,31 +76,48 @@ apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
+def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 
 configurations {
     zipArchive
     all {
-        resolutionStrategy.force "org.mockito:mockito-core:5.5.0"
+        resolutionStrategy {
+            force "org.mockito:mockito-core:5.8.0"
+            force "com.google.guava:guava:32.1.3-jre" // CVE for 31.1
+            force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
+        }
     }
 }
 
-def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+task addJarsToClasspath(type: Copy) {
+    from(fileTree(dir: sqlJarDirectory)) {
+        include "opensearch-sql-${version}.jar"
+        include "ppl-${version}.jar"
+        include "protocol-${version}.jar"
+    }
+    into("$buildDir/classes")
+}
 
 dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
-    testImplementation "org.opensearch.test:framework:${opensearch_version}"
-    testImplementation "org.mockito:mockito-core:3.10.0"
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
-    testImplementation 'org.mockito:mockito-junit-jupiter:3.10.0'
-    testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
-    testImplementation "com.cronutils:cron-utils:9.1.6"
-    testImplementation "commons-validator:commons-validator:1.7"
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
-    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.19.0"
-    compileOnly group: 'org.json', name: 'json', version: '20230227'
+    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.22.0"
+    compileOnly group: 'org.json', name: 'json', version: '20231013'
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
+    implementation("com.google.guava:guava:32.1.3-jre")
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
+    compileOnly "org.opensearch:common-utils:${version}"
+    testImplementation "org.opensearch.test:framework:${opensearch_version}"
+    testImplementation "org.mockito:mockito-core:5.8.0"
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
+    testImplementation "com.cronutils:cron-utils:9.2.1"
+    testImplementation "commons-validator:commons-validator:1.8.0"
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+
+    // ZipArchive dependencies used for integration tests
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${opensearch_build}"
 }
 
 task extractSqlJar(type: Copy) {
@@ -94,13 +126,15 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
-project.tasks.delombok.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
 
 dependencyLicenses.enabled = false
 loggerUsageCheck.enabled = false
 testingConventions.enabled = false
+thirdPartyAudit.enabled = false
 
 test {
     useJUnitPlatform()
@@ -112,12 +146,16 @@ test {
 }
 
 spotless {
-    java {
-        removeUnusedImports()
-        importOrder 'java', 'javax', 'org', 'com'
-        licenseHeaderFile 'spotless.license.java'
-
-        eclipse().configFile rootProject.file('.eclipseformat.xml')
+    if (JavaVersion.current() >= JavaVersion.VERSION_17) {
+        // Spotless configuration for Java files
+        java {
+            removeUnusedImports()
+            importOrder 'java', 'javax', 'org', 'com'
+            licenseHeaderFile 'spotless.license.java'
+            eclipse().configFile rootProject.file('.eclipseformat.xml')
+        }
+    } else {
+        logger.lifecycle("Spotless plugin requires Java 17 or higher. Skipping Spotless tasks.")
     }
 }
 
@@ -133,9 +171,9 @@ compileTestJava {
 
 
 opensearchplugin {
-    name 'agent-tools'
-    description 'OpenSearch Agent Tools'
-    classname 'org.opensearch.agent_tool.ToolPlugin'
+    name 'skills'
+    description 'OpenSearch Skills'
+    classname 'org.opensearch.agent.ToolPlugin'
     extendedPlugins = ['opensearch-ml']
     licenseFile rootProject.file("LICENSE.txt")
     noticeFile rootProject.file("NOTICE")
@@ -159,8 +197,8 @@ publishing {
     publications {
         pluginZip(MavenPublication) { publication ->
             pom {
-                name = "OpenSearch Agent Tools"
-                description = "OpenSearch Agent Tools"
+                name = "OpenSearch Skills"
+                description = "OpenSearch Skills"
                 groupId = "org.opensearch.plugin"
                 licenses {
                     license {
@@ -171,7 +209,7 @@ publishing {
                 developers {
                     developer {
                         name = "OpenSearch"
-                        url = "https://github.com/opensearch-project/agent-tools"
+                        url = "https://github.com/opensearch-project/skills"
                     }
                 }
             }
@@ -179,6 +217,92 @@ publishing {
     }
     gradle.startParameter.setShowStacktrace(ShowStacktrace.ALWAYS)
     gradle.startParameter.setLogLevel(LogLevel.DEBUG)
+}
+
+def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
+opensearch_tmp_dir.mkdirs()
+def _numNodes = findProperty('numNodes') as Integer ?: 1
+
+// Set up integration tests
+task integTest(type: RestIntegTestTask) {
+    description = "Run tests against a cluster"
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+}
+tasks.named("check").configure { dependsOn(integTest) }
+
+integTest {
+
+    dependsOn "bundlePlugin"
+    systemProperty 'tests.security.manager', 'false'
+    systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    systemProperty('project.root', project.rootDir.absolutePath)
+    systemProperty "https", System.getProperty("https")
+    systemProperty "user", System.getProperty("user")
+    systemProperty "password", System.getProperty("password")
+
+
+    // doFirst delays this block until execution time
+    doFirst {
+        // Tell the test JVM if the cluster JVM is running under a debugger so that tests can
+        // use longer timeouts for requests.
+        def isDebuggingCluster = getDebug() || System.getProperty("test.debug") != null
+        systemProperty 'cluster.debug', isDebuggingCluster
+        // Set number of nodes system property to be used in tests
+        systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+        // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
+        // not being written, the waitForAllConditions ensures it's written
+        getClusters().forEach { cluster ->
+            cluster.waitForAllConditions()
+        }
+    }
+
+    // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
+    if (System.getProperty("test.debug") != null) {
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+    }
+}
+
+// Set up integration test clusters, installs all zipArchive dependencies and this plugin
+testClusters.integTest {
+    testDistribution = "ARCHIVE"
+
+    // Installs all registered zipArchive dependencies on integTest cluster nodes
+    configurations.zipArchive.asFileTree.each {
+        plugin(provider(new Callable<RegularFile>(){
+            @Override
+            RegularFile call() throws Exception {
+                return new RegularFile() {
+                    @Override
+                    File getAsFile() {
+                        return it
+                    }
+                }
+            }
+        }))
+    }
+
+    // Install skills plugin on integTest cluster nodes
+    plugin(project.tasks.bundlePlugin.archiveFile)
+
+    // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
+    if (_numNodes > 1) numberOfNodes = _numNodes
+
+    // When running integration tests it doesn't forward the --debug-jvm to the cluster anymore
+    // i.e. we have to use a custom property to flag when we want to debug OpenSearch JVM
+    // since we also support multi node integration tests we increase debugPort per node
+    if (System.getProperty("opensearch.debug") != null) {
+        def debugPort = 5005
+        nodes.forEach { node ->
+            node.jvmArgs("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=*:${debugPort}")
+            debugPort += 1
+        }
+    }
+}
+
+// Automatically sets up the integration test cluster locally
+run {
+    useCluster testClusters.integTest
 }
 
 // updateVersion: Task to auto increment to the next development iteration
