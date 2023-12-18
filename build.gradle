@@ -263,7 +263,7 @@ integTest {
     }
 }
 
-// Set up integration test clusters, installs all zipArchive dependencies and Flow Framework
+// Set up integration test clusters, installs all zipArchive dependencies and this plugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
 
@@ -282,7 +282,7 @@ testClusters.integTest {
         }))
     }
 
-    // Install Flow Framwork Plugin on integTest cluster nodes
+    // Install skills plugin on integTest cluster nodes
     plugin(project.tasks.bundlePlugin.archiveFile)
 
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
