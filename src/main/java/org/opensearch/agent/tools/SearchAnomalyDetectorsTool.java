@@ -23,10 +23,9 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
-
-import org.opensearch.search.SearchHit;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -58,6 +57,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
 
     public SearchAnomalyDetectorsTool(Client client) {
         this.client = client;
+        this.adClient = new AnomalyDetectionNodeClient(client);
 
         // probably keep this overridden output parser. need to ensure the output matches what's expected
         outputParser = new Parser<>() {
@@ -81,7 +81,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
         final Boolean highCardinality = parameters.containsKey("highCardinality")
             ? Boolean.parseBoolean(parameters.get("highCardinality"))
             : null;
-        final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") ? Long.parseLong(parameters.get("lastUpdateTime")): null;
+        final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") ? Long.parseLong(parameters.get("lastUpdateTime")) : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
         final SortOrder sortOrder = sortOrderStr == "asc" ? SortOrder.ASC : SortOrder.DESC;
         final String sortString = parameters.getOrDefault("sortString", "name.keyword");

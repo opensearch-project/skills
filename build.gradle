@@ -109,8 +109,13 @@ dependencies {
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${version}.jar"])
 
     compileOnly "org.opensearch:common-utils:${version}"
+
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
-    testImplementation "org.mockito:mockito-core:5.8.0"
+    testImplementation group: 'junit', name: 'junit', version: '4.13.2'
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.8.0'
+    testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
+    testImplementation("net.bytebuddy:byte-buddy:1.14.7")   
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.14.7") 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
@@ -146,12 +151,13 @@ testingConventions.enabled = false
 thirdPartyAudit.enabled = false
 
 test {
-    useJUnitPlatform()
     testLogging {
         exceptionFormat "full"
         events "skipped", "passed", "failed" // "started"
         showStandardStreams true
     }
+    include '**/*Tests.class'
+    systemProperty 'tests.security.manager', 'false'
 }
 
 spotless {
