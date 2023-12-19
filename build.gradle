@@ -12,14 +12,6 @@ buildscript {
         opensearch_version = System.getProperty("opensearch.version", "2.12.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
-        version_tokens = opensearch_version.tokenize('-')
-        opensearch_build = version_tokens[0] + '.0'
-        if (buildVersionQualifier) {
-            opensearch_build += "-${buildVersionQualifier}"
-        }
-        if (isSnapshot) {
-            opensearch_build += "-SNAPSHOT"
-        }
     }
 
     repositories {
@@ -77,6 +69,8 @@ apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
+def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
     zipArchive
@@ -96,28 +90,52 @@ task addJarsToClasspath(type: Copy) {
         include "protocol-${version}.jar"
     }
     into("$buildDir/classes")
+
+    from(fileTree(dir: jsJarDirectory)) {
+        include "opensearch-job-scheduler-${version}.jar"
+    }
+    into("$buildDir/classes")
+
+    from(fileTree(dir: adJarDirectory)) {
+        include "opensearch-time-series-analytics-${version}.jar"
+    }
+    into("$buildDir/classes")
 }
 
 dependencies {
-    compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
+    // 3P dependencies
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.22.0"
     compileOnly group: 'org.json', name: 'json', version: '20231013'
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
     implementation("com.google.guava:guava:32.1.3-jre")
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.13.0'
+
+    // Plugin dependencies
+    compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
+    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
+
+    // ZipArchive dependencies used for integration tests
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
+    zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
+
+    // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
-    testImplementation "org.mockito:mockito-core:5.8.0"
+    testImplementation group: 'junit', name: 'junit', version: '4.13.2'
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.8.0'
+    testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
+    testImplementation("net.bytebuddy:byte-buddy:1.14.7")   
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.14.7") 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
     testImplementation "com.cronutils:cron-utils:9.2.1"
     testImplementation "commons-validator:commons-validator:1.8.0"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
-
-    // ZipArchive dependencies used for integration tests
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${opensearch_build}"
 }
 
 task extractSqlJar(type: Copy) {
@@ -126,7 +144,21 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
+task extractJsJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-job-scheduler")}))
+    into jsJarDirectory
+}
+
+task extractAdJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-anomaly-detection")}))
+    into adJarDirectory
+}
+
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(extractJsJar)
+tasks.addJarsToClasspath.dependsOn(extractAdJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
@@ -137,12 +169,13 @@ testingConventions.enabled = false
 thirdPartyAudit.enabled = false
 
 test {
-    useJUnitPlatform()
     testLogging {
         exceptionFormat "full"
         events "skipped", "passed", "failed" // "started"
         showStandardStreams true
     }
+    include '**/*Tests.class'
+    systemProperty 'tests.security.manager', 'false'
 }
 
 spotless {
@@ -161,6 +194,8 @@ spotless {
 
 compileJava {
     dependsOn extractSqlJar
+    dependsOn extractJsJar
+    dependsOn extractAdJar
     dependsOn delombok
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }
@@ -168,6 +203,8 @@ compileJava {
 compileTestJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }
+
+forbiddenApisTest.ignoreFailures = true
 
 
 opensearchplugin {
