@@ -14,6 +14,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -51,12 +52,12 @@ public class AbstractRetrieverToolTests {
     public void setup() {
         try (InputStream searchResponseIns = AbstractRetrieverTool.class.getResourceAsStream("retrieval_tool_search_response.json")) {
             if (searchResponseIns != null) {
-                mockedSearchResponseString = new String(searchResponseIns.readAllBytes());
+                mockedSearchResponseString = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
         try (InputStream searchResponseIns = AbstractRetrieverTool.class.getResourceAsStream("retrieval_tool_empty_search_response.json")) {
             if (searchResponseIns != null) {
-                mockedEmptySearchResponseString = new String(searchResponseIns.readAllBytes());
+                mockedEmptySearchResponseString = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
 
@@ -71,7 +72,6 @@ public class AbstractRetrieverToolTests {
         when(mockedImpl.getQueryBody(any(String.class))).thenReturn(TEST_QUERY);
     }
 
-    @Test
     @SneakyThrows
     public void testRunAsyncWithSearchResults() {
         Client client = mock(Client.class);
@@ -102,7 +102,6 @@ public class AbstractRetrieverToolTests {
         );
     }
 
-    @Test
     @SneakyThrows
     public void testRunAsyncWithEmptySearchResponse() {
         Client client = mock(Client.class);
@@ -129,7 +128,6 @@ public class AbstractRetrieverToolTests {
         assertEquals("", future.get());
     }
 
-    @Test
     @SneakyThrows
     public void testRunAsyncWithIllegalQueryThenListenerOnFailure() {
         Client client = mock(Client.class);

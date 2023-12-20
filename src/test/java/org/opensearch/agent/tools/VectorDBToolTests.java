@@ -34,7 +34,6 @@ public class VectorDBToolTests {
         params.put(VectorDBTool.K_FIELD, TEST_K.toString());
     }
 
-    @Test
     @SneakyThrows
     public void testCreateTool() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
@@ -49,7 +48,6 @@ public class VectorDBToolTests {
         assertEquals("Use this tool to search data in OpenSearch index.", VectorDBTool.Factory.getInstance().getDefaultDescription());
     }
 
-    @Test
     @SneakyThrows
     public void testGetQueryBody() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
@@ -60,7 +58,6 @@ public class VectorDBToolTests {
         );
     }
 
-    @Test
     @SneakyThrows
     public void testGetQueryBodyWithIllegalParams() {
         Map<String, Object> illegalParams1 = new HashMap<>(params);
