@@ -51,11 +51,11 @@ public abstract class AbstractRetrieverTool implements Tool {
     protected String version;
 
     protected AbstractRetrieverTool(
-            Client client,
-            NamedXContentRegistry xContentRegistry,
-            String index,
-            String[] sourceFields,
-            Integer docSize
+        Client client,
+        NamedXContentRegistry xContentRegistry,
+        String index,
+        String[] sourceFields,
+        Integer docSize
     ) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
@@ -74,9 +74,7 @@ public abstract class AbstractRetrieverTool implements Tool {
 
         String query = getQueryBody(question);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        XContentParser queryParser = XContentType.JSON
-                .xContent()
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
+        XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
         searchSourceBuilder.parseXContent(queryParser);
         searchSourceBuilder.fetchSource(sourceFields, null);
         searchSourceBuilder.size(docSize);

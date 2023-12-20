@@ -39,7 +39,7 @@ public class AbstractRetrieverToolTests {
     static public final String[] TEST_SOURCE_FIELDS = new String[] { "test 1", "test 2" };
     static public final Integer TEST_DOC_SIZE = 3;
     static public final NamedXContentRegistry TEST_XCONTENT_REGISTRY_FOR_QUERY = new NamedXContentRegistry(
-            new SearchModule(Settings.EMPTY, List.of()).getNamedXContents()
+        new SearchModule(Settings.EMPTY, List.of()).getNamedXContents()
     );
 
     private String mockedSearchResponseString;
@@ -61,13 +61,13 @@ public class AbstractRetrieverToolTests {
         }
 
         mockedImpl = Mockito
-                .mock(
-                        AbstractRetrieverTool.class,
-                        Mockito
-                                .withSettings()
-                                .useConstructor(null, TEST_XCONTENT_REGISTRY_FOR_QUERY, TEST_INDEX, TEST_SOURCE_FIELDS, TEST_DOC_SIZE)
-                                .defaultAnswer(Mockito.CALLS_REAL_METHODS)
-                );
+            .mock(
+                AbstractRetrieverTool.class,
+                Mockito
+                    .withSettings()
+                    .useConstructor(null, TEST_XCONTENT_REGISTRY_FOR_QUERY, TEST_INDEX, TEST_SOURCE_FIELDS, TEST_DOC_SIZE)
+                    .defaultAnswer(Mockito.CALLS_REAL_METHODS)
+            );
         when(mockedImpl.getQueryBody(any(String.class))).thenReturn(TEST_QUERY);
     }
 
@@ -76,10 +76,10 @@ public class AbstractRetrieverToolTests {
     public void testRunAsyncWithSearchResults() {
         Client client = mock(Client.class);
         SearchResponse mockedSearchResponse = SearchResponse
-                .fromXContent(
-                        JsonXContent.jsonXContent
-                                .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedSearchResponseString)
-                );
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedSearchResponseString)
+            );
         doAnswer(invocation -> {
             SearchRequest searchRequest = invocation.getArgument(0);
             assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
@@ -96,9 +96,9 @@ public class AbstractRetrieverToolTests {
 
         future.join();
         assertEquals(
-                "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"Company test_mock have a history of 100 years.\"},\"_id\":\"1\",\"_score\":89.2917}\n"
-                        + "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"the price of the api is 2$ per invokation\"},\"_id\":\"2\",\"_score\":0.10702579}\n",
-                future.get()
+            "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"Company test_mock have a history of 100 years.\"},\"_id\":\"1\",\"_score\":89.2917}\n"
+                + "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"the price of the api is 2$ per invokation\"},\"_id\":\"2\",\"_score\":0.10702579}\n",
+            future.get()
         );
     }
 
@@ -107,10 +107,10 @@ public class AbstractRetrieverToolTests {
     public void testRunAsyncWithEmptySearchResponse() {
         Client client = mock(Client.class);
         SearchResponse mockedEmptySearchResponse = SearchResponse
-                .fromXContent(
-                        JsonXContent.jsonXContent
-                                .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedEmptySearchResponseString)
-                );
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedEmptySearchResponseString)
+            );
         doAnswer(invocation -> {
             SearchRequest searchRequest = invocation.getArgument(0);
             assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
@@ -142,7 +142,6 @@ public class AbstractRetrieverToolTests {
         Exception exception1 = assertThrows(Exception.class, future1::join);
         assertTrue(exception1.getCause() instanceof IllegalArgumentException);
         assertEquals(exception1.getCause().getMessage(), "[input] is null or empty, can not process it.");
-
 
         final CompletableFuture<String> future2 = new CompletableFuture<>();
         ActionListener<String> listener2 = ActionListener.wrap(future2::complete, future2::completeExceptionally);

@@ -37,13 +37,13 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
 
     @Builder
     public NeuralSparseSearchTool(
-            Client client,
-            NamedXContentRegistry xContentRegistry,
-            String index,
-            String embeddingField,
-            String[] sourceFields,
-            Integer docSize,
-            String modelId
+        Client client,
+        NamedXContentRegistry xContentRegistry,
+        String index,
+        String embeddingField,
+        String[] sourceFields,
+        Integer docSize,
+        String modelId
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
         this.modelId = modelId;
@@ -54,17 +54,17 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
     protected String getQueryBody(String queryText) {
         if (StringUtils.isBlank(embeddingField) || StringUtils.isBlank(modelId)) {
             throw new IllegalArgumentException(
-                    "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
+                "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
         return "{\"query\":{\"neural_sparse\":{\""
-                + embeddingField
-                + "\":{\"query_text\":\""
-                + queryText
-                + "\",\"model_id\":\""
-                + modelId
-                + "\"}}}"
-                + " }";
+            + embeddingField
+            + "\":{\"query_text\":\""
+            + queryText
+            + "\",\"model_id\":\""
+            + modelId
+            + "\"}}}"
+            + " }";
     }
 
     @Override
@@ -96,15 +96,15 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
             String modelId = (String) params.get(MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
             return NeuralSparseSearchTool
-                    .builder()
-                    .client(client)
-                    .xContentRegistry(xContentRegistry)
-                    .index(index)
-                    .embeddingField(embeddingField)
-                    .sourceFields(sourceFields)
-                    .modelId(modelId)
-                    .docSize(docSize)
-                    .build();
+                .builder()
+                .client(client)
+                .xContentRegistry(xContentRegistry)
+                .index(index)
+                .embeddingField(embeddingField)
+                .sourceFields(sourceFields)
+                .modelId(modelId)
+                .docSize(docSize)
+                .build();
         }
     }
 }

@@ -43,7 +43,10 @@ public class NeuralSparseSearchToolTests {
         assertEquals(AbstractRetrieverToolTests.TEST_DOC_SIZE, tool.getDocSize());
         assertEquals("NeuralSparseSearchTool", tool.getType());
         assertEquals("NeuralSparseSearchTool", tool.getName());
-        assertEquals("Use this tool to search data in OpenSearch index.", NeuralSparseSearchTool.Factory.getInstance().getDefaultDescription());
+        assertEquals(
+            "Use this tool to search data in OpenSearch index.",
+            NeuralSparseSearchTool.Factory.getInstance().getDefaultDescription()
+        );
     }
 
     @Test
@@ -51,9 +54,9 @@ public class NeuralSparseSearchToolTests {
     public void testGetQueryBody() {
         NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
         assertEquals(
-                "{\"query\":{\"neural_sparse\":{\"test embedding\":{\""
-                        + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\"}}} }",
-                tool.getQueryBody(TEST_QUERY_TEXT)
+            "{\"query\":{\"neural_sparse\":{\"test embedding\":{\""
+                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\"}}} }",
+            tool.getQueryBody(TEST_QUERY_TEXT)
         );
     }
 
@@ -64,8 +67,8 @@ public class NeuralSparseSearchToolTests {
         illegalParams1.remove(NeuralSparseSearchTool.MODEL_ID_FIELD);
         NeuralSparseSearchTool tool1 = NeuralSparseSearchTool.Factory.getInstance().create(illegalParams1);
         Exception exception1 = assertThrows(
-                IllegalArgumentException.class,
-                () -> tool1.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
+            IllegalArgumentException.class,
+            () -> tool1.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception1.getMessage());
 
@@ -73,8 +76,8 @@ public class NeuralSparseSearchToolTests {
         illegalParams2.remove(NeuralSparseSearchTool.EMBEDDING_FIELD);
         NeuralSparseSearchTool tool2 = NeuralSparseSearchTool.Factory.getInstance().create(illegalParams2);
         Exception exception2 = assertThrows(
-                IllegalArgumentException.class,
-                () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
+            IllegalArgumentException.class,
+            () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception2.getMessage());
     }

@@ -54,9 +54,9 @@ public class VectorDBToolTests {
     public void testGetQueryBody() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
         assertEquals(
-                "{\"query\":{\"neural\":{\"test embedding\":{\""
-                        + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\",\"k\":123}}} }",
-                tool.getQueryBody(TEST_QUERY_TEXT)
+            "{\"query\":{\"neural\":{\"test embedding\":{\""
+                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\",\"k\":123}}} }",
+            tool.getQueryBody(TEST_QUERY_TEXT)
         );
     }
 
@@ -67,8 +67,8 @@ public class VectorDBToolTests {
         illegalParams1.remove(VectorDBTool.MODEL_ID_FIELD);
         VectorDBTool tool1 = VectorDBTool.Factory.getInstance().create(illegalParams1);
         Exception exception1 = assertThrows(
-                IllegalArgumentException.class,
-                () -> tool1.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
+            IllegalArgumentException.class,
+            () -> tool1.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception1.getMessage());
 
@@ -76,8 +76,8 @@ public class VectorDBToolTests {
         illegalParams2.remove(VectorDBTool.EMBEDDING_FIELD);
         VectorDBTool tool2 = VectorDBTool.Factory.getInstance().create(illegalParams2);
         Exception exception2 = assertThrows(
-                IllegalArgumentException.class,
-                () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
+            IllegalArgumentException.class,
+            () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception2.getMessage());
     }

@@ -5,18 +5,19 @@
 
 package org.opensearch.agent.tools;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
+
+import java.util.Map;
+
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.client.Client;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 
-import java.util.Map;
-
-import static org.opensearch.ml.common.utils.StringUtils.gson;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * This tool supports neural search with embedding models and knn index.
@@ -39,14 +40,14 @@ public class VectorDBTool extends AbstractRetrieverTool {
 
     @Builder
     public VectorDBTool(
-            Client client,
-            NamedXContentRegistry xContentRegistry,
-            String index,
-            String embeddingField,
-            String[] sourceFields,
-            Integer docSize,
-            String modelId,
-            Integer k
+        Client client,
+        NamedXContentRegistry xContentRegistry,
+        String index,
+        String embeddingField,
+        String[] sourceFields,
+        Integer docSize,
+        String modelId,
+        Integer k
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
         this.modelId = modelId;
@@ -58,19 +59,19 @@ public class VectorDBTool extends AbstractRetrieverTool {
     protected String getQueryBody(String queryText) {
         if (StringUtils.isBlank(embeddingField) || StringUtils.isBlank(modelId)) {
             throw new IllegalArgumentException(
-                    "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
+                "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
         return "{\"query\":{\"neural\":{\""
-                + embeddingField
-                + "\":{\"query_text\":\""
-                + queryText
-                + "\",\"model_id\":\""
-                + modelId
-                + "\",\"k\":"
-                + k
-                + "}}}"
-                + " }";
+            + embeddingField
+            + "\":{\"query_text\":\""
+            + queryText
+            + "\",\"model_id\":\""
+            + modelId
+            + "\",\"k\":"
+            + k
+            + "}}}"
+            + " }";
     }
 
     @Override
@@ -103,16 +104,16 @@ public class VectorDBTool extends AbstractRetrieverTool {
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
             return VectorDBTool
-                    .builder()
-                    .client(client)
-                    .xContentRegistry(xContentRegistry)
-                    .index(index)
-                    .embeddingField(embeddingField)
-                    .sourceFields(sourceFields)
-                    .modelId(modelId)
-                    .docSize(docSize)
-                    .k(k)
-                    .build();
+                .builder()
+                .client(client)
+                .xContentRegistry(xContentRegistry)
+                .index(index)
+                .embeddingField(embeddingField)
+                .sourceFields(sourceFields)
+                .modelId(modelId)
+                .docSize(docSize)
+                .k(k)
+                .build();
         }
     }
 }

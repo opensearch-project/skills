@@ -63,10 +63,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
 
     @Override
     public List<Tool.Factory<? extends Tool>> getToolFactories() {
-        return List.of(
-                PPLTool.Factory.getInstance(),
-                NeuralSparseSearchTool.Factory.getInstance(),
-                VectorDBTool.Factory.getInstance()
-        );
+        return List.of(PPLTool.Factory.getInstance(), NeuralSparseSearchTool.Factory.getInstance(), VectorDBTool.Factory.getInstance());
     }
 }
