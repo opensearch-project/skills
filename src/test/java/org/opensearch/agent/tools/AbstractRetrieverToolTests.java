@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.Before;
-import org.junit.Test;
 import org.mockito.Mockito;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
