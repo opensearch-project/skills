@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -81,7 +82,7 @@ public class SearchAnomalyDetectorsToolTests {
             null,
             null
         );
-        String expectedResponseStr = String.format("AnomalyDetectors=[]TotalAnomalyDetectors=%d", hits.length);
+        String expectedResponseStr = String.format(Locale.getDefault(), "AnomalyDetectors=[]TotalAnomalyDetectors=%d", hits.length);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);

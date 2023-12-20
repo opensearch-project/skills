@@ -41,8 +41,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
     @Getter
     @Setter
     private String description = DEFAULT_DESCRIPTION;
-    @Getter
-    private String type;
+
     @Getter
     private String version;
 
@@ -83,7 +82,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
             : null;
         final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") ? Long.parseLong(parameters.get("lastUpdateTime")) : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
-        final SortOrder sortOrder = sortOrderStr == "asc" ? SortOrder.ASC : SortOrder.DESC;
+        final SortOrder sortOrder = sortOrderStr.equalsIgnoreCase("asc") ? SortOrder.ASC : SortOrder.DESC;
         final String sortString = parameters.getOrDefault("sortString", "name.keyword");
         final int size = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
         final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
