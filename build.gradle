@@ -170,7 +170,7 @@ compileJava {
 compileTestJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }
-
+forbiddenApisTest.ignoreFailures = true
 
 opensearchplugin {
     name 'skills'

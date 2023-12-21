@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -74,7 +75,7 @@ public class VisualizationsTool implements Tool {
                         String id = trimIdPrefix(h.getId());
                         Map<String, String> visMap = (Map<String, String>) h.getSourceAsMap().get(SAVED_OBJECT_TYPE);
                         String title = visMap.get("title");
-                        visBuilder.append(String.format("%s,%s\n", title, id));
+                        visBuilder.append(String.format(Locale.ROOT, "%s,%s\n", title, id));
                     });
 
                     listener.onResponse((T) visBuilder.toString());
@@ -98,7 +99,7 @@ public class VisualizationsTool implements Tool {
     String trimIdPrefix(String id) {
         id = Optional.ofNullable(id).orElse("");
         if (id.startsWith(SAVED_OBJECT_TYPE)) {
-            String prefix = String.format("%s:", SAVED_OBJECT_TYPE);
+            String prefix = String.format(Locale.ROOT, "%s:", SAVED_OBJECT_TYPE);
             return id.substring(prefix.length());
         }
         return id;
