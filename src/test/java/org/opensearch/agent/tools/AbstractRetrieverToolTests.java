@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,6 +16,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -166,5 +168,16 @@ public class AbstractRetrieverToolTests {
 
         Exception exception4 = assertThrows(Exception.class, future4::join);
         assertTrue(exception4.getCause() instanceof NullPointerException);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testValidate() {
+        assertTrue(mockedImpl.validate(Map.of(AbstractRetrieverTool.INPUT_FIELD, "hi")));
+        assertFalse(mockedImpl.validate(Map.of(AbstractRetrieverTool.INPUT_FIELD, "")));
+        assertFalse(mockedImpl.validate(Map.of(AbstractRetrieverTool.INPUT_FIELD, " ")));
+        assertFalse(mockedImpl.validate(Map.of("test", " ")));
+        assertFalse(mockedImpl.validate(new HashMap<>()));
+        assertFalse(mockedImpl.validate(null));
     }
 }

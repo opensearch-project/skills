@@ -15,6 +15,8 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.gson.JsonSyntaxException;
+
 import lombok.SneakyThrows;
 
 public class NeuralSparseSearchToolTests {
@@ -80,5 +82,35 @@ public class NeuralSparseSearchToolTests {
             () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception2.getMessage());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testCreateToolsParseParams() {
+        assertThrows(
+            ClassCastException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.INDEX_FIELD, 123))
+        );
+
+        assertThrows(
+            ClassCastException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.EMBEDDING_FIELD, 123))
+        );
+
+        assertThrows(
+            ClassCastException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.MODEL_ID_FIELD, 123))
+        );
+
+        assertThrows(
+            JsonSyntaxException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.SOURCE_FIELD, "123"))
+        );
+
+        // although it will be parsed as integer, but the parameters value should always be String
+        assertThrows(
+            ClassCastException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.DOC_SIZE_FIELD, 123))
+        );
     }
 }

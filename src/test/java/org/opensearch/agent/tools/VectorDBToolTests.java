@@ -15,6 +15,8 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.gson.JsonSyntaxException;
+
 import lombok.SneakyThrows;
 
 public class VectorDBToolTests {
@@ -80,5 +82,22 @@ public class VectorDBToolTests {
             () -> tool2.getQueryBody(AbstractRetrieverToolTests.TEST_QUERY)
         );
         assertEquals("Parameter [embedding_field] and [model_id] can not be null or empty.", exception2.getMessage());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testCreateToolsParseParams() {
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.INDEX_FIELD, 123)));
+
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.EMBEDDING_FIELD, 123)));
+
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.MODEL_ID_FIELD, 123)));
+
+        assertThrows(JsonSyntaxException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.SOURCE_FIELD, "123")));
+
+        // although it will be parsed as integer, but the parameters value should always be String
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.DOC_SIZE_FIELD, 123)));
+
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.K_FIELD, 123)));
     }
 }
