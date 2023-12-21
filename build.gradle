@@ -138,6 +138,8 @@ thirdPartyAudit.enabled = false
 
 test {
     useJUnitPlatform()
+    include '**/*Tests.class'
+    systemProperty 'tests.security.manager', 'false'
     testLogging {
         exceptionFormat "full"
         events "skipped", "passed", "failed" // "started"

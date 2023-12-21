@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.PPLTool;
+import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
@@ -54,11 +55,12 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         this.xContentRegistry = xContentRegistry;
 
         PPLTool.Factory.getInstance().init(client);
+        VisualizationsTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
     @Override
     public List<Tool.Factory<? extends Tool>> getToolFactories() {
-        return List.of(PPLTool.Factory.getInstance());
+        return List.of(PPLTool.Factory.getInstance(), VisualizationsTool.Factory.getInstance());
     }
 }
