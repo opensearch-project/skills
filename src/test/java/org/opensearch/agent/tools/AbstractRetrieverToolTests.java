@@ -129,7 +129,7 @@ public class AbstractRetrieverToolTests {
         mockedImpl.run(Map.of(AbstractRetrieverTool.INPUT_FIELD, "hello world"), listener);
 
         future.join();
-        assertEquals("", future.get());
+        assertEquals("Can not get any match from search result.", future.get());
     }
 
     @Test
