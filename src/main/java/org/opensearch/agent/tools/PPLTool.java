@@ -17,6 +17,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
@@ -116,7 +118,7 @@ public class PPLTool implements Tool {
                     ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
-                    String ppl = dataAsMap.get("response");
+                    String ppl = parseOutput(dataAsMap.get("response"), indexName);
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
                     PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
@@ -299,23 +301,55 @@ public class PPLTool implements Tool {
     }
 
     private <T extends ActionResponse> ActionListener<T> getPPLTransportActionListener(ActionListener<TransportPPLQueryResponse> listener) {
-        return ActionListener.wrap(r -> { listener.onResponse(fromActionResponse(r)); }, listener::onFailure);
+        return ActionListener.wrap(r -> { listener.onResponse(TransportPPLQueryResponse.fromActionResponse(r)); }, listener::onFailure);
     }
 
-    private static TransportPPLQueryResponse fromActionResponse(ActionResponse actionResponse) {
-        if (actionResponse instanceof TransportPPLQueryResponse) {
-            return (TransportPPLQueryResponse) actionResponse;
-        }
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); OutputStreamStreamOutput osso = new OutputStreamStreamOutput(baos)) {
-            actionResponse.writeTo(osso);
-            try (StreamInput input = new InputStreamStreamInput(new ByteArrayInputStream(baos.toByteArray()))) {
-                return new TransportPPLQueryResponse(input);
+    private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
+        if (parameters.containsKey("input")) {
+            try {
+                Map<String, String> chatParameters = gson.fromJson(parameters.get("input"), Map.class);
+                parameters.putAll(chatParameters);
+            } finally {
+                return parameters;
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException("failed to parse ActionResponse into TransportPPLQueryResponse", e);
         }
+        return parameters;
+    }
 
+    private String parseOutput(String llmOutput, String indexName){
+        String ppl;
+        Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>");
+        Matcher matcher = pattern.matcher(llmOutput);
+
+        if (matcher.find()) {
+            ppl = matcher.group(1)
+                    .replaceAll("[\\r\\n]", " ")
+                    .replaceAll("ISNOTNULL", "isnotnull")
+                    .trim();
+        }
+        else{ // logic for only ppl returned
+            int sourceIndex = llmOutput.indexOf("source=");
+            if (sourceIndex != -1) {
+                llmOutput = llmOutput.substring(sourceIndex);
+
+                // Splitting the string at "|"
+                String[] lists = llmOutput.split("\\|");
+
+                // Modifying the first element
+                if (lists.length > 0) {
+                    lists[0] = "source=" + indexName;
+                }
+
+                // Joining the string back together
+                ppl = String.join("|", lists);
+            }
+            else {
+            ppl = llmOutput;
+            }
+        }
+        ppl = ppl.replace("`", "");
+        ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
+        return ppl;
     }
 
     private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
