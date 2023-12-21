@@ -104,9 +104,9 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.22.0"
     compileOnly group: 'org.json', name: 'json', version: '20231013'
     compileOnly "org.opensearch:common-utils:${version}"
+    compileOnly("com.google.guava:guava:32.1.2-jre")
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.10'
 
-    implementation("com.google.guava:guava:32.1.3-jre")
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${versions.commonslang}"
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
