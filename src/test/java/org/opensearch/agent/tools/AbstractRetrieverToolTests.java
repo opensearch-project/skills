@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.Before;
+import org.junit.Test;
 import org.mockito.Mockito;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
@@ -71,6 +72,7 @@ public class AbstractRetrieverToolTests {
         when(mockedImpl.getQueryBody(any(String.class))).thenReturn(TEST_QUERY);
     }
 
+    @Test
     @SneakyThrows
     public void testRunAsyncWithSearchResults() {
         Client client = mock(Client.class);
@@ -101,6 +103,7 @@ public class AbstractRetrieverToolTests {
         );
     }
 
+    @Test
     @SneakyThrows
     public void testRunAsyncWithEmptySearchResponse() {
         Client client = mock(Client.class);
@@ -127,6 +130,7 @@ public class AbstractRetrieverToolTests {
         assertEquals("", future.get());
     }
 
+    @Test
     @SneakyThrows
     public void testRunAsyncWithIllegalQueryThenListenerOnFailure() {
         Client client = mock(Client.class);

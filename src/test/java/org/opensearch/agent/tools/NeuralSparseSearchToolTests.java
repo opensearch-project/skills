@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Before;
+import org.junit.Test;
 
 import lombok.SneakyThrows;
 
@@ -31,6 +32,7 @@ public class NeuralSparseSearchToolTests {
         params.put(NeuralSparseSearchTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
     }
 
+    @Test
     @SneakyThrows
     public void testCreateTool() {
         NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
@@ -47,6 +49,7 @@ public class NeuralSparseSearchToolTests {
         );
     }
 
+    @Test
     @SneakyThrows
     public void testGetQueryBody() {
         NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
@@ -57,6 +60,7 @@ public class NeuralSparseSearchToolTests {
         );
     }
 
+    @Test
     @SneakyThrows
     public void testGetQueryBodyWithIllegalParams() {
         Map<String, Object> illegalParams1 = new HashMap<>(params);
