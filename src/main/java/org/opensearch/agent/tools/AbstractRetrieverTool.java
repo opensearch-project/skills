@@ -88,6 +88,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         try {
             searchRequest = buildSearchRequest(parameters);
         } catch (Exception e) {
+            log.error("Failed to build search request.", e);
             listener.onFailure(e);
             return;
         }
@@ -108,7 +109,7 @@ public abstract class AbstractRetrieverTool implements Tool {
                 }
                 listener.onResponse((T) contextBuilder.toString());
             } else {
-                listener.onResponse((T) "");
+                listener.onResponse((T) "Can not get any match from search result.");
             }
         }, e -> {
             log.error("Failed to search index.", e);
