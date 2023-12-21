@@ -119,11 +119,7 @@ public abstract class AbstractRetrieverTool implements Tool {
 
     @Override
     public boolean validate(Map<String, String> parameters) {
-        if (parameters == null || parameters.size() == 0) {
-            return false;
-        }
-        String question = parameters.get("input");
-        return !StringUtils.isBlank(question);
+        return parameters != null && parameters.size() > 0 && !StringUtils.isBlank(parameters.get("input"));
     }
 
     protected static abstract class Factory<T extends Tool> implements Tool.Factory<T> {
