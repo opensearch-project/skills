@@ -70,7 +70,7 @@ apply plugin: 'opensearch.pluginzip'
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
-def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
+def adJarDirectory = "$buildDir/dependencies/opensearch-anomaly-detection"
 
 configurations {
     zipArchive
@@ -97,7 +97,7 @@ task addJarsToClasspath(type: Copy) {
     into("$buildDir/classes")
 
     from(fileTree(dir: adJarDirectory)) {
-        include "opensearch-time-series-analytics-${version}.jar"
+        include "opensearch-anomaly-detection-${version}.jar"
     }
     into("$buildDir/classes")
 }
@@ -113,7 +113,7 @@ dependencies {
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
-    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
 
