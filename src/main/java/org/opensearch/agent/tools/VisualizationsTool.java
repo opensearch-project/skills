@@ -29,6 +29,7 @@ import com.google.common.base.Strings;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
@@ -41,9 +42,18 @@ public class VisualizationsTool implements Tool {
     public static final String SAVED_OBJECT_TYPE = "visualization";
     private static final String DEFAULT_DESCRIPTION =
         "Use this tool to find user created visualizations. This tool takes the visualization name as input and returns the first 3 matching visualizations";
+    @Getter
+    @Setter
     private String description = DEFAULT_DESCRIPTION;
 
+    @Getter
+    @Setter
     private String name = NAME;
+    @Getter
+    @Setter
+    private String type = TYPE;
+    @Getter
+    private final String version = VERSION;
     private final Client client;
     @Getter
     private final String index;
@@ -103,36 +113,6 @@ public class VisualizationsTool implements Tool {
             return id.substring(prefix.length());
         }
         return id;
-    }
-
-    @Override
-    public String getType() {
-        return TYPE;
-    }
-
-    @Override
-    public String getVersion() {
-        return VERSION;
-    }
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    @Override
-    public String getDescription() {
-        return description;
-    }
-
-    @Override
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     @Override

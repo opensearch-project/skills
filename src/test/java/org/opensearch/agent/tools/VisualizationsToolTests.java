@@ -9,6 +9,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -44,12 +45,12 @@ public class VisualizationsToolTests {
         VisualizationsTool.Factory.getInstance().init(client);
         try (InputStream searchResponseIns = VisualizationsToolTests.class.getResourceAsStream("visualization.json")) {
             if (searchResponseIns != null) {
-                searchResponse = new String(searchResponseIns.readAllBytes());
+                searchResponse = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
         try (InputStream searchResponseIns = VisualizationsToolTests.class.getResourceAsStream("visualization_not_found.json")) {
             if (searchResponseIns != null) {
-                searchResponseNotFound = new String(searchResponseIns.readAllBytes());
+                searchResponseNotFound = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
     }
