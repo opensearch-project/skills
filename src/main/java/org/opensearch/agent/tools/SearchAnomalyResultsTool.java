@@ -16,10 +16,10 @@ import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.ExistsQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
-import org.opensearch.index.query.WildcardQueryBuilder;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
@@ -71,17 +71,15 @@ public class SearchAnomalyResultsTool implements Tool {
     }
 
     // TODO: update description
-    // Response is currently in a simple string format including the list of anomaly results (only name and ID attached), and
-    // number of total results. The output will likely need to be updated, standardized, and include more fields in the
+    // Response is currently in a simple string format including the list of anomaly results (only detector ID, grade, confidence),
+    // and toal # of results. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         final String detectorId = parameters.getOrDefault("detectorId", null);
-        final Boolean realTime = parameters.containsKey("realTime")
-            ? Boolean.parseBoolean(parameters.get("realTime"))
-            : null;
-        final Boolean anomalyGradeThreshold = parameters.containsKey("anomalyGradeThreshold")
-            ? Boolean.parseBoolean(parameters.get("anomalyGradeThreshold"))
+        final Boolean realTime = parameters.containsKey("realTime") ? Boolean.parseBoolean(parameters.get("realTime")) : null;
+        final Double anomalyGradeThreshold = parameters.containsKey("anomalyGradeThreshold")
+            ? Double.parseDouble(parameters.get("anomalyGradeThreshold"))
             : null;
         final Long dataStartTime = parameters.containsKey("dataStartTime") && StringUtils.isNumeric(parameters.get("dataStartTime"))
             ? Long.parseLong(parameters.get("dataStartTime"))
@@ -95,23 +93,34 @@ public class SearchAnomalyResultsTool implements Tool {
         final int size = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
         final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
 
-        // TODO: update list below
         List<QueryBuilder> mustList = new ArrayList<QueryBuilder>();
-        if (detectorName != null) {
-            mustList.add(new TermQueryBuilder("name.keyword", detectorName));
+        if (detectorId != null) {
+            mustList.add(new TermQueryBuilder("detector_id", detectorId));
         }
-        if (detectorNamePattern != null) {
-            mustList.add(new WildcardQueryBuilder("name.keyword", detectorNamePattern));
+        // We include or exclude the task ID if fetching historical or real-time results, respectively.
+        // For more details, see https://opensearch.org/docs/latest/observing-your-data/ad/api/#search-detector-result
+        if (realTime != null) {
+            BoolQueryBuilder boolQuery = new BoolQueryBuilder();
+            ExistsQueryBuilder existsQuery = new ExistsQueryBuilder("task_id");
+            if (realTime) {
+                boolQuery.mustNot(existsQuery);
+            } else {
+                boolQuery.must(existsQuery);
+            }
+            mustList.add(boolQuery);
         }
-        if (indices != null) {
-            mustList.add(new TermQueryBuilder("indices", indices));
+        if (anomalyGradeThreshold != null) {
+            mustList.add(new RangeQueryBuilder("anomaly_grade").gte(anomalyGradeThreshold));
         }
-        if (highCardinality != null) {
-            mustList.add(new TermQueryBuilder("detector_type", highCardinality ? "MULTI_ENTITY" : "SINGLE_ENTITY"));
-        }
-        if (lastUpdateTime != null) {
-            mustList.add(new BoolQueryBuilder().filter(new RangeQueryBuilder("last_update_time").gte(lastUpdateTime)));
-
+        if (dataStartTime != null || dataEndTime != null) {
+            RangeQueryBuilder rangeQuery = new RangeQueryBuilder("anomaly_grade");
+            if (dataStartTime != null) {
+                rangeQuery.gte(dataStartTime);
+            }
+            if (dataEndTime != null) {
+                rangeQuery.lte(dataEndTime);
+            }
+            mustList.add(rangeQuery);
         }
 
         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
@@ -122,16 +131,17 @@ public class SearchAnomalyResultsTool implements Tool {
             .from(startIndex)
             .sort(sortString, sortOrder);
 
-        SearchRequest searchDetectorRequest = new SearchRequest().source(searchSourceBuilder);
+        SearchRequest searchAnomalyResultsRequest = new SearchRequest().source(searchSourceBuilder);
 
-        ActionListener<SearchResponse> searchAnomalyResultListener = ActionListener.<SearchResponse>wrap(response -> {
+        ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
             StringBuilder sb = new StringBuilder();
             SearchHit[] hits = response.getHits().getHits();
             sb.append("AnomalyResults=[");
             for (SearchHit hit : hits) {
                 sb.append("{");
                 sb.append("id=").append(hit.getId()).append(",");
-                sb.append("name=").append(hit.getSourceAsMap().get("name"));
+                sb.append("grade=").append(hit.getSourceAsMap().get("anomaly_grade"));
+                sb.append("confidence=").append(hit.getSourceAsMap().get("confidence"));
                 sb.append("}");
             }
             sb.append("]");
@@ -139,7 +149,7 @@ public class SearchAnomalyResultsTool implements Tool {
             listener.onResponse((T) sb.toString());
         }, e -> { listener.onFailure(e); });
 
-        adClient.searchAnomalyResults(searchDetectorRequest, searchDetectorListener);
+        adClient.searchAnomalyResults(searchAnomalyResultsRequest, searchAnomalyResultsListener);
     }
 
     @Override
