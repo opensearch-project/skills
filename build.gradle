@@ -121,7 +121,7 @@ dependencies {
 
     // ZipArchive dependencies used for integration tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${opensearch_build}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 }
 
 task extractSqlJar(type: Copy) {
@@ -147,7 +147,6 @@ test {
         showStandardStreams true
     }
     include '**/*Tests.class'
-    systemProperty 'tests.security.manager', 'false'
 }
 
 spotless {
