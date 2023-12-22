@@ -82,7 +82,8 @@ public class SearchAnomalyDetectorsTool implements Tool {
             ? Boolean.parseBoolean(parameters.get("highCardinality"))
             : null;
         final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
-        ? Long.parseLong(parameters.get("lastUpdateTime")) : null;
+            ? Long.parseLong(parameters.get("lastUpdateTime"))
+            : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
         final SortOrder sortOrder = sortOrderStr.equalsIgnoreCase("asc") ? SortOrder.ASC : SortOrder.DESC;
         final String sortString = parameters.getOrDefault("sortString", "name.keyword");
