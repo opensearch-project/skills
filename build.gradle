@@ -82,7 +82,7 @@ configurations {
     zipArchive
     all {
         resolutionStrategy {
-            force "org.mockito:mockito-core:${versions.mockito}"
+            force "org.mockito:mockito-core:5.8.0"
             force "com.google.guava:guava:33.0.0-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
         }
