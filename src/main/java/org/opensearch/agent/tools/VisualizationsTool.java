@@ -35,7 +35,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 @ToolAnnotation(VisualizationsTool.TYPE)
 public class VisualizationsTool implements Tool {
-    public static final String NAME = "Find Visualizations";
+    public static final String NAME = "FindVisualizations";
     public static final String TYPE = "VisualizationTool";
     public static final String VERSION = "v1.0";
 
