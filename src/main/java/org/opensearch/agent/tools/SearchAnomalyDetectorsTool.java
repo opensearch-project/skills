@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
@@ -80,7 +81,8 @@ public class SearchAnomalyDetectorsTool implements Tool {
         final Boolean highCardinality = parameters.containsKey("highCardinality")
             ? Boolean.parseBoolean(parameters.get("highCardinality"))
             : null;
-        final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") ? Long.parseLong(parameters.get("lastUpdateTime")) : null;
+        final Long lastUpdateTime = parameters.containsKey("lastUpdateTime") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
+        ? Long.parseLong(parameters.get("lastUpdateTime")) : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
         final SortOrder sortOrder = sortOrderStr.equalsIgnoreCase("asc") ? SortOrder.ASC : SortOrder.DESC;
         final String sortString = parameters.getOrDefault("sortString", "name.keyword");
