@@ -70,7 +70,6 @@ public class SearchAnomalyResultsTool implements Tool {
         };
     }
 
-    // TODO: update description
     // Response is currently in a simple string format including the list of anomaly results (only detector ID, grade, confidence),
     // and toal # of results. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
