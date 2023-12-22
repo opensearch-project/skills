@@ -139,8 +139,8 @@ public class SearchAnomalyResultsTool implements Tool {
             sb.append("AnomalyResults=[");
             for (SearchHit hit : hits) {
                 sb.append("{");
-                sb.append("id=").append(hit.getId()).append(",");
-                sb.append("grade=").append(hit.getSourceAsMap().get("anomaly_grade"));
+                sb.append("detectorId=").append(hit.getSourceAsMap().get("detector_id")).append(",");
+                sb.append("grade=").append(hit.getSourceAsMap().get("anomaly_grade")).append(",");
                 sb.append("confidence=").append(hit.getSourceAsMap().get("confidence"));
                 sb.append("}");
             }
