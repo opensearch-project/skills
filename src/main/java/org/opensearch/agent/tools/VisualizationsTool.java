@@ -40,10 +40,15 @@ public class VisualizationsTool implements Tool {
     public static final String VERSION = "v1.0";
 
     public static final String SAVED_OBJECT_TYPE = "visualization";
+
+    /**
+     * default number of visualizations returned
+     */
+    private static final int DEFAULT_SIZE = 3;
     private static final String DEFAULT_DESCRIPTION =
-        "Use this tool to find user created visualizations. This tool takes the visualization name as input and returns the first 3 matching visualizations";
-    @Getter
+        "Use this tool to find user created visualizations. This tool takes the visualization name as input and returns matching visualizations";
     @Setter
+    @Getter
     private String description = DEFAULT_DESCRIPTION;
 
     @Getter
@@ -57,11 +62,14 @@ public class VisualizationsTool implements Tool {
     private final Client client;
     @Getter
     private final String index;
+    @Getter
+    private final int size;
 
     @Builder
-    public VisualizationsTool(Client client, String index) {
+    public VisualizationsTool(Client client, String index, int size) {
         this.client = client;
         this.index = index;
+        this.size = size;
     }
 
     @Override
@@ -145,7 +153,14 @@ public class VisualizationsTool implements Tool {
         @Override
         public VisualizationsTool create(Map<String, Object> params) {
             String index = params.get("index") == null ? ".kibana" : (String) params.get("index");
-            return VisualizationsTool.builder().client(client).index(index).build();
+            String sizeStr = params.get("size") == null ? "3" : (String) params.get("size");
+            int size;
+            try {
+                size = Integer.parseInt(sizeStr);
+            } catch (NumberFormatException ignored) {
+                size = DEFAULT_SIZE;
+            }
+            return VisualizationsTool.builder().client(client).index(index).size(size).build();
         }
 
         @Override

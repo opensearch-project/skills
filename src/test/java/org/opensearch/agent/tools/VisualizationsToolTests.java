@@ -65,6 +65,18 @@ public class VisualizationsToolTests {
     }
 
     @Test
+    public void testNumberOfVisualizationReturned() {
+        VisualizationsTool tool1 = VisualizationsTool.Factory.getInstance().create(Collections.emptyMap());
+        assertEquals(tool1.getSize(), 3);
+
+        VisualizationsTool tool2 = VisualizationsTool.Factory.getInstance().create(Map.of("size", "1"));
+        assertEquals(tool2.getSize(), 1);
+
+        VisualizationsTool tool3 = VisualizationsTool.Factory.getInstance().create(Map.of("size", "badString"));
+        assertEquals(tool3.getSize(), 3);
+    }
+
+    @Test
     public void testTrimPrefix() {
         VisualizationsTool tool = VisualizationsTool.Factory.getInstance().create(Collections.emptyMap());
         assertEquals(tool.trimIdPrefix(null), "");
