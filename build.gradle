@@ -114,7 +114,8 @@ dependencies {
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
-    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
+    compileOnly "org.opensearch:opensearch-job-scheduler-spi:${version}"
+//    compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
@@ -152,11 +153,11 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
-task extractJsJar(type: Copy) {
-    mustRunAfter()
-    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-job-scheduler")}))
-    into jsJarDirectory
-}
+//task extractJsJar(type: Copy) {
+//    mustRunAfter()
+//    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-job-scheduler")}))
+//    into jsJarDirectory
+//}
 
 task extractAdJar(type: Copy) {
     mustRunAfter()
@@ -165,7 +166,7 @@ task extractAdJar(type: Copy) {
 }
 
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
-tasks.addJarsToClasspath.dependsOn(extractJsJar)
+//tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
@@ -210,7 +211,7 @@ spotless {
 
 compileJava {
     dependsOn extractSqlJar
-    dependsOn extractJsJar
+//    dependsOn extractJsJar
     dependsOn extractAdJar
     dependsOn delombok
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])

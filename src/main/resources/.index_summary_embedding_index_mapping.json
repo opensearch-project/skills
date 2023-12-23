@@ -1,0 +1,19 @@
+{
+  "properties": {
+    "index_name": {
+      "type": "keyword"
+    },
+    "index_summary": {
+      "type": "text"
+    },
+    "index_template": {
+      "type": "keyword"
+    },
+    "alias": {
+      "type": "keyword"
+    },
+    "data_stream": {
+      "type": "keyword"
+    }
+  }
+}
