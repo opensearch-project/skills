@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
