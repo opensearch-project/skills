@@ -164,7 +164,6 @@ tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
-tasks.publishNebulaPublicationToStagingRepository.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
 
 dependencyLicenses.enabled = false
