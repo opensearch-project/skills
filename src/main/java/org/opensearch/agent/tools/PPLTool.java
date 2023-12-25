@@ -5,10 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -30,9 +26,6 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
-import org.opensearch.core.common.io.stream.InputStreamStreamInput;
-import org.opensearch.core.common.io.stream.OutputStreamStreamOutput;
-import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -318,18 +311,14 @@ public class PPLTool implements Tool {
         return parameters;
     }
 
-    private String parseOutput(String llmOutput, String indexName){
+    private String parseOutput(String llmOutput, String indexName) {
         String ppl;
         Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>");
         Matcher matcher = pattern.matcher(llmOutput);
 
         if (matcher.find()) {
-            ppl = matcher.group(1)
-                    .replaceAll("[\\r\\n]", " ")
-                    .replaceAll("ISNOTNULL", "isnotnull")
-                    .trim();
-        }
-        else{ // logic for only ppl returned
+            ppl = matcher.group(1).replaceAll("[\\r\\n]", " ").replaceAll("ISNOTNULL", "isnotnull").trim();
+        } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
             if (sourceIndex != -1) {
                 llmOutput = llmOutput.substring(sourceIndex);
@@ -344,9 +333,8 @@ public class PPLTool implements Tool {
 
                 // Joining the string back together
                 ppl = String.join("|", lists);
-            }
-            else {
-            ppl = llmOutput;
+            } else {
+                ppl = llmOutput;
             }
         }
         ppl = ppl.replace("`", "");
