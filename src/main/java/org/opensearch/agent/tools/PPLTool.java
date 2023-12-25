@@ -313,7 +313,7 @@ public class PPLTool implements Tool {
 
     private String parseOutput(String llmOutput, String indexName) {
         String ppl;
-        Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>");
+        Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>"); // For ppl like <ppl> source=a \n | fields b </ppl>
         Matcher matcher = pattern.matcher(llmOutput);
 
         if (matcher.find()) {
