@@ -112,16 +112,8 @@ public class PPLToolTests {
             return null;
         }).when(client).search(any(), any());
 
-        when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
-        when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
-        when(mlTaskResponse.getOutput()).thenReturn(modelTensorOutput);
+        initMLTensors();
 
-        // call model
-        doAnswer(invocation -> {
-            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
-            listener.onResponse(mlTaskResponse);
-            return null;
-        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
 
         when(transportPPLQueryResponse.getResult()).thenReturn(pplResult);
 
@@ -143,6 +135,23 @@ public class PPLToolTests {
             Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
             assertEquals("ppl result", returnResults.get("executionResult"));
             assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testTool_withPPLTag() {
+        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        pplReturns = Collections.singletonMap("response", "<ppl>source=demo\n|\n\rhead 1</ppl>");
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
+        initMLTensors();
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo|head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
 
     }
@@ -254,5 +263,18 @@ public class PPLToolTests {
         pplReturns = Collections.singletonMap("response", "source=demo| head 1");
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
 
+    }
+
+    private void initMLTensors(){
+        when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
+        when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
+        when(mlTaskResponse.getOutput()).thenReturn(modelTensorOutput);
+
+        // call model
+        doAnswer(invocation -> {
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            listener.onResponse(mlTaskResponse);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 }

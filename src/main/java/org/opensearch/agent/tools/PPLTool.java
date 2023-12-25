@@ -8,14 +8,17 @@ package org.opensearch.agent.tools;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
@@ -225,6 +228,8 @@ public class PPLTool implements Tool {
         Map<String, String> fieldsToType = new HashMap<>();
         extractNamesTypes(mappingSource, fieldsToType, "");
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
+        List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
+        Collections.sort(sortedKeys);
 
         if (searchHits.length > 0) {
             SearchHit hit = searchHits[0];
@@ -235,12 +240,12 @@ public class PPLTool implements Tool {
             }
             extractSamples(sampleSource, fieldsToSample, "");
 
-            for (String key : fieldsToType.keySet()) {
+            for (String key : sortedKeys) {
                 String line = "- " + key + ": " + fieldsToType.get(key) + " (" + fieldsToSample.get(key) + ")";
                 tableInfoJoiner.add(line);
             }
         } else {
-            for (String key : fieldsToType.keySet()) {
+            for (String key : sortedKeys) {
                 String line = "- " + key + ": " + fieldsToType.get(key);
                 tableInfoJoiner.add(line);
             }
@@ -251,7 +256,10 @@ public class PPLTool implements Tool {
     }
 
     private String constructPrompt(String tableInfo, String question, String indexName) {
-        return String.format(Locale.getDefault(), contextPrompt, question.strip(), indexName, tableInfo.strip());
+        Map<String, String> indexInfo = org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap.of("mappingInfo", tableInfo, "question",  question, "indexName", indexName);
+        StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
+        String finalPrompt = substitutor.replace(contextPrompt);
+        return finalPrompt;
     }
 
     private void extractNamesTypes(Map<String, Object> mappingSource, Map<String, String> fieldsToType, String prefix) {
@@ -317,7 +325,7 @@ public class PPLTool implements Tool {
         Matcher matcher = pattern.matcher(llmOutput);
 
         if (matcher.find()) {
-            ppl = matcher.group(1).replaceAll("[\\r\\n]", " ").replaceAll("ISNOTNULL", "isnotnull").trim();
+            ppl = matcher.group(1).replaceAll("[\\r\\n]", "").replaceAll("ISNOTNULL", "isnotnull").trim();
         } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
             if (sourceIndex != -1) {
