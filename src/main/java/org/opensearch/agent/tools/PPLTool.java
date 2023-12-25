@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
@@ -256,7 +255,8 @@ public class PPLTool implements Tool {
     }
 
     private String constructPrompt(String tableInfo, String question, String indexName) {
-        Map<String, String> indexInfo = org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap.of("mappingInfo", tableInfo, "question",  question, "indexName", indexName);
+        Map<String, String> indexInfo = org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap
+            .of("mappingInfo", tableInfo, "question", question, "indexName", indexName);
         StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
         String finalPrompt = substitutor.replace(contextPrompt);
         return finalPrompt;

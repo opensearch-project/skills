@@ -114,7 +114,6 @@ public class PPLToolTests {
 
         initMLTensors();
 
-
         when(transportPPLQueryResponse.getResult()).thenReturn(pplResult);
 
         doAnswer(invocation -> {
