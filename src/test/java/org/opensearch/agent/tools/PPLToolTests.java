@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import com.google.common.collect.ImmutableMap;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.search.TotalHits;
 import org.junit.Before;
@@ -28,14 +29,12 @@ import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Tool;
-import org.json.JSONObject;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
-import software.amazon.awssdk.utils.ImmutableMap;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -148,7 +147,7 @@ public class PPLToolTests {
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult ->{
             Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
             assertEquals("ppl result", returnResults.get("executionResult"));
-            assertEquals("source=demo | head 1", returnResults.get("ppl"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
         }, e -> {
             log.info(e);
         }));
@@ -223,7 +222,7 @@ public class PPLToolTests {
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl ->{
             assertEquals(pplResult, "ppl result");
         }, e -> {
-            assertEquals("execute ppl:source=demo | head 1, get error: execute ppl error", e.getMessage());
+            assertEquals("execute ppl:source=demo| head 1, get error: execute ppl error", e.getMessage());
         }));
     }
 
@@ -241,7 +240,7 @@ public class PPLToolTests {
         hit = new SearchHit(1);
         hit.sourceRef(bytesArray);
         searchHits = new SearchHits(new SearchHit[] {hit}, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
-        pplReturns = Collections.singletonMap("response", "source=demo | head 1");
+        pplReturns = Collections.singletonMap("response", "source=demo| head 1");
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
 
     }

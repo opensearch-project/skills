@@ -60,6 +60,8 @@ import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
+@Setter
+@Getter
 @ToolAnnotation(PPLTool.TYPE)
 public class PPLTool implements Tool {
 
@@ -352,15 +354,4 @@ public class PPLTool implements Tool {
         return ppl;
     }
 
-    private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
-        if (parameters.containsKey("input")) {
-            try {
-                Map<String, String> chatParameters = gson.fromJson(parameters.get("input"), Map.class);
-                parameters.putAll(chatParameters);
-            } finally {
-                return parameters;
-            }
-        }
-        return parameters;
-    }
 }
