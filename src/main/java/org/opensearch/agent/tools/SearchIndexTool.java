@@ -105,7 +105,7 @@ public class SearchIndexTool implements Tool {
                         });
                         contextBuilder.append(doc).append("\n");
                     }
-                    listener.onResponse((T) StringUtils.gson.toJson(contextBuilder.toString()));
+                    listener.onResponse((T) contextBuilder.toString());
                 } else {
                     listener.onResponse((T) "");
                 }
