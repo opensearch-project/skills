@@ -8,6 +8,7 @@ package org.opensearch.agent.tools;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
@@ -15,6 +16,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -63,6 +65,25 @@ public class SearchAnomalyResultsToolTests {
         nullParams = null;
         emptyParams = Collections.emptyMap();
         nonEmptyParams = Map.of("detectorId", "foo");
+    }
+
+    @Test
+    public void testParseParams() throws Exception {
+        Tool tool = SearchAnomalyResultsTool.Factory.getInstance().create(Collections.emptyMap());
+        Map<String, String> validParams = new HashMap<String, String>();
+        validParams.put("detectorId", "foo");
+        validParams.put("realTime", "true");
+        validParams.put("anomalyGradethreshold", "-1");
+        validParams.put("dataStartTime", "1234");
+        validParams.put("dataEndTime", "5678");
+        validParams.put("sortOrder", "AsC");
+        validParams.put("sortString", "foo.bar");
+        validParams.put("size", "10");
+        validParams.put("startIndex", "0");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        assertDoesNotThrow(() -> tool.run(validParams, listener));
     }
 
     @Test
