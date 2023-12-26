@@ -218,7 +218,7 @@ public class AbstractRetrieverToolTests {
         // Create a mock object of the abstract Factory class
         Client client = mock(Client.class);
         AbstractRetrieverTool.Factory<Tool> factoryMock = new AbstractRetrieverTool.Factory<>() {
-            public PPLTool create(Map<String, Object> params) {
+            public AbstractRetrieverTool create(Map<String, Object> params) {
                 return null;
             }
         };

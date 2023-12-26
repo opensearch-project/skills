@@ -5,13 +5,15 @@
 
 package org.opensearch.agent.tools;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.opensearch.agent.tools.AbstractRetrieverTool.DEFAULT_DESCRIPTION;
 
 import java.io.InputStream;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +31,7 @@ import org.opensearch.core.common.ParsingException;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.connector.MLConnectorSearchAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
 import org.opensearch.search.SearchModule;
@@ -160,5 +163,11 @@ public class SearchIndexToolTests {
         ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(ParsingException.class);
         // since error message for ParsingException is different, we only need to expect ParsingException to be thrown
         verify(listener).onFailure(argumentCaptor.capture());
+    }
+
+    @Test
+    public void testFactory() {
+        SearchIndexTool searchIndexTool = SearchIndexTool.Factory.getInstance().create(Collections.emptyMap());
+        assertEquals(SearchIndexTool.TYPE, searchIndexTool.getType());
     }
 }
