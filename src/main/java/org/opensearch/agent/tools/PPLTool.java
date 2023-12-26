@@ -17,6 +17,7 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
@@ -93,6 +94,9 @@ public class PPLTool implements Tool {
         parameters = extractFromChatParameters(parameters);
         String indexName = parameters.get("index");
         String question = parameters.get("question");
+        if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
+            throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
+        }
         SearchRequest searchRequest = buildSearchRequest(indexName);
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
@@ -341,7 +345,7 @@ public class PPLTool implements Tool {
                 // Joining the string back together
                 ppl = String.join("|", lists);
             } else {
-                ppl = llmOutput;
+                throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
             }
         }
         ppl = ppl.replace("`", "");
