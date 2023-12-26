@@ -5,19 +5,20 @@
 
 package org.opensearch.agent.tools;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
@@ -28,9 +29,6 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
-import org.opensearch.core.common.io.stream.InputStreamStreamInput;
-import org.opensearch.core.common.io.stream.OutputStreamStreamOutput;
-import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -58,6 +56,8 @@ import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
+@Setter
+@Getter
 @ToolAnnotation(PPLTool.TYPE)
 public class PPLTool implements Tool {
 
@@ -94,6 +94,9 @@ public class PPLTool implements Tool {
         parameters = extractFromChatParameters(parameters);
         String indexName = parameters.get("index");
         String question = parameters.get("question");
+        if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
+            throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
+        }
         SearchRequest searchRequest = buildSearchRequest(indexName);
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
@@ -116,7 +119,7 @@ public class PPLTool implements Tool {
                     ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
-                    String ppl = dataAsMap.get("response");
+                    String ppl = parseOutput(dataAsMap.get("response"), indexName);
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
                     PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
@@ -228,6 +231,8 @@ public class PPLTool implements Tool {
         Map<String, String> fieldsToType = new HashMap<>();
         extractNamesTypes(mappingSource, fieldsToType, "");
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
+        List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
+        Collections.sort(sortedKeys);
 
         if (searchHits.length > 0) {
             SearchHit hit = searchHits[0];
@@ -238,12 +243,12 @@ public class PPLTool implements Tool {
             }
             extractSamples(sampleSource, fieldsToSample, "");
 
-            for (String key : fieldsToType.keySet()) {
+            for (String key : sortedKeys) {
                 String line = "- " + key + ": " + fieldsToType.get(key) + " (" + fieldsToSample.get(key) + ")";
                 tableInfoJoiner.add(line);
             }
         } else {
-            for (String key : fieldsToType.keySet()) {
+            for (String key : sortedKeys) {
                 String line = "- " + key + ": " + fieldsToType.get(key);
                 tableInfoJoiner.add(line);
             }
@@ -254,7 +259,10 @@ public class PPLTool implements Tool {
     }
 
     private String constructPrompt(String tableInfo, String question, String indexName) {
-        return String.format(Locale.getDefault(), contextPrompt, question.strip(), indexName, tableInfo.strip());
+        Map<String, String> indexInfo = ImmutableMap.of("mappingInfo", tableInfo, "question", question, "indexName", indexName);
+        StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
+        String finalPrompt = substitutor.replace(contextPrompt);
+        return finalPrompt;
     }
 
     private void extractNamesTypes(Map<String, Object> mappingSource, Map<String, String> fieldsToType, String prefix) {
@@ -299,23 +307,7 @@ public class PPLTool implements Tool {
     }
 
     private <T extends ActionResponse> ActionListener<T> getPPLTransportActionListener(ActionListener<TransportPPLQueryResponse> listener) {
-        return ActionListener.wrap(r -> { listener.onResponse(fromActionResponse(r)); }, listener::onFailure);
-    }
-
-    private static TransportPPLQueryResponse fromActionResponse(ActionResponse actionResponse) {
-        if (actionResponse instanceof TransportPPLQueryResponse) {
-            return (TransportPPLQueryResponse) actionResponse;
-        }
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); OutputStreamStreamOutput osso = new OutputStreamStreamOutput(baos)) {
-            actionResponse.writeTo(osso);
-            try (StreamInput input = new InputStreamStreamInput(new ByteArrayInputStream(baos.toByteArray()))) {
-                return new TransportPPLQueryResponse(input);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("failed to parse ActionResponse into TransportPPLQueryResponse", e);
-        }
-
+        return ActionListener.wrap(r -> { listener.onResponse(TransportPPLQueryResponse.fromActionResponse(r)); }, listener::onFailure);
     }
 
     private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
@@ -329,4 +321,36 @@ public class PPLTool implements Tool {
         }
         return parameters;
     }
+
+    private String parseOutput(String llmOutput, String indexName) {
+        String ppl;
+        Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>"); // For ppl like <ppl> source=a \n | fields b </ppl>
+        Matcher matcher = pattern.matcher(llmOutput);
+
+        if (matcher.find()) {
+            ppl = matcher.group(1).replaceAll("[\\r\\n]", "").replaceAll("ISNOTNULL", "isnotnull").trim();
+        } else { // logic for only ppl returned
+            int sourceIndex = llmOutput.indexOf("source=");
+            if (sourceIndex != -1) {
+                llmOutput = llmOutput.substring(sourceIndex);
+
+                // Splitting the string at "|"
+                String[] lists = llmOutput.split("\\|");
+
+                // Modifying the first element
+                if (lists.length > 0) {
+                    lists[0] = "source=" + indexName;
+                }
+
+                // Joining the string back together
+                ppl = String.join("|", lists);
+            } else {
+                throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
+            }
+        }
+        ppl = ppl.replace("`", "");
+        ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
+        return ppl;
+    }
+
 }
