@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -158,6 +160,25 @@ public class SearchAlertsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
+    public void testParseParams() throws Exception {
+        Tool tool = SearchAlertsTool.Factory.getInstance().create(Collections.emptyMap());
+        Map<String, String> validParams = new HashMap<String, String>();
+        validParams.put("sortOrder", "asc");
+        validParams.put("sortString", "foo.bar");
+        validParams.put("tableSize", "10");
+        validParams.put("startIndex", "0");
+        validParams.put("searchString", "foo");
+        validParams.put("severityLevel", "ALL");
+        validParams.put("alertState", "ALL");
+        validParams.put("monitorId", "foo");
+        validParams.put("alertIndex", "foo");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        assertDoesNotThrow(() -> tool.run(validParams, listener));
     }
 
     @Test

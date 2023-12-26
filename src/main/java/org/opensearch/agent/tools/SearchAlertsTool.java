@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.opensearch.client.Client;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
@@ -66,8 +67,12 @@ public class SearchAlertsTool implements Tool {
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         final String tableSortOrder = parameters.getOrDefault("sortOrder", "asc");
         final String tableSortString = parameters.getOrDefault("sortString", "monitor_name.keyword");
-        final int tableSize = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
-        final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
+        final int tableSize = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
+            ? Integer.parseInt(parameters.get("size"))
+            : 20;
+        final int startIndex = parameters.containsKey("startIndex") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
+            ? Integer.parseInt(parameters.get("startIndex"))
+            : 0;
         final String searchString = parameters.getOrDefault("searchString", null);
 
         // not exposing "missing" from the table, using default of null

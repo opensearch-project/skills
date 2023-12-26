@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
@@ -85,10 +87,14 @@ public class SearchMonitorsTool implements Tool {
         final Boolean hasTriggers = parameters.containsKey("hasTriggers") ? Boolean.parseBoolean(parameters.get("hasTriggers")) : null;
         final String indices = parameters.getOrDefault("indices", null);
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
-        final SortOrder sortOrder = sortOrderStr == "asc" ? SortOrder.ASC : SortOrder.DESC;
+        final SortOrder sortOrder = "asc".equalsIgnoreCase(sortOrderStr) ? SortOrder.ASC : SortOrder.DESC;
         final String sortString = parameters.getOrDefault("sortString", "monitor.name.keyword");
-        final int size = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
-        final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
+        final int size = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("size"))
+            ? Integer.parseInt(parameters.get("size"))
+            : 20;
+        final int startIndex = parameters.containsKey("startIndex") && StringUtils.isNumeric(parameters.get("startIndex"))
+            ? Integer.parseInt(parameters.get("startIndex"))
+            : 0;
 
         // If a monitor ID is specified, all other params will be ignored. Simply return the monitor details based on that ID
         // via the get monitor transport action
@@ -125,8 +131,9 @@ public class SearchMonitorsTool implements Tool {
                 NestedQueryBuilder nestedTriggerQuery = new NestedQueryBuilder(
                     "monitor.triggers",
                     new ExistsQueryBuilder("monitor.triggers"),
-                    null
+                    ScoreMode.None
                 );
+
                 BoolQueryBuilder triggerQuery = new BoolQueryBuilder();
                 if (hasTriggers) {
                     triggerQuery.must(nestedTriggerQuery);
@@ -138,7 +145,11 @@ public class SearchMonitorsTool implements Tool {
             if (indices != null) {
                 mustList
                     .add(
-                        new NestedQueryBuilder("monitor.inputs", new WildcardQueryBuilder("monitor.inputs.search.indices", indices), null)
+                        new NestedQueryBuilder(
+                            "monitor.inputs",
+                            new WildcardQueryBuilder("monitor.inputs.search.indices", indices),
+                            ScoreMode.None
+                        )
                     );
             }
 

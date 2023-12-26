@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -190,6 +192,26 @@ public class SearchMonitorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
+    public void testParseParams() throws Exception {
+        Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
+        Map<String, String> validParams = new HashMap<String, String>();
+        validParams.put("monitorName", "foo");
+        validParams.put("enabled", "true");
+        validParams.put("hasTriggers", "true");
+        validParams.put("indices", "bar");
+        validParams.put("sortOrder", "ASC");
+        validParams.put("sortString", "baz");
+        validParams.put("size", "10");
+        validParams.put("startIndex", "0");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        assertDoesNotThrow(() -> tool.run(validParams, listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("detectorId", "foo"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("sortOrder", "AsC"), listener));
     }
 
     @Test
