@@ -14,7 +14,6 @@ import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
 import org.opensearch.agent.tools.SearchIndexTool;
 import org.opensearch.agent.tools.VectorDBTool;
-import org.opensearch.agent.tools.SearchIndexTool;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;

@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
@@ -32,7 +37,7 @@ import lombok.SneakyThrows;
 
 public class SearchIndexToolTests {
     static public final NamedXContentRegistry TEST_XCONTENT_REGISTRY_FOR_QUERY = new NamedXContentRegistry(
-            new SearchModule(Settings.EMPTY, List.of()).getNamedXContents()
+        new SearchModule(Settings.EMPTY, List.of()).getNamedXContents()
     );
 
     private Client client;
@@ -46,10 +51,10 @@ public class SearchIndexToolTests {
     public void setup() {
         client = mock(Client.class);
         mockedSearchIndexTool = Mockito
-                .mock(
-                        SearchIndexTool.class,
-                        Mockito.withSettings().useConstructor(client, TEST_XCONTENT_REGISTRY_FOR_QUERY).defaultAnswer(Mockito.CALLS_REAL_METHODS)
-                );
+            .mock(
+                SearchIndexTool.class,
+                Mockito.withSettings().useConstructor(client, TEST_XCONTENT_REGISTRY_FOR_QUERY).defaultAnswer(Mockito.CALLS_REAL_METHODS)
+            );
 
         try (InputStream searchResponseIns = SearchIndexTool.class.getResourceAsStream("retrieval_tool_search_response.json")) {
             if (searchResponseIns != null) {
@@ -111,10 +116,10 @@ public class SearchIndexToolTests {
     @SneakyThrows
     public void testRunWithSearchResults() {
         SearchResponse mockedSearchResponse = SearchResponse
-                .fromXContent(
-                        JsonXContent.jsonXContent
-                                .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedSearchResponseString)
-                );
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedSearchResponseString)
+            );
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(mockedSearchResponse);
