@@ -179,6 +179,12 @@ public class SearchAlertsToolTests {
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         assertDoesNotThrow(() -> tool.run(validParams, listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("monitorIds", "[]"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("monitorIds", "[foo]"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("workflowIds", "[]"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("workflowIds", "[foo]"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("alertIds", "[]"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("alertIds", "[foo]"), listener));
     }
 
     @Test
