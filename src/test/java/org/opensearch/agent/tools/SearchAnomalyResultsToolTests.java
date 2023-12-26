@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -62,6 +63,15 @@ public class SearchAnomalyResultsToolTests {
         nullParams = null;
         emptyParams = Collections.emptyMap();
         nonEmptyParams = Map.of("detectorId", "foo");
+    }
+
+    @Test
+    public void testRunWithInvalidAnomalyGradeParam() throws Exception {
+        Tool tool = SearchAnomalyResultsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        assertThrows(NumberFormatException.class, () -> tool.run(Map.of("anomalyGradeThreshold", "foo"), listener));
     }
 
     @Test
