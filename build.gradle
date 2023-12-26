@@ -120,6 +120,7 @@ dependencies {
 
     // ZipArchive dependencies used for integration tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
+    //JS plugin is published to `org/opensearch` instead of `org/opensearch/plugin` under local maven repo: https://mvnrepository.com/artifact/org.opensearch/opensearch-job-scheduler.
     zipArchive group: 'org.opensearch', name:'opensearch-job-scheduler', version: "${version}"
     zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
