@@ -6,14 +6,22 @@
 package org.opensearch.agent.tools;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
+import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.transport.GetAnomalyDetectorRequest;
+import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
+import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
 import org.opensearch.client.Client;
+import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
@@ -123,24 +131,98 @@ public class SearchAnomalyDetectorsTool implements Tool {
 
         SearchRequest searchDetectorRequest = new SearchRequest().source(searchSourceBuilder);
 
-        if (running != null || disabled != null || failed != null) {
-            // TODO: add a listener to trigger when the first response is received, to trigger the profile API call
-            // to fetch the detector state, etc.
-            // Will need AD client to onboard the profile API first.
-        }
-
         ActionListener<SearchResponse> searchDetectorListener = ActionListener.<SearchResponse>wrap(response -> {
             StringBuilder sb = new StringBuilder();
-            SearchHit[] hits = response.getHits().getHits();
+            List<SearchHit> hits = Arrays.asList(response.getHits().getHits());
+            Map<String, SearchHit> hitsAsMap = hits.stream().collect(Collectors.toMap(SearchHit::getId, hit -> hit));
+
+            // If we need to filter by detector state, make subsequent profile API calls to each detector
+            if (running != null || disabled != null || failed != null) {
+
+                // Send out individual AD client calls to fetch detector profiles, continuously adding to a
+                // tracked list of CompletableFutures
+                List<CompletableFuture<GetAnomalyDetectorResponse>> profileFutures = new ArrayList<>();
+                for (SearchHit hit : hits) {
+                    CompletableFuture<GetAnomalyDetectorResponse> profileFuture = new CompletableFuture<>();
+                    profileFutures.add(profileFuture);
+                    ActionListener<GetAnomalyDetectorResponse> profileListener = ActionListener
+                        .<GetAnomalyDetectorResponse>wrap(profileResponse -> {
+                            profileFuture.complete(profileResponse);
+                        }, e -> {
+                            log.error("Failed to get anomaly detector profile.", e);
+                            profileFuture.completeExceptionally(e);
+                            listener.onFailure(e);
+                        });
+
+                    GetAnomalyDetectorRequest profileRequest = new GetAnomalyDetectorRequest(
+                        hit.getId(),
+                        Versions.MATCH_ANY,
+                        true,
+                        true,
+                        "",
+                        "",
+                        false,
+                        null
+                    );
+                    adClient.getDetectorProfile(profileRequest, profileListener);
+                }
+
+                // Wait for all CompletableFutures to complete, and iterate through the responses. Filter out
+                // detectors with unwanted detector states.
+                CompletableFuture<List<GetAnomalyDetectorResponse>> listFuture = CompletableFuture
+                    .allOf(profileFutures.toArray(new CompletableFuture<?>[0]))
+                    .thenApply(v -> profileFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()));
+                final List<GetAnomalyDetectorResponse> profileResponses = listFuture.join();
+                for (GetAnomalyDetectorResponse profileResponse : profileResponses) {
+                    if (profileResponse != null && profileResponse.getDetector() != null) {
+                        String detectorId = profileResponse.getDetector().getId();
+
+                        // We follow the existing logic as the frontend to determine overall detector state
+                        // https://github.com/opensearch-project/anomaly-detection-dashboards-plugin/blob/main/server/routes/utils/adHelpers.ts#L437
+                        String detectorState;
+                        ADTask realtimeTask = profileResponse.getRealtimeAdTask();
+
+                        if (realtimeTask != null) {
+                            String taskState = realtimeTask.getState();
+                            if (taskState.equalsIgnoreCase("CREATED")) {
+                                detectorState = DetectorStateString.Initializing.name();
+                            } else if (taskState.equalsIgnoreCase("RUNNING")) {
+                                detectorState = DetectorStateString.Running.name();
+                            } else if (taskState.equalsIgnoreCase("INIT_FAILURE")
+                                || taskState.equalsIgnoreCase("UNEXPECTED_FAILURE")
+                                || taskState.equalsIgnoreCase("FAILED")) {
+                                detectorState = DetectorStateString.Failed.name();
+                            } else {
+                                // Task states may fall under other values, such as "FEATURE_REQUIRED" / "STOPPED" / etc.
+                                // We assume here that these will all fall under the disabled category
+                                detectorState = DetectorStateString.Disabled.name();
+                            }
+                        } else {
+                            detectorState = DetectorStateString.Disabled.name();
+                        }
+
+                        if (running != null && !running && detectorState.equals(DetectorStateString.Running.name())) {
+                            hitsAsMap.remove(detectorId);
+                        }
+                        if (disabled != null && !disabled && detectorState.equals(DetectorStateString.Disabled.name())) {
+                            hitsAsMap.remove(detectorId);
+                        }
+                        if (failed != null && !failed && detectorState.equals(DetectorStateString.Failed.name())) {
+                            hitsAsMap.remove(detectorId);
+                        }
+                    }
+                }
+            }
+
             sb.append("AnomalyDetectors=[");
-            for (SearchHit hit : hits) {
+            for (SearchHit hit : hitsAsMap.values()) {
                 sb.append("{");
                 sb.append("id=").append(hit.getId()).append(",");
                 sb.append("name=").append(hit.getSourceAsMap().get("name"));
                 sb.append("}");
             }
             sb.append("]");
-            sb.append("TotalAnomalyDetectors=").append(response.getHits().getTotalHits().value);
+            sb.append("TotalAnomalyDetectors=").append(hitsAsMap.values().size());
             listener.onResponse((T) sb.toString());
         }, e -> {
             log.error("Failed to search anomaly detectors.", e);
