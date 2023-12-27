@@ -69,10 +69,10 @@ public class SearchAlertsTool implements Tool {
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         final String tableSortOrder = parameters.getOrDefault("sortOrder", "asc");
         final String tableSortString = parameters.getOrDefault("sortString", "monitor_name.keyword");
-        final int tableSize = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
+        final int tableSize = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("size"))
             ? Integer.parseInt(parameters.get("size"))
             : 20;
-        final int startIndex = parameters.containsKey("startIndex") && StringUtils.isNumeric(parameters.get("lastUpdateTime"))
+        final int startIndex = parameters.containsKey("startIndex") && StringUtils.isNumeric(parameters.get("startIndex"))
             ? Integer.parseInt(parameters.get("startIndex"))
             : 0;
         final String searchString = parameters.getOrDefault("searchString", null);
