@@ -69,6 +69,7 @@ apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
     zipArchive
@@ -91,6 +92,10 @@ task addJarsToClasspath(type: Copy) {
     }
     into("$buildDir/classes")
 
+    from(fileTree(dir: adJarDirectory)) {
+        include "opensearch-time-series-analytics-${version}.jar"
+    }
+    into("$buildDir/classes")
 }
 
 dependencies {
@@ -105,8 +110,9 @@ dependencies {
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     implementation group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
-    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
-//    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
+//    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
+    //TODO change this to jar dependency once ad successfully published main branch jars.
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
 
@@ -136,7 +142,14 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
+task extractAdJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-anomaly-detection")}))
+    into adJarDirectory
+}
+
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(extractAdJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
@@ -180,6 +193,7 @@ spotless {
 
 compileJava {
     dependsOn extractSqlJar
+    dependsOn extractAdJar
     dependsOn delombok
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }
