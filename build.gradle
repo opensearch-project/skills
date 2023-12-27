@@ -179,6 +179,14 @@ test {
     systemProperty 'tests.security.manager', 'false'
 }
 
+jacocoTestReport {
+    dependsOn test
+    reports {
+        html.required = true // human readable
+        xml.required = true // for coverlay
+    }
+}
+
 spotless {
     if (JavaVersion.current() >= JavaVersion.VERSION_17) {
         // Spotless configuration for Java files
