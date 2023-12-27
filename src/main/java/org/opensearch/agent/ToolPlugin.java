@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
 import org.opensearch.agent.tools.VectorDBTool;
+import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
@@ -56,6 +57,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         this.xContentRegistry = xContentRegistry;
 
         PPLTool.Factory.getInstance().init(client);
+        VisualizationsTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
         return Collections.emptyList();
@@ -63,6 +65,12 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
 
     @Override
     public List<Tool.Factory<? extends Tool>> getToolFactories() {
-        return List.of(PPLTool.Factory.getInstance(), NeuralSparseSearchTool.Factory.getInstance(), VectorDBTool.Factory.getInstance());
+        return List
+            .of(
+                PPLTool.Factory.getInstance(),
+                NeuralSparseSearchTool.Factory.getInstance(),
+                VectorDBTool.Factory.getInstance(),
+                VisualizationsTool.Factory.getInstance()
+            );
     }
 }
