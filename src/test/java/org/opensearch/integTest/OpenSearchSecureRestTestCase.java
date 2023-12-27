@@ -2,6 +2,9 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+/*
+ * The first version of this class is duplicated from neural-search OpenSearchSecureRestTestCase.
+ */
 
 package org.opensearch.integTest;
 

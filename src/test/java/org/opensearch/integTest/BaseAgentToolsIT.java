@@ -23,11 +23,14 @@ import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.MLTask;
+import org.opensearch.ml.common.MLTaskState;
 
 import java.util.List;
 import java.util.Map;
 
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
+    private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
+    private static final int DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND = 1000;
     /**
      * Update cluster settings to run ml models
      */
@@ -60,14 +63,6 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     @SneakyThrows
-    private String parseTaskIdFromResponse(Response response) {
-        Map map = parseResponseToMap(response);
-        String taskId = map.get(MLTask.TASK_ID_FIELD).toString();
-        assertNotNull(taskId);
-        return taskId;
-    }
-
-    @SneakyThrows
     private Map parseResponseToMap(Response response) {
         Map<String, Object> responseInMap = XContentHelper.convertToMap(
                 XContentType.JSON.xContent(),
@@ -78,7 +73,16 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return responseInMap;
     }
 
-    public String registerModel(String requestBody) {
+    @SneakyThrows
+    private Object parseFieldFromResponse(Response response, String field) {
+        assertNotNull(field);
+        Map map = parseResponseToMap(response);
+        Object result = map.get(field);
+        assertNotNull(result);
+        return result;
+    }
+
+    protected String registerModel(String requestBody) {
         Response response = makeRequest(
                 client(),
                 "POST",
@@ -87,10 +91,10 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
                 requestBody,
                 null
         );
-        return parseTaskIdFromResponse(response);
+        return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
-    public String deployModel(String modelId) {
+    protected String deployModel(String modelId) {
         Response response = makeRequest(
                 client(),
                 "POST",
@@ -99,7 +103,38 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
                 (String) null,
                 null
         );
-        return parseTaskIdFromResponse(response);
+        return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
+    }
+
+    @SneakyThrows
+    protected Response waitTaskComplete(String taskId) {
+        for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
+            Response response = makeRequest(
+                    client(),
+                    "GET",
+                    "/_plugins/_ml/tasks/" + taskId,
+                    null,
+                    (String) null,
+                    null
+            );
+            String state = parseFieldFromResponse(response, MLTask.STATE_FIELD).toString();
+            if (state.equals(MLTaskState.COMPLETED)) {
+                return response;
+            }
+            Thread.sleep(DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND);
+        }
+        fail("The task failed to complete after " + MAX_TASK_RESULT_QUERY_TIME_IN_SECOND + " seconds.");
+        return null;
+    }
+
+    // Register the model then deploy it. Returns the model_id until the model is deployed
+    protected String registerModelThenDeploy(String requestBody) {
+        String registerModelTaskId = registerModel(requestBody);
+        Response registerTaskResponse = waitTaskComplete(registerModelTaskId);
+        String modelId = parseFieldFromResponse(registerTaskResponse, MLTask.MODEL_ID_FIELD).toString();
+        String deployModelTaskId = deployModel(modelId);
+        waitTaskComplete(deployModelTaskId);
+        return modelId;
     }
 
     public static Response makeRequest(
