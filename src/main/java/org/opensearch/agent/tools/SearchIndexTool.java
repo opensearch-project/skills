@@ -5,8 +5,7 @@
 
 package org.opensearch.agent.tools;
 
-import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
-import static org.opensearch.ml.common.CommonValue.ML_MODEL_INDEX;
+import static org.opensearch.ml.common.CommonValue.*;
 
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
@@ -25,6 +24,7 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.connector.MLConnectorSearchAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
+import org.opensearch.ml.common.transport.model_group.MLModelGroupSearchAction;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -47,7 +47,7 @@ public class SearchIndexTool implements Tool {
 
     public static final String TYPE = "SearchIndexTool";
     private static final String DEFAULT_DESCRIPTION =
-        "Use this tool to search index with a query. You should pass in two parameters: index and query. Index is the index name and the query is an OpenSearch DSL query.";
+        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query.";
 
     private String name = TYPE;
 
@@ -120,6 +120,8 @@ public class SearchIndexTool implements Tool {
                 client.execute(MLConnectorSearchAction.INSTANCE, searchRequest, actionListener);
             } else if (Objects.equals(index, ML_MODEL_INDEX)) {
                 client.execute(MLModelSearchAction.INSTANCE, searchRequest, actionListener);
+            } else if (Objects.equals(index, ML_MODEL_GROUP_INDEX)) {
+                client.execute(MLModelGroupSearchAction.INSTANCE, searchRequest, actionListener);
             } else {
                 client.search(searchRequest, actionListener);
             }
