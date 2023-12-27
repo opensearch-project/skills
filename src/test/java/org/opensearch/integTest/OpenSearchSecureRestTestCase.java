@@ -2,9 +2,6 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-/*
- * The first version of this class is duplicated from neural-search OpenSearchSecureRestTestCase.
- */
 
 package org.opensearch.integTest;
 
@@ -103,23 +100,27 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
         }
         builder.setDefaultHeaders(defaultHeaders);
         builder.setHttpClientConfigCallback(httpClientBuilder -> {
-            final String userName = Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_USER))
-                    .orElseThrow(() -> new RuntimeException("user name is missing"));
-            final String password = Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_PASSWORD))
-                    .orElseThrow(() -> new RuntimeException("password is missing"));
+            final String userName = Optional
+                .ofNullable(System.getProperty(SYS_PROPERTY_KEY_USER))
+                .orElseThrow(() -> new RuntimeException("user name is missing"));
+            final String password = Optional
+                .ofNullable(System.getProperty(SYS_PROPERTY_KEY_PASSWORD))
+                .orElseThrow(() -> new RuntimeException("password is missing"));
             final BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
             final AuthScope anyScope = new AuthScope(null, -1);
             credentialsProvider.setCredentials(anyScope, new UsernamePasswordCredentials(userName, password.toCharArray()));
             try {
-                final TlsStrategy tlsStrategy = ClientTlsStrategyBuilder.create()
-                        .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                        .setSslContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build())
-                        .build();
-                final PoolingAsyncClientConnectionManager connectionManager = PoolingAsyncClientConnectionManagerBuilder.create()
-                        .setMaxConnPerRoute(DEFAULT_MAX_CONN_PER_ROUTE)
-                        .setMaxConnTotal(DEFAULT_MAX_CONN_TOTAL)
-                        .setTlsStrategy(tlsStrategy)
-                        .build();
+                final TlsStrategy tlsStrategy = ClientTlsStrategyBuilder
+                    .create()
+                    .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                    .setSslContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build())
+                    .build();
+                final PoolingAsyncClientConnectionManager connectionManager = PoolingAsyncClientConnectionManagerBuilder
+                    .create()
+                    .setMaxConnPerRoute(DEFAULT_MAX_CONN_PER_ROUTE)
+                    .setMaxConnTotal(DEFAULT_MAX_CONN_TOTAL)
+                    .setTlsStrategy(tlsStrategy)
+                    .build();
                 return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider).setConnectionManager(connectionManager);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -127,10 +128,8 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
         });
 
         final String socketTimeoutString = settings.get(CLIENT_SOCKET_TIMEOUT);
-        final TimeValue socketTimeout = TimeValue.parseTimeValue(
-                socketTimeoutString == null ? DEFAULT_SOCKET_TIMEOUT : socketTimeoutString,
-                CLIENT_SOCKET_TIMEOUT
-        );
+        final TimeValue socketTimeout = TimeValue
+            .parseTimeValue(socketTimeoutString == null ? DEFAULT_SOCKET_TIMEOUT : socketTimeoutString, CLIENT_SOCKET_TIMEOUT);
         builder.setRequestConfigCallback(conf -> {
             Timeout timeout = Timeout.ofMilliseconds(Math.toIntExact(socketTimeout.getMillis()));
             conf.setConnectTimeout(timeout);
@@ -155,12 +154,13 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
         final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
         final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (
-                final XContentParser parser = xContentType.xContent()
-                        .createParser(
-                                NamedXContentRegistry.EMPTY,
-                                DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-                                response.getEntity().getContent()
-                        )
+            final XContentParser parser = xContentType
+                .xContent()
+                .createParser(
+                    NamedXContentRegistry.EMPTY,
+                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+                    response.getEntity().getContent()
+                )
         ) {
             final XContentParser.Token token = parser.nextToken();
             final List<Map<String, Object>> parserList;
@@ -170,11 +170,12 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
                 parserList = Collections.singletonList(parser.mapOrdered());
             }
 
-            final List<String> externalIndices = parserList.stream()
-                    .map(index -> (String) index.get("index"))
-                    .filter(indexName -> indexName != null)
-                    .filter(indexName -> !indexName.startsWith(INTERNAL_INDICES_PREFIX))
-                    .collect(Collectors.toList());
+            final List<String> externalIndices = parserList
+                .stream()
+                .map(index -> (String) index.get("index"))
+                .filter(indexName -> indexName != null)
+                .filter(indexName -> !indexName.startsWith(INTERNAL_INDICES_PREFIX))
+                .collect(Collectors.toList());
 
             for (final String indexName : externalIndices) {
                 adminClient().performRequest(new Request("DELETE", "/" + indexName));

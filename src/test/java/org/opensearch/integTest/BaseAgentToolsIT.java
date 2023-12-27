@@ -5,8 +5,9 @@
 
 package org.opensearch.integTest;
 
-import com.google.common.collect.ImmutableList;
-import lombok.SneakyThrows;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
@@ -25,12 +26,14 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 
-import java.util.List;
-import java.util.Map;
+import com.google.common.collect.ImmutableList;
+
+import lombok.SneakyThrows;
 
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
     private static final int DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND = 1000;
+
     /**
      * Update cluster settings to run ml models
      */
@@ -44,19 +47,20 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     protected void updateClusterSettings(String settingKey, Object value) {
-        XContentBuilder builder = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("persistent")
-                .field(settingKey, value)
-                .endObject()
-                .endObject();
+        XContentBuilder builder = XContentFactory
+            .jsonBuilder()
+            .startObject()
+            .startObject("persistent")
+            .field(settingKey, value)
+            .endObject()
+            .endObject();
         Response response = makeRequest(
-                client(),
-                "PUT",
-                "_cluster/settings",
-                null,
-                builder.toString(),
-                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, ""))
+            client(),
+            "PUT",
+            "_cluster/settings",
+            null,
+            builder.toString(),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, ""))
         );
 
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
@@ -64,11 +68,8 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     private Map parseResponseToMap(Response response) {
-        Map<String, Object> responseInMap = XContentHelper.convertToMap(
-                XContentType.JSON.xContent(),
-                EntityUtils.toString(response.getEntity()),
-                false
-        );
+        Map<String, Object> responseInMap = XContentHelper
+            .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
         response.getEntity().toString();
         return responseInMap;
     }
@@ -83,43 +84,27 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     protected String registerModel(String requestBody) {
-        Response response = makeRequest(
-                client(),
-                "POST",
-                "/_plugins/_ml/models/_register",
-                null,
-                requestBody,
-                null
-        );
+        Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/_register", null, requestBody, null);
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
     protected String deployModel(String modelId) {
-        Response response = makeRequest(
-                client(),
-                "POST",
-                "/_plugins/_ml/models/" + modelId + "/_deploy",
-                null,
-                (String) null,
-                null
-        );
+        Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_deploy", null, (String) null, null);
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
     @SneakyThrows
     protected Response waitTaskComplete(String taskId) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
-            Response response = makeRequest(
-                    client(),
-                    "GET",
-                    "/_plugins/_ml/tasks/" + taskId,
-                    null,
-                    (String) null,
-                    null
-            );
+            Response response = makeRequest(client(), "GET", "/_plugins/_ml/tasks/" + taskId, null, (String) null, null);
             String state = parseFieldFromResponse(response, MLTask.STATE_FIELD).toString();
-            if (state.equals(MLTaskState.COMPLETED)) {
+            if (state.equals(MLTaskState.COMPLETED.toString())) {
                 return response;
+            }
+            if (state.equals(MLTaskState.FAILED.toString())
+                || state.equals(MLTaskState.CANCELLED.toString())
+                || state.equals(MLTaskState.COMPLETED_WITH_ERROR.toString())) {
+                break;
             }
             Thread.sleep(DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND);
         }
@@ -138,37 +123,37 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     public static Response makeRequest(
-            RestClient client,
-            String method,
-            String endpoint,
-            Map<String, String> params,
-            String jsonEntity,
-            List<Header> headers
+        RestClient client,
+        String method,
+        String endpoint,
+        Map<String, String> params,
+        String jsonEntity,
+        List<Header> headers
     ) {
         HttpEntity httpEntity = StringUtils.isBlank(jsonEntity) ? null : new StringEntity(jsonEntity, ContentType.APPLICATION_JSON);
         return makeRequest(client, method, endpoint, params, httpEntity, headers);
     }
 
     public static Response makeRequest(
-            RestClient client,
-            String method,
-            String endpoint,
-            Map<String, String> params,
-            HttpEntity entity,
-            List<Header> headers
+        RestClient client,
+        String method,
+        String endpoint,
+        Map<String, String> params,
+        HttpEntity entity,
+        List<Header> headers
     ) {
         return makeRequest(client, method, endpoint, params, entity, headers, false);
     }
 
     @SneakyThrows
     public static Response makeRequest(
-            RestClient client,
-            String method,
-            String endpoint,
-            Map<String, String> params,
-            HttpEntity entity,
-            List<Header> headers,
-            boolean strictDeprecationMode
+        RestClient client,
+        String method,
+        String endpoint,
+        Map<String, String> params,
+        HttpEntity entity,
+        List<Header> headers,
+        boolean strictDeprecationMode
     ) {
         Request request = new Request(method, endpoint);
 
