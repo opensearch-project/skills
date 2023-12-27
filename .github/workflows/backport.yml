@@ -19,6 +19,7 @@ jobs:
           github.event.action == 'labeled'
           && contains(github.event.label.name, 'backport')
         )
+      )
     permissions:
       contents: write
       pull-requests: write
