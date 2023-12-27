@@ -218,7 +218,7 @@ forbiddenApisTest.ignoreFailures = true
 
 
 opensearchplugin {
-    name 'skills'
+    name 'opensearch-skills'
     description 'OpenSearch Skills'
     classname 'org.opensearch.agent.ToolPlugin'
     extendedPlugins = ['opensearch-ml']
