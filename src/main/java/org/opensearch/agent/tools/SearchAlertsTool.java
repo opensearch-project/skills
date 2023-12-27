@@ -26,7 +26,9 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
+@Log4j2
 @ToolAnnotation(SearchAlertsTool.TYPE)
 public class SearchAlertsTool implements Tool {
     public static final String TYPE = "SearchAlertsTool";
@@ -115,7 +117,10 @@ public class SearchAlertsTool implements Tool {
             sb.append("]");
             sb.append("TotalAlerts=").append(response.getTotalAlerts());
             listener.onResponse((T) sb.toString());
-        }, e -> { listener.onFailure(e); });
+        }, e -> {
+            log.error("Failed to search alerts.", e);
+            listener.onFailure(e);
+        });
 
         // execute the search
         AlertingPluginInterface.INSTANCE.getAlerts((NodeClient) client, getAlertsRequest, getAlertsListener);

@@ -38,7 +38,9 @@ import org.opensearch.search.sort.SortOrder;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
+@Log4j2
 @ToolAnnotation(SearchMonitorsTool.TYPE)
 public class SearchMonitorsTool implements Tool {
     public static final String TYPE = "SearchMonitorsTool";
@@ -114,7 +116,10 @@ public class SearchMonitorsTool implements Tool {
                     sb.append("Monitors=[]TotalMonitors=0");
                 }
                 listener.onResponse((T) sb.toString());
-            }, e -> { listener.onFailure(e); });
+            }, e -> {
+                log.error("Failed to search monitors.", e);
+                listener.onFailure(e);
+            });
             AlertingPluginInterface.INSTANCE.getMonitor((NodeClient) client, getMonitorRequest, getMonitorListener);
         } else {
             List<QueryBuilder> mustList = new ArrayList<QueryBuilder>();
@@ -176,7 +181,10 @@ public class SearchMonitorsTool implements Tool {
                 sb.append("]");
                 sb.append("TotalMonitors=").append(response.getHits().getTotalHits().value);
                 listener.onResponse((T) sb.toString());
-            }, e -> { listener.onFailure(e); });
+            }, e -> {
+                log.error("Failed to search monitors.", e);
+                listener.onFailure(e);
+            });
             AlertingPluginInterface.INSTANCE.searchMonitors((NodeClient) client, searchMonitorRequest, searchMonitorListener);
         }
     }
