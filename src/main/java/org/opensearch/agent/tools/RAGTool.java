@@ -110,15 +110,16 @@ public class RAGTool extends AbstractRetrieverTool {
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         String input = null;
 
+        if (!this.validate(parameters)) {
+            throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
+        }
+
         try {
-            if (!this.validate(parameters)) {
-                throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
-            }
             String question = parameters.get(INPUT_FIELD);
             input = gson.fromJson(question, String.class);
         } catch (Exception e) {
-            log.error("[" + INPUT_FIELD + "] is null or empty, can not process it.", e);
-            listener.onFailure(e);
+            log.error("Failed to read question from " + INPUT_FIELD, e);
+            listener.onFailure(new IllegalArgumentException("Failed to read question from " + INPUT_FIELD));
             return;
         }
 
@@ -222,6 +223,9 @@ public class RAGTool extends AbstractRetrieverTool {
         return question != null && !question.trim().isEmpty();
     }
 
+    /**
+     * Factory class to create RAGTool
+     */
     public static class Factory extends AbstractRetrieverTool.Factory<RAGTool> {
         private Client client;
         private NamedXContentRegistry xContentRegistry;

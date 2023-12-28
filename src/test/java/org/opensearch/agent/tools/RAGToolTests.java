@@ -255,14 +255,20 @@ public class RAGToolTests {
         assertEquals("Failed to run model " + TEST_INFERENCE_MODEL_ID, argumentCaptor.getValue().getMessage());
     }
 
-    @Test
-    public void testRunWithEmptyInput() throws IOException {
+    @Test(expected = IllegalArgumentException.class)
+    public void testRunWithEmptyInput() {
         ActionListener listener = mock(ActionListener.class);
         ragTool.run(Map.of(INPUT_FIELD, ""), listener);
+    }
+
+    @Test
+    public void testRunWithMalformedInput() throws IOException {
+        ActionListener listener = mock(ActionListener.class);
+        ragTool.run(Map.of(INPUT_FIELD, "{hello?"), listener);
         verify(listener).onFailure(any(RuntimeException.class));
         ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(argumentCaptor.capture());
-        assertEquals("[" + INPUT_FIELD + "] is null or empty, can not process it.", argumentCaptor.getValue().getMessage());
+        assertEquals("Failed to read question from " + INPUT_FIELD, argumentCaptor.getValue().getMessage());
 
     }
 
