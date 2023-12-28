@@ -238,6 +238,8 @@ public class SearchMonitorsToolTests {
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         assertDoesNotThrow(() -> tool.run(validParams, listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("hasTriggers", "false"), listener));
+        assertDoesNotThrow(() -> tool.run(Map.of("monitorNamePattern", "foo*"), listener));
         assertDoesNotThrow(() -> tool.run(Map.of("detectorId", "foo"), listener));
         assertDoesNotThrow(() -> tool.run(Map.of("sortOrder", "AsC"), listener));
     }
