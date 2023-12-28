@@ -12,6 +12,7 @@ buildscript {
         opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
+        kotlin_version = System.getProperty("kotlin.version", "1.8.21")
     }
 
     repositories {
@@ -117,6 +118,7 @@ dependencies {
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
 
     // ZipArchive dependencies used for integration tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
