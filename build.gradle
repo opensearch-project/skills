@@ -79,8 +79,6 @@ configurations {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.0.0-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
-            force "com.google.code.gson:gson:2.10.1"
-            force "org.apache.commons:commons-lang3:3.13.0"
         }
     }
 }
@@ -112,7 +110,7 @@ dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     implementation group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
 //    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
-    //TODO change this to jar dependency once ad successfully published main branch jars.
+    //TODO change this to jar dependency once ad successfully published jars.
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
