@@ -168,7 +168,7 @@ public class SearchAlertsToolTests {
         Map<String, String> validParams = new HashMap<String, String>();
         validParams.put("sortOrder", "asc");
         validParams.put("sortString", "foo.bar");
-        validParams.put("tableSize", "10");
+        validParams.put("size", "10");
         validParams.put("startIndex", "0");
         validParams.put("searchString", "foo");
         validParams.put("severityLevel", "ALL");

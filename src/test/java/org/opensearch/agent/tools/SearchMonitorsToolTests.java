@@ -63,6 +63,8 @@ public class SearchMonitorsToolTests {
     private Map<String, String> nonEmptyParams;
     private Map<String, String> monitorIdParams;
 
+    private Monitor testMonitor;
+
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
@@ -72,6 +74,23 @@ public class SearchMonitorsToolTests {
         emptyParams = Collections.emptyMap();
         nonEmptyParams = Map.of("monitorName", "foo");
         monitorIdParams = Map.of("monitorId", "foo");
+        testMonitor = new Monitor(
+            "monitor-1-id",
+            0L,
+            "monitor-1",
+            true,
+            new CronSchedule("31 * * * *", ZoneId.of("Asia/Kolkata"), null),
+            Instant.now(),
+            Instant.now(),
+            Monitor.MonitorType.QUERY_LEVEL_MONITOR,
+            new User("test-user", Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+            0,
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            new DataSources(),
+            ""
+        );
     }
 
     @Test
@@ -111,30 +130,18 @@ public class SearchMonitorsToolTests {
 
     @Test
     public void testRunWithMonitorId() throws Exception {
-        final String monitorId = "monitor-1-id";
-        final String monitorName = "monitor-1";
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
 
-        Monitor monitor = new Monitor(
-            monitorId,
+        GetMonitorResponse getMonitorResponse = new GetMonitorResponse(
+            testMonitor.getId(),
+            1L,
+            2L,
             0L,
-            monitorName,
-            true,
-            new CronSchedule("31 * * * *", ZoneId.of("Asia/Kolkata"), null),
-            Instant.now(),
-            Instant.now(),
-            Monitor.MonitorType.QUERY_LEVEL_MONITOR,
-            new User("test-user", Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
-            0,
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptyMap(),
-            new DataSources(),
-            ""
+            testMonitor,
+            Collections.emptyList()
         );
-
-        GetMonitorResponse getMonitorResponse = new GetMonitorResponse(monitorId, 1L, 2L, 0L, monitor, Collections.emptyList());
-        String expectedResponseStr = String.format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", monitorId, monitorName, 1);
+        String expectedResponseStr = String
+            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), 1);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
@@ -152,18 +159,38 @@ public class SearchMonitorsToolTests {
     }
 
     @Test
+    public void testRunWithMonitorIdNotFound() throws Exception {
+        Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        GetMonitorResponse responseWithNullMonitor = new GetMonitorResponse(testMonitor.getId(), 1L, 2L, 0L, null, Collections.emptyList());
+        String expectedResponseStr = String.format("Monitors=[]TotalMonitors=0");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+
+        doAnswer((invocation) -> {
+            ActionListener<GetMonitorResponse> responseListener = invocation.getArgument(2);
+            responseListener.onResponse(responseWithNullMonitor);
+            return null;
+        }).when(nodeClient).execute(any(ActionType.class), any(), any());
+
+        tool.run(monitorIdParams, listener);
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(listener, times(1)).onResponse(responseCaptor.capture());
+        assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
     public void testRunWithSingleMonitor() throws Exception {
-        final String monitorName = "monitor-1";
-        final String monitorId = "monitor-1-id";
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
 
         XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
         content.startObject();
         content.field("type", "monitor");
-        content.field("name", monitorName);
+        content.field("name", testMonitor.getName());
         content.endObject();
         SearchHit[] hits = new SearchHit[1];
-        hits[0] = new SearchHit(0, monitorId, null, null).sourceRef(BytesReference.bytes(content));
+        hits[0] = new SearchHit(0, testMonitor.getId(), null, null).sourceRef(BytesReference.bytes(content));
 
         TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
 
@@ -177,7 +204,8 @@ public class SearchMonitorsToolTests {
             null,
             null
         );
-        String expectedResponseStr = String.format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", monitorId, monitorName, hits.length);
+        String expectedResponseStr = String
+            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), hits.length);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
