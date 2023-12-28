@@ -98,7 +98,7 @@ public class AbstractRetrieverToolTests {
         future.join();
         assertEquals(
             "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"Company test_mock have a history of 100 years.\"},\"_id\":\"1\",\"_score\":89.2917}\n"
-                + "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"the price of the api is 2$ per invokation\"},\"_id\":\"2\",\"_score\":0.10702579}\n",
+                + "{\"_index\":\"hybrid-index\",\"_source\":{\"passage_text\":\"the price of the api is 2$ per invocation\"},\"_id\":\"2\",\"_score\":0.10702579}\n",
             future.get()
         );
     }
@@ -218,7 +218,7 @@ public class AbstractRetrieverToolTests {
         // Create a mock object of the abstract Factory class
         Client client = mock(Client.class);
         AbstractRetrieverTool.Factory<Tool> factoryMock = new AbstractRetrieverTool.Factory<>() {
-            public PPLTool create(Map<String, Object> params) {
+            public AbstractRetrieverTool create(Map<String, Object> params) {
                 return null;
             }
         };
