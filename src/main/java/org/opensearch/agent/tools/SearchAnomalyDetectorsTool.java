@@ -30,7 +30,9 @@ import org.opensearch.search.sort.SortOrder;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
+@Log4j2
 @ToolAnnotation(SearchAnomalyDetectorsTool.TYPE)
 public class SearchAnomalyDetectorsTool implements Tool {
     public static final String TYPE = "SearchAnomalyDetectorsTool";
@@ -140,7 +142,10 @@ public class SearchAnomalyDetectorsTool implements Tool {
             sb.append("]");
             sb.append("TotalAnomalyDetectors=").append(response.getHits().getTotalHits().value);
             listener.onResponse((T) sb.toString());
-        }, e -> { listener.onFailure(e); });
+        }, e -> {
+            log.error("Failed to search anomaly detectors.", e);
+            listener.onFailure(e);
+        });
 
         adClient.searchAnomalyDetectors(searchDetectorRequest, searchDetectorListener);
     }
