@@ -5,9 +5,12 @@
 
 package org.opensearch.integTest;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import com.google.gson.Gson;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
@@ -31,8 +34,12 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.input.execute.agent.AgentMLInput;
+import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.output.model.ModelTensorOutput;
+import org.opensearch.ml.common.output.model.ModelTensors;
 
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
+    public static final Gson gson = new Gson();
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
     private static final int DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND = 1000;
 
@@ -171,8 +178,29 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return parseFieldFromResponse(response, AgentMLInput.AGENT_ID_FIELD).toString();
     }
 
-    public String executeAgent(String requstBody) {
-        return "";
+    private String parseStringResponseFromExecuteAgentResponse(Response response) {
+        Map responseInMap = parseResponseToMap(response);
+        Optional<String> optionalResult = Optional.ofNullable(responseInMap)
+                .map(m -> (List) m.get(ModelTensorOutput.INFERENCE_RESULT_FIELD))
+                .map(l -> (Map) l.get(0))
+                .map(m -> (List) m.get(ModelTensors.OUTPUT_FIELD))
+                .map(l -> (Map) l.get(0))
+                .map(m -> (String) (m.get(ModelTensor.RESULT_FIELD)));
+        return optionalResult.get();
+    }
+
+    // execute the agent, and return the String response from the json structure 
+    // {"inference_results": [{"output": [{"name": "response","result": "the result to return."}]}]}
+    public String executeAgent(String agentId, String requestBody) {
+        Response response = makeRequest(
+                client(),
+                "POST",
+                "/_plugins/_ml/agents/"+agentId+"/_execute",
+                null,
+                requestBody,
+                null
+        );
+        return parseStringResponseFromExecuteAgentResponse(response);
     }
 
     public static Response makeRequest(
