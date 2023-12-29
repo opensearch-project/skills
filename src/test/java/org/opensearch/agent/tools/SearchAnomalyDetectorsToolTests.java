@@ -228,7 +228,7 @@ public class SearchAnomalyDetectorsToolTests {
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
 
-        tool.run(emptyParams, listener);
+        tool.run(Map.of("running", "false"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         assertEquals(expectedResponseStr, responseCaptor.getValue());
