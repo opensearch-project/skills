@@ -209,6 +209,63 @@ public class SearchAnomalyDetectorsToolTests {
     }
 
     @Test
+    public void testRunWithTaskStateCreated() throws Exception {
+        final String detectorName = "detector-1";
+        final String detectorId = "detector-1-id";
+        Tool tool = SearchAnomalyDetectorsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        // Generate mock values and responses
+        SearchHit[] hits = new SearchHit[1];
+        hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
+        SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
+        GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
+            .generateGetAnomalyDetectorResponses(new String[] { detectorId }, new String[] { DetectorStateString.Running.name() });
+        // Overriding the mocked response to set realtime task state to CREATED
+        when(getDetectorProfileResponse.getRealtimeAdTask().getState()).thenReturn("CREATED");
+        String expectedResponseStr = String
+            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
+
+        tool.run(emptyParams, listener);
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(listener, times(1)).onResponse(responseCaptor.capture());
+        assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
+    public void testRunWithTaskStateVariousFailed() throws Exception {
+        final String detectorName1 = "detector-1";
+        final String detectorId1 = "detector-1-id";
+        final String detectorName2 = "detector-2";
+        final String detectorId2 = "detector-2-id";
+        final String detectorName3 = "detector-3";
+        final String detectorId3 = "detector-3-id";
+        Tool tool = SearchAnomalyDetectorsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        // Generate mock values and responses
+        SearchHit[] hits = new SearchHit[3];
+        hits[0] = TestHelpers.generateSearchDetectorHit(detectorName1, detectorId1);
+        hits[1] = TestHelpers.generateSearchDetectorHit(detectorName2, detectorId2);
+        hits[2] = TestHelpers.generateSearchDetectorHit(detectorName3, detectorId3);
+        SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
+        GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
+            .generateGetAnomalyDetectorResponses(
+                new String[] { detectorId1, detectorId2, detectorId3 },
+                new String[] { "INIT_FAILURE", "UNEXPECTED_FAILURE", "FAILED" }
+            );
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
+
+        tool.run(Map.of("failed", "true"), listener);
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(listener, times(1)).onResponse(responseCaptor.capture());
+        assertTrue(responseCaptor.getValue().contains("TotalAnomalyDetectors=3"));
+    }
+
+    @Test
     public void testRunWithCombinedDetectorStatesTrue() throws Exception {
         final String detectorName1 = "detector-1";
         final String detectorId1 = "detector-1-id";
