@@ -114,8 +114,10 @@ dependencies {
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
-    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
-    implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${version}.jar"])
+    compileOnly group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
+//    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
+    //TODO change this to jar dependency once ad successfully published jars.
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
