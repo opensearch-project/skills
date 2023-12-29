@@ -71,7 +71,7 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
     }
 
     private void prepareVisualization(String title, String id) throws IOException {
-        Request request = new Request("POST", ".kibana/_doc/" + id);
+        Request request = new Request("POST", String.format(Locale.ROOT, ".kibana/_doc/%s?refresh=true", id));
         request
             .setJsonEntity(
                 "{\n"
