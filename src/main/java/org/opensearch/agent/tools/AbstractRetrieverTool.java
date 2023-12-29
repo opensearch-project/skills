@@ -66,6 +66,15 @@ public abstract class AbstractRetrieverTool implements Tool {
 
     protected abstract String getQueryBody(String queryText);
 
+    public static Map<String, Object> processResponse(SearchHit hit) {
+        Map<String, Object> docContent = new HashMap<>();
+        docContent.put("_index", hit.getIndex());
+        docContent.put("_id", hit.getId());
+        docContent.put("_score", hit.getScore());
+        docContent.put("_source", hit.getSourceAsMap());
+        return docContent;
+    }
+
     private <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String question = parameters.get(INPUT_FIELD);
         if (StringUtils.isBlank(question)) {
@@ -98,13 +107,8 @@ public abstract class AbstractRetrieverTool implements Tool {
 
             if (hits != null && hits.length > 0) {
                 StringBuilder contextBuilder = new StringBuilder();
-                for (int i = 0; i < hits.length; i++) {
-                    SearchHit hit = hits[i];
-                    Map<String, Object> docContent = new HashMap<>();
-                    docContent.put("_index", hit.getIndex());
-                    docContent.put("_id", hit.getId());
-                    docContent.put("_score", hit.getScore());
-                    docContent.put("_source", hit.getSourceAsMap());
+                for (SearchHit hit : hits) {
+                    Map<String, Object> docContent = processResponse(hit);
                     contextBuilder.append(gson.toJson(docContent)).append("\n");
                 }
                 listener.onResponse((T) contextBuilder.toString());

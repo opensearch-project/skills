@@ -12,6 +12,7 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
+import org.opensearch.agent.tools.SearchIndexTool;
 import org.opensearch.agent.tools.VectorDBTool;
 import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Client;
@@ -60,6 +61,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         VisualizationsTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
+        SearchIndexTool.Factory.getInstance().init(client, xContentRegistry);
         return Collections.emptyList();
     }
 
