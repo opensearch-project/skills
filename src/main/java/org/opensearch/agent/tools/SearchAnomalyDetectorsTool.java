@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -140,7 +141,8 @@ public class SearchAnomalyDetectorsTool implements Tool {
             if (running != null || disabled != null || failed != null) {
                 List<CompletableFuture<GetAnomalyDetectorResponse>> profileFutures = new ArrayList<>();
                 for (SearchHit hit : hits) {
-                    CompletableFuture<GetAnomalyDetectorResponse> profileFuture = new CompletableFuture<>();
+                    CompletableFuture<GetAnomalyDetectorResponse> profileFuture = new CompletableFuture<GetAnomalyDetectorResponse>()
+                        .orTimeout(30000, TimeUnit.MILLISECONDS);
                     profileFutures.add(profileFuture);
                     ActionListener<GetAnomalyDetectorResponse> profileListener = ActionListener
                         .<GetAnomalyDetectorResponse>wrap(profileResponse -> {
@@ -163,17 +165,25 @@ public class SearchAnomalyDetectorsTool implements Tool {
                     );
                     adClient.getDetectorProfile(profileRequest, profileListener);
                 }
-                CompletableFuture<List<GetAnomalyDetectorResponse>> listFuture = CompletableFuture
-                    .allOf(profileFutures.toArray(new CompletableFuture<?>[0]))
-                    .thenApply(v -> profileFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()));
-                final List<GetAnomalyDetectorResponse> profileResponses = listFuture.join();
+
+                List<GetAnomalyDetectorResponse> profileResponses = new ArrayList<>();
+                try {
+                    CompletableFuture<List<GetAnomalyDetectorResponse>> listFuture = CompletableFuture
+                        .allOf(profileFutures.toArray(new CompletableFuture<?>[0]))
+                        .thenApply(v -> profileFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()));
+                    profileResponses = listFuture.join();
+                } catch (Exception e) {
+                    log.error("Failed to get all anomaly detector profiles.", e);
+                    listener.onFailure(e);
+                }
+
                 for (GetAnomalyDetectorResponse profileResponse : profileResponses) {
                     if (profileResponse != null && profileResponse.getDetector() != null) {
                         String detectorId = profileResponse.getDetector().getId();
 
                         // We follow the existing logic as the frontend to determine overall detector state
                         // https://github.com/opensearch-project/anomaly-detection-dashboards-plugin/blob/main/server/routes/utils/adHelpers.ts#L437
-                        String detectorState;
+                        String detectorState = DetectorStateString.Disabled.name();
                         ADTask realtimeTask = profileResponse.getRealtimeAdTask();
 
                         if (realtimeTask != null) {
@@ -186,24 +196,15 @@ public class SearchAnomalyDetectorsTool implements Tool {
                                 || taskState.equalsIgnoreCase("UNEXPECTED_FAILURE")
                                 || taskState.equalsIgnoreCase("FAILED")) {
                                 detectorState = DetectorStateString.Failed.name();
-                            } else {
-                                // Task states may fall under other values, such as "FEATURE_REQUIRED" / "STOPPED" / etc.
-                                // Defaulting all other states to fall under the disabled category
-                                detectorState = DetectorStateString.Disabled.name();
                             }
-                        } else {
-                            detectorState = DetectorStateString.Disabled.name();
                         }
 
-                        if (running != null && !running && detectorState.equals(DetectorStateString.Running.name())) {
+                        if ((Boolean.FALSE.equals(running) && detectorState.equals(DetectorStateString.Running.name()))
+                            || (Boolean.FALSE.equals(disabled) && detectorState.equals(DetectorStateString.Disabled.name()))
+                            || (Boolean.FALSE.equals(failed) && detectorState.equals(DetectorStateString.Failed.name()))) {
                             hitsAsMap.remove(detectorId);
                         }
-                        if (disabled != null && !disabled && detectorState.equals(DetectorStateString.Disabled.name())) {
-                            hitsAsMap.remove(detectorId);
-                        }
-                        if (failed != null && !failed && detectorState.equals(DetectorStateString.Failed.name())) {
-                            hitsAsMap.remove(detectorId);
-                        }
+
                     }
                 }
             }
@@ -216,7 +217,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
                 sb.append("}");
             }
             sb.append("]");
-            sb.append("TotalAnomalyDetectors=").append(hitsAsMap.values().size());
+            sb.append("TotalAnomalyDetectors=").append(hitsAsMap.size());
             listener.onResponse((T) sb.toString());
         }, e -> {
             log.error("Failed to search anomaly detectors.", e);
