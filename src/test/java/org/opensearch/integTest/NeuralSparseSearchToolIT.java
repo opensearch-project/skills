@@ -96,8 +96,8 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
         assertEquals(
             "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 3\"},\"_id\":\"2\",\"_score\":6.0}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 2\"},\"_id\":\"1\",\"_score\":3.0}\n",
+            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 3\"},\"_id\":\"2\",\"_score\":2.4136734}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 2\"},\"_id\":\"1\",\"_score\":1.2068367}\n",
             result
         );
 
@@ -120,8 +120,8 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
         assertEquals(
             "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"2\",\"_score\":6.0}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":3.0}\n",
+            "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"2\",\"_score\":2.4136734}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":1.2068367}\n",
             result
         );
     }
