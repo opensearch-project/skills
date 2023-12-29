@@ -121,7 +121,6 @@ dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
 
     // ZipArchive dependencies used for integration tests
-    zipArchive group: 'org.opensearch.plugin', name: 'opensearch-job-scheduler', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
     zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
