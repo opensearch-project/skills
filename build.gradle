@@ -108,7 +108,7 @@ dependencies {
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
-    implementation group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
+    compileOnly group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
 //    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
     //TODO change this to jar dependency once ad successfully published jars.
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
