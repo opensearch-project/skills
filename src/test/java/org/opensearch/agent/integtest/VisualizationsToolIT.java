@@ -84,7 +84,7 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
                     + "}"
             );
         Response response = executeRequest(request);
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), RestStatus.OK.getStatus());
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), RestStatus.CREATED.getStatus());
     }
 
     private String extractAdditionalInfo(String responseStr) {
