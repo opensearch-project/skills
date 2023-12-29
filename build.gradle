@@ -70,7 +70,7 @@ apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
-def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
+def adJarDirectory = "$buildDir/dependencies/opensearch-anomaly-detection"
 
 configurations {
     zipArchive
@@ -92,7 +92,7 @@ task addJarsToClasspath(type: Copy) {
     into("$buildDir/classes")
 
     from(fileTree(dir: adJarDirectory)) {
-        include "opensearch-time-series-analytics-${version}.jar"
+        include "opensearch-anomaly-detection-${version}.jar"
     }
     into("$buildDir/classes")
 }
@@ -109,9 +109,9 @@ dependencies {
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     implementation group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
-//    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
+//    implementation group: 'org.opensearch', name: 'opensearch-anomaly-detection', version: "${version}"
     //TODO change this to jar dependency once ad successfully published jars.
-    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
