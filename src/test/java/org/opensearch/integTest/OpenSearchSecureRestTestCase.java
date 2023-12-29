@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* the first version of this class is duplicated from neural-search plugin.
+* https://github.com/opensearch-project/neural-search/blob/5daddfd2f10486ad4688742aa26db82461b6a73c/src/test/java/org/opensearch/neuralsearch/OpenSearchSecureRestTestCase.java#L1C1-L181C2*/
 package org.opensearch.integTest;
 
 import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_PER_ROUTE;
