@@ -138,9 +138,6 @@ public class SearchAnomalyDetectorsTool implements Tool {
 
             // If we need to filter by detector state, make subsequent profile API calls to each detector
             if (running != null || disabled != null || failed != null) {
-
-                // Send out individual AD client calls to fetch detector profiles, continuously adding to a
-                // tracked list of CompletableFutures
                 List<CompletableFuture<GetAnomalyDetectorResponse>> profileFutures = new ArrayList<>();
                 for (SearchHit hit : hits) {
                     CompletableFuture<GetAnomalyDetectorResponse> profileFuture = new CompletableFuture<>();
@@ -166,9 +163,6 @@ public class SearchAnomalyDetectorsTool implements Tool {
                     );
                     adClient.getDetectorProfile(profileRequest, profileListener);
                 }
-
-                // Wait for all CompletableFutures to complete, and iterate through the responses. Filter out
-                // detectors with unwanted detector states.
                 CompletableFuture<List<GetAnomalyDetectorResponse>> listFuture = CompletableFuture
                     .allOf(profileFutures.toArray(new CompletableFuture<?>[0]))
                     .thenApply(v -> profileFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()));
@@ -194,7 +188,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
                                 detectorState = DetectorStateString.Failed.name();
                             } else {
                                 // Task states may fall under other values, such as "FEATURE_REQUIRED" / "STOPPED" / etc.
-                                // We assume here that these will all fall under the disabled category
+                                // Defaulting all other states to fall under the disabled category
                                 detectorState = DetectorStateString.Disabled.name();
                             }
                         } else {
