@@ -24,6 +24,7 @@ import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.input.execute.agent.AgentMLInput;
@@ -88,6 +89,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         Object result = map.get(field);
         assertNotNull(result);
         return result;
+    }
+
+    protected String createConnector(String requestBody) {
+        Response response = makeRequest(client(), "POST", "/_plugins/_ml/connectors/_create", null, requestBody, null);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, MLModel.CONNECTOR_ID_FIELD).toString();
     }
 
     protected String registerModel(String requestBody) {
