@@ -29,6 +29,8 @@ import org.opensearch.ml.common.MLTaskState;
 import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
+import org.opensearch.ml.common.agent.MLAgent;
+import org.opensearch.ml.common.input.execute.agent.AgentMLInput;
 
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
@@ -85,11 +87,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     protected String registerModel(String requestBody) {
         Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/_register", null, requestBody, null);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
     protected String deployModel(String modelId) {
         Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_deploy", null, (String) null, null);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
@@ -97,6 +101,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     protected Response waitTaskComplete(String taskId) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
             Response response = makeRequest(client(), "GET", "/_plugins/_ml/tasks/" + taskId, null, (String) null, null);
+            assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
             String state = parseFieldFromResponse(response, MLTask.STATE_FIELD).toString();
             if (state.equals(MLTaskState.COMPLETED.toString())) {
                 return response;
@@ -120,6 +125,54 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         String deployModelTaskId = deployModel(modelId);
         waitTaskComplete(deployModelTaskId);
         return modelId;
+    }
+
+    protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
+        Response response = makeRequest(
+                client(),
+                "PUT",
+                indexName,
+                null,
+                indexConfiguration,
+                null
+        );
+        assertEquals("true", parseFieldFromResponse(response, "acknowledged").toString());
+        assertEquals(indexName, parseFieldFromResponse(response, "index").toString());
+    }
+
+    @SneakyThrows
+    protected void addDocToIndex(String indexName, String docId, List<String> fieldNames, List<Object> fieldContents) {
+        XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
+        for (int i = 0; i < fieldNames.size(); i++) {
+            builder.field(fieldNames.get(i), fieldContents.get(i));
+        }
+        builder.endObject();
+        Response response = makeRequest(
+                client(),
+                "POST",
+                "/" + indexName + "/_doc/" + docId + "?refresh=true",
+                null,
+                builder.toString(),
+                null
+        );
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
+    public String createAgent(String requestBody) {
+        Response response = makeRequest(
+                client(),
+                "POST",
+                "/_plugins/_ml/agents/_register",
+                null,
+               requestBody,
+                null
+        );
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, AgentMLInput.AGENT_ID_FIELD).toString();
+    }
+
+    public String executeAgent(String requstBody) {
+        return "";
     }
 
     public static Response makeRequest(
