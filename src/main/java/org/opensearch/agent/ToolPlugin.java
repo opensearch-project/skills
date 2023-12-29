@@ -12,7 +12,12 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
+import org.opensearch.agent.tools.RAGTool;
+import org.opensearch.agent.tools.SearchAlertsTool;
+import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
+import org.opensearch.agent.tools.SearchAnomalyResultsTool;
 import org.opensearch.agent.tools.SearchIndexTool;
+import org.opensearch.agent.tools.SearchMonitorsTool;
 import org.opensearch.agent.tools.VectorDBTool;
 import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Client;
@@ -62,6 +67,11 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
         SearchIndexTool.Factory.getInstance().init(client, xContentRegistry);
+        RAGTool.Factory.getInstance().init(client, xContentRegistry);
+        SearchAlertsTool.Factory.getInstance().init(client);
+        SearchAnomalyDetectorsTool.Factory.getInstance().init(client);
+        SearchAnomalyResultsTool.Factory.getInstance().init(client);
+        SearchMonitorsTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
@@ -72,7 +82,13 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 PPLTool.Factory.getInstance(),
                 NeuralSparseSearchTool.Factory.getInstance(),
                 VectorDBTool.Factory.getInstance(),
-                VisualizationsTool.Factory.getInstance()
+                VisualizationsTool.Factory.getInstance(),
+                SearchIndexTool.Factory.getInstance(),
+                RAGTool.Factory.getInstance(),
+                SearchAlertsTool.Factory.getInstance(),
+                SearchAnomalyDetectorsTool.Factory.getInstance(),
+                SearchAnomalyResultsTool.Factory.getInstance(),
+                SearchMonitorsTool.Factory.getInstance()
             );
     }
 }
