@@ -6,6 +6,9 @@
 package org.opensearch.agent.tools.utils;
 
 public class ToolConstants {
+    // Detector state is not cleanly defined on the backend plugin. So, we persist a standard
+    // set of states here for users to interface with when fetching and filtering detectors.
+    // This follows what frontend AD users are familiar with, as we use the same backend parsing logic.
     public static enum DetectorStateString {
         Running,
         Disabled,

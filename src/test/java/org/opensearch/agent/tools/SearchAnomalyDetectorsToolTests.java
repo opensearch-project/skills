@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -175,6 +176,33 @@ public class SearchAnomalyDetectorsToolTests {
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
 
         tool.run(Map.of("foo", "bar"), listener);
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(listener, times(1)).onResponse(responseCaptor.capture());
+        assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
+    public void testRunWithNullRealtimeTask() throws Exception {
+        final String detectorName = "detector-1";
+        final String detectorId = "detector-1-id";
+        Tool tool = SearchAnomalyDetectorsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        // Generate mock values and responses
+        SearchHit[] hits = new SearchHit[1];
+        hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
+        SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
+        GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
+            .generateGetAnomalyDetectorResponses(new String[] { detectorId }, new String[] { DetectorStateString.Running.name() });
+        // Overriding the mocked response to realtime task and setting to null. This occurs when
+        // a detector is created but is never started.
+        when(getDetectorProfileResponse.getRealtimeAdTask()).thenReturn(null);
+        String expectedResponseStr = String
+            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+        mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
+
+        tool.run(Map.of("disabled", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         assertEquals(expectedResponseStr, responseCaptor.getValue());
