@@ -70,6 +70,7 @@ apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
 def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
@@ -91,6 +92,11 @@ task addJarsToClasspath(type: Copy) {
     }
     into("$buildDir/classes")
 
+    from(fileTree(dir: jsJarDirectory)) {
+        include "opensearch-job-scheduler-${version}.jar"
+    }
+    into("$buildDir/classes")
+
     from(fileTree(dir: adJarDirectory)) {
         include "opensearch-time-series-analytics-${version}.jar"
     }
@@ -108,9 +114,7 @@ dependencies {
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
-    compileOnly group: 'org.opensearch', name: 'opensearch-job-scheduler', version: "${version}"
-//    implementation group: 'org.opensearch', name: 'opensearch-time-series-analytics', version: "${version}"
-    //TODO change this to jar dependency once ad successfully published jars.
+    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
@@ -118,6 +122,7 @@ dependencies {
 
     // ZipArchive dependencies used for integration tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
     zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
 
@@ -142,6 +147,12 @@ task extractSqlJar(type: Copy) {
     into sqlJarDirectory
 }
 
+task extractJsJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-job-scheduler")}))
+    into jsJarDirectory
+}
+
 task extractAdJar(type: Copy) {
     mustRunAfter()
     from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-anomaly-detection")}))
@@ -149,6 +160,7 @@ task extractAdJar(type: Copy) {
 }
 
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
@@ -193,6 +205,7 @@ spotless {
 
 compileJava {
     dependsOn extractSqlJar
+    dependsOn extractJsJar
     dependsOn extractAdJar
     dependsOn delombok
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
