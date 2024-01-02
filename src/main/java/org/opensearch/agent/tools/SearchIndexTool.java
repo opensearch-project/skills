@@ -80,12 +80,11 @@ public class SearchIndexTool implements Tool {
 
     private SearchRequest getSearchRequest(String index, String query) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        XContentParser queryParser = XContentType.JSON
-                .xContent()
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
+        XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
         searchSourceBuilder.parseXContent(queryParser);
         return new SearchRequest().source(searchSourceBuilder).indices(index);
     }
+
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
@@ -102,8 +101,7 @@ public class SearchIndexTool implements Tool {
                     // try different json parsing method
                     query = jsonObject.get(QUERY_FIELD).getAsString();
                     searchRequest = getSearchRequest(index, query);
-                }
-                catch (Exception e2) {
+                } catch (Exception e2) {
                     // try wrapped query
                     query = "{\"query\": " + query + "}";
                     searchRequest = getSearchRequest(index, query);
