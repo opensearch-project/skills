@@ -1,0 +1,5 @@
+{
+  "name":"amazon/neural-sparse/opensearch-neural-sparse-tokenizer-v1",
+  "version":"1.0.1",
+  "model_format": "TORCH_SCRIPT"
+}
