@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.CommonValue.*;
 
+import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
@@ -77,6 +78,14 @@ public class SearchIndexTool implements Tool {
         return parameters != null && parameters.containsKey(INPUT_FIELD) && parameters.get(INPUT_FIELD) != null;
     }
 
+    private SearchRequest getSearchRequest(String index, String query) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        XContentParser queryParser = XContentType.JSON
+                .xContent()
+                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
+        searchSourceBuilder.parseXContent(queryParser);
+        return new SearchRequest().source(searchSourceBuilder).indices(index);
+    }
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
@@ -84,14 +93,22 @@ public class SearchIndexTool implements Tool {
             JsonObject jsonObject = StringUtils.gson.fromJson(input, JsonObject.class);
             String index = jsonObject.get(INDEX_FIELD).getAsString();
             String query = jsonObject.get(QUERY_FIELD).toString();
-            query = "{\"query\": " + query + "}";
 
-            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-            XContentParser queryParser = XContentType.JSON
-                .xContent()
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
-            searchSourceBuilder.parseXContent(queryParser);
-            SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(index);
+            SearchRequest searchRequest;
+            try {
+                searchRequest = getSearchRequest(index, query);
+            } catch (Exception e1) {
+                try {
+                    // try different json parsing method
+                    query = jsonObject.get(QUERY_FIELD).getAsString();
+                    searchRequest = getSearchRequest(index, query);
+                }
+                catch (Exception e2) {
+                    // try wrapped query
+                    query = "{\"query\": " + query + "}";
+                    searchRequest = getSearchRequest(index, query);
+                }
+            }
 
             ActionListener<SearchResponse> actionListener = ActionListener.<SearchResponse>wrap(r -> {
                 SearchHit[] hits = r.getHits().getHits();
