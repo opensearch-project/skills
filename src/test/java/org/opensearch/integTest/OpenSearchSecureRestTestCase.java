@@ -5,9 +5,6 @@
 
 package org.opensearch.integTest;
 
-import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_PER_ROUTE;
-import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_TOTAL;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -15,19 +12,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.hc.client5.http.auth.AuthScope;
-import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
-import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
-import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager;
-import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
-import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
-import org.apache.hc.core5.http.Header;
-import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.http.message.BasicHeader;
-import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
-import org.apache.hc.core5.ssl.SSLContextBuilder;
-import org.apache.hc.core5.util.Timeout;
+import org.apache.http.Header;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.junit.After;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -36,8 +29,8 @@ import org.opensearch.client.RestClientBuilder;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.xcontent.DeprecationHandler;
-import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
@@ -100,42 +93,28 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
         }
         builder.setDefaultHeaders(defaultHeaders);
         builder.setHttpClientConfigCallback(httpClientBuilder -> {
-            final String userName = Optional
-                .ofNullable(System.getProperty(SYS_PROPERTY_KEY_USER))
-                .orElseThrow(() -> new RuntimeException("user name is missing"));
-            final String password = Optional
-                .ofNullable(System.getProperty(SYS_PROPERTY_KEY_PASSWORD))
-                .orElseThrow(() -> new RuntimeException("password is missing"));
-            final BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-            final AuthScope anyScope = new AuthScope(null, -1);
-            credentialsProvider.setCredentials(anyScope, new UsernamePasswordCredentials(userName, password.toCharArray()));
+            final String userName = Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_USER))
+                    .orElseThrow(() -> new RuntimeException("user name is missing"));
+            final String password = Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_PASSWORD))
+                    .orElseThrow(() -> new RuntimeException("password is missing"));
+            final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+            credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(userName, password));
             try {
-                final TlsStrategy tlsStrategy = ClientTlsStrategyBuilder
-                    .create()
-                    .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                    .setSslContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build())
-                    .build();
-                final PoolingAsyncClientConnectionManager connectionManager = PoolingAsyncClientConnectionManagerBuilder
-                    .create()
-                    .setMaxConnPerRoute(DEFAULT_MAX_CONN_PER_ROUTE)
-                    .setMaxConnTotal(DEFAULT_MAX_CONN_TOTAL)
-                    .setTlsStrategy(tlsStrategy)
-                    .build();
-                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider).setConnectionManager(connectionManager);
+                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider)
+                        // disable the certificate since our testing cluster just uses the default security configuration
+                        .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                        .setSSLContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
 
         final String socketTimeoutString = settings.get(CLIENT_SOCKET_TIMEOUT);
-        final TimeValue socketTimeout = TimeValue
-            .parseTimeValue(socketTimeoutString == null ? DEFAULT_SOCKET_TIMEOUT : socketTimeoutString, CLIENT_SOCKET_TIMEOUT);
-        builder.setRequestConfigCallback(conf -> {
-            Timeout timeout = Timeout.ofMilliseconds(Math.toIntExact(socketTimeout.getMillis()));
-            conf.setConnectTimeout(timeout);
-            conf.setResponseTimeout(timeout);
-            return conf;
-        });
+        final TimeValue socketTimeout = TimeValue.parseTimeValue(
+                socketTimeoutString == null ? DEFAULT_SOCKET_TIMEOUT : socketTimeoutString,
+                CLIENT_SOCKET_TIMEOUT
+        );
+        builder.setRequestConfigCallback(conf -> conf.setSocketTimeout(Math.toIntExact(socketTimeout.getMillis())));
         if (settings.hasValue(CLIENT_PATH_PREFIX)) {
             builder.setPathPrefix(settings.get(CLIENT_PATH_PREFIX));
         }
@@ -152,14 +131,11 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
     @After
     public void deleteExternalIndices() throws IOException {
         final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
-        final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (
-            final XContentParser parser = xContentType
-                .xContent()
-                .createParser(
-                    NamedXContentRegistry.EMPTY,
-                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-                    response.getEntity().getContent()
+                final XContentParser parser = JsonXContent.jsonXContent.createParser(
+                        NamedXContentRegistry.EMPTY,
+                        DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+                        response.getEntity().getContent()
                 )
         ) {
             final XContentParser.Token token = parser.nextToken();
@@ -170,12 +146,11 @@ public abstract class OpenSearchSecureRestTestCase extends OpenSearchRestTestCas
                 parserList = Collections.singletonList(parser.mapOrdered());
             }
 
-            final List<String> externalIndices = parserList
-                .stream()
-                .map(index -> (String) index.get("index"))
-                .filter(indexName -> indexName != null)
-                .filter(indexName -> !indexName.startsWith(INTERNAL_INDICES_PREFIX))
-                .collect(Collectors.toList());
+            final List<String> externalIndices = parserList.stream()
+                    .map(index -> (String) index.get("index"))
+                    .filter(indexName -> indexName != null)
+                    .filter(indexName -> !indexName.startsWith(INTERNAL_INDICES_PREFIX))
+                    .collect(Collectors.toList());
 
             for (final String indexName : externalIndices) {
                 adminClient().performRequest(new Request("DELETE", "/" + indexName));
