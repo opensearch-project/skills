@@ -92,6 +92,15 @@ public class SearchIndexToolTests {
     }
 
     @Test
+    public void testRunWithModelGroupIndex() {
+        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": {\"match_all\": {}}}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, never()).search(any(), any());
+        Mockito.verify(client, times(1)).execute(eq(MLConnectorSearchAction.INSTANCE), any(), any());
+    }
+
+    @Test
     public void testRunWithConnectorIndex() {
         String inputString = "{\"index\": \".plugins-ml-connector\", \"query\": {\"match_all\": {}}}";
         Map<String, String> parameters = Map.of("input", inputString);
