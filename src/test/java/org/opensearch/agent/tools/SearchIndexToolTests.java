@@ -28,6 +28,7 @@ import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.transport.connector.MLConnectorSearchAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
+import org.opensearch.ml.common.transport.model_group.MLModelGroupSearchAction;
 import org.opensearch.search.SearchModule;
 
 import lombok.SneakyThrows;
@@ -92,15 +93,6 @@ public class SearchIndexToolTests {
     }
 
     @Test
-    public void testRunWithModelGroupIndex() {
-        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": {\"match_all\": {}}}";
-        Map<String, String> parameters = Map.of("input", inputString);
-        mockedSearchIndexTool.run(parameters, null);
-        Mockito.verify(client, never()).search(any(), any());
-        Mockito.verify(client, times(1)).execute(eq(MLConnectorSearchAction.INSTANCE), any(), any());
-    }
-
-    @Test
     public void testRunWithConnectorIndex() {
         String inputString = "{\"index\": \".plugins-ml-connector\", \"query\": {\"match_all\": {}}}";
         Map<String, String> parameters = Map.of("input", inputString);
@@ -116,6 +108,15 @@ public class SearchIndexToolTests {
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, never()).search(any(), any());
         Mockito.verify(client, times(1)).execute(eq(MLModelSearchAction.INSTANCE), any(), any());
+    }
+
+    @Test
+    public void testRunWithModelGroupIndex() {
+        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": {\"match_all\": {}}}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, never()).search(any(), any());
+        Mockito.verify(client, times(1)).execute(eq(MLModelGroupSearchAction.INSTANCE), any(), any());
     }
 
     @Test
