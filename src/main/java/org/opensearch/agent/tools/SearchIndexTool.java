@@ -88,16 +88,10 @@ public class SearchIndexTool implements Tool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
-            log.info("search index tool with parameters");
-            log.info(parameters.toString());
             String input = parameters.get(INPUT_FIELD);
             JsonObject jsonObject = StringUtils.gson.fromJson(input, JsonObject.class);
             String index = jsonObject.get(INDEX_FIELD).getAsString();
-            log.info("search index tool with index");
-            log.info(index);
             String query = jsonObject.get(QUERY_FIELD).toString();
-            log.info("search index tool with query");
-            log.info(query);
 
             SearchRequest searchRequest;
             try {
