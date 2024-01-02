@@ -84,7 +84,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithNormalIndex() {
-        String inputString = "{\"index\": \"test-index\", \"query\": {\"match_all\": {}}}";
+        String inputString = "{\"index\": \"test-index\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, times(1)).search(any(), any());
@@ -154,6 +154,26 @@ public class SearchIndexToolTests {
         mockedSearchIndexTool.run(parameters, listener);
         Mockito.verify(client, Mockito.never()).execute(any(), any(), any());
         Mockito.verify(client, Mockito.never()).search(any(), any());
+    }
+
+    @Test
+    public void testRunWithEmptyQueryBody() {
+        // this empty query should be parsed with jsonObject.get(QUERY_FIELD).getAsString();
+        String inputString = "{\"index\": \"test-index\", \"query\": \"{}\"}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, times(1)).search(any(), any());
+        Mockito.verify(client, Mockito.never()).execute(any(), any(), any());
+    }
+
+    @Test
+    public void testRunWithWrappedQuery() {
+        // this query should be wrapped liked "{\"query\": " + query + "}"
+        String inputString = "{\"index\": \".plugins-ml-model\", \"query\": {\"match_all\": {}}}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, never()).search(any(), any());
+        Mockito.verify(client, times(1)).execute(eq(MLModelSearchAction.INSTANCE), any(), any());
     }
 
     @Test
