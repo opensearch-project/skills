@@ -75,10 +75,9 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     @SneakyThrows
-    private Map parseResponseToMap(Response response) {
+    private Map<String, Object> parseResponseToMap(Response response) {
         Map<String, Object> responseInMap = XContentHelper
             .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
-        response.getEntity().toString();
         return responseInMap;
     }
 
@@ -110,13 +109,14 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     @SneakyThrows
-    protected Response waitTaskComplete(String taskId) {
+    protected Map<String, Object> waitTaskComplete(String taskId) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
             Response response = makeRequest(client(), "GET", "/_plugins/_ml/tasks/" + taskId, null, (String) null, null);
             assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
-            String state = parseFieldFromResponse(response, MLTask.STATE_FIELD).toString();
+            Map<String, Object> responseInMap = parseResponseToMap(response);
+            String state = responseInMap.get(MLTask.STATE_FIELD).toString();
             if (state.equals(MLTaskState.COMPLETED.toString())) {
-                return response;
+                return responseInMap;
             }
             if (state.equals(MLTaskState.FAILED.toString())
                 || state.equals(MLTaskState.CANCELLED.toString())
@@ -132,8 +132,8 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     // Register the model then deploy it. Returns the model_id until the model is deployed
     protected String registerModelThenDeploy(String requestBody) {
         String registerModelTaskId = registerModel(requestBody);
-        Response registerTaskResponse = waitTaskComplete(registerModelTaskId);
-        String modelId = parseFieldFromResponse(registerTaskResponse, MLTask.MODEL_ID_FIELD).toString();
+        Map<String, Object> registerTaskResponseInMap = waitTaskComplete(registerModelTaskId);
+        String modelId = registerTaskResponseInMap.get(MLTask.MODEL_ID_FIELD).toString();
         String deployModelTaskId = deployModel(modelId);
         waitTaskComplete(deployModelTaskId);
         return modelId;
@@ -141,8 +141,9 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
         Response response = makeRequest(client(), "PUT", indexName, null, indexConfiguration, null);
-        assertEquals("true", parseFieldFromResponse(response, "acknowledged").toString());
-        assertEquals(indexName, parseFieldFromResponse(response, "index").toString());
+        Map<String, Object> responseInMap = parseResponseToMap(response);
+        assertEquals("true", responseInMap.get("acknowledged").toString());
+        assertEquals(indexName, responseInMap.get("index").toString());
     }
 
     @SneakyThrows
