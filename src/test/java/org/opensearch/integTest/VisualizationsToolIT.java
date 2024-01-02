@@ -3,18 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.agent.integtest;
+package org.opensearch.integTest;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Request;
-import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 import org.opensearch.core.rest.RestStatus;
 
@@ -28,13 +26,23 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
     List<PromptHandler> promptHandlers() {
         return List.of(new PromptHandler() {
             @Override
-            Pair<String, String> questionAndInput() {
-                return Pair.of("can you show me RAM info with visualization?", "RAM");
+            ToolInput toolInput() {
+                return ToolInput
+                    .builder()
+                    .toolType(VisualizationsTool.TYPE)
+                    .toolInput("RAM")
+                    .question("can you show me RAM info with visualization?")
+                    .build();
             }
         }, new PromptHandler() {
             @Override
-            Pair<String, String> questionAndInput() {
-                return Pair.of("how about the sales about this month?", "sales");
+            ToolInput toolInput() {
+                return ToolInput
+                    .builder()
+                    .toolType(VisualizationsTool.TYPE)
+                    .toolInput("sales")
+                    .question("how about the sales about this month?")
+                    .build();
             }
         });
     }
@@ -46,10 +54,7 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
     public void testVisualizationNotFound() throws IOException {
         Request request = new Request("POST", "/_plugins/_ml/agents/" + agentId + "/_execute");
         request.setJsonEntity("{\"parameters\":{\"question\":\"can you show me RAM info with visualization?\"}}");
-        RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
-        builder.addHeader("Content-Type", "application/json");
-        request.setOptions(builder);
-        Response response = getRestClient().performRequest(request);
+        Response response = executeRequest(request);
         String responseStr = readResponse(response);
         String toolOutput = extractAdditionalInfo(responseStr);
         Assert.assertEquals("No Visualization found", toolOutput);
@@ -61,29 +66,22 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
         prepareVisualization(title, id);
         Request request = new Request("POST", "/_plugins/_ml/agents/" + agentId + "/_execute");
         request.setJsonEntity("{\"parameters\":{\"question\":\"how about the sales about this month?\"}}");
-        RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
-        builder.addHeader("Content-Type", "application/json");
-        request.setOptions(builder);
-        Response response = getRestClient().performRequest(request);
+        Response response = executeRequest(request);
         String responseStr = readResponse(response);
         String toolOutput = extractAdditionalInfo(responseStr);
         Assert.assertEquals("Title,Id\n" + String.format(Locale.ROOT, "%s,%s\n", title, id), toolOutput);
     }
 
-    private void prepareVisualization(String title, String id) throws IOException {
-        Request request = new Request("POST", String.format(Locale.ROOT, ".kibana/_doc/%s?refresh=true", id));
-        request
-            .setJsonEntity(
-                "{\n"
-                    + "    \"visualization\": {\n"
-                    + "        \"title\": \""
-                    + title
-                    + "\"\n"
-                    + "    },\n"
-                    + "    \"type\": \"visualization\"\n"
-                    + "}"
-            );
-        Response response = executeRequest(request);
+    private void prepareVisualization(String title, String id) {
+        String body = "{\n"
+            + "    \"visualization\": {\n"
+            + "        \"title\": \""
+            + title
+            + "\"\n"
+            + "    },\n"
+            + "    \"type\": \"visualization\"\n"
+            + "}";
+        Response response = makeRequest(client(), "POST", String.format(Locale.ROOT, ".kibana/_doc/%s?refresh=true", id), null, body, null);
         Assert.assertEquals(response.getStatusLine().getStatusCode(), RestStatus.CREATED.getStatus());
     }
 
