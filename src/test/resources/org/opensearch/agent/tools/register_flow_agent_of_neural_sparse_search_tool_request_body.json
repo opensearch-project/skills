@@ -1,0 +1,17 @@
+{
+  "name": "Test_Neural_Sparse_Agent_For_RAG",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "NeuralSparseSearchTool",
+      "parameters": {
+        "description":"user this tool to search data from the test index",
+        "model_id": "<MODEL_ID>",
+        "index": "test_index",
+        "embedding_field": "embedding",
+        "source_field": ["text"],
+        "input": "${parameters.question}"
+      }
+    }
+  ]
+}
