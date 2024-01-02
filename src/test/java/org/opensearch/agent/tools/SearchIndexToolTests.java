@@ -17,19 +17,18 @@ import java.util.concurrent.CompletableFuture;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.core.common.ParsingException;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.transport.connector.MLConnectorSearchAction;
 import org.opensearch.ml.common.transport.model.MLModelSearchAction;
+import org.opensearch.ml.common.transport.model_group.MLModelGroupSearchAction;
 import org.opensearch.search.SearchModule;
 
 import lombok.SneakyThrows;
@@ -86,7 +85,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithNormalIndex() {
-        String inputString = "{\"index\": \"test-index\", \"query\": {\"match_all\": {}}}";
+        String inputString = "{\"index\": \"test-index\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, times(1)).search(any(), any());
@@ -109,6 +108,15 @@ public class SearchIndexToolTests {
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, never()).search(any(), any());
         Mockito.verify(client, times(1)).execute(eq(MLModelSearchAction.INSTANCE), any(), any());
+    }
+
+    @Test
+    public void testRunWithModelGroupIndex() {
+        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": {\"match_all\": {}}}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, never()).search(any(), any());
+        Mockito.verify(client, times(1)).execute(eq(MLModelGroupSearchAction.INSTANCE), any(), any());
     }
 
     @Test
@@ -156,9 +164,26 @@ public class SearchIndexToolTests {
         mockedSearchIndexTool.run(parameters, listener);
         Mockito.verify(client, Mockito.never()).execute(any(), any(), any());
         Mockito.verify(client, Mockito.never()).search(any(), any());
-        ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(ParsingException.class);
-        // since error message for ParsingException is different, we only need to expect ParsingException to be thrown
-        verify(listener).onFailure(argumentCaptor.capture());
+    }
+
+    @Test
+    public void testRunWithEmptyQueryBody() {
+        // this empty query should be parsed with jsonObject.get(QUERY_FIELD).getAsString();
+        String inputString = "{\"index\": \"test-index\", \"query\": \"{}\"}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, times(1)).search(any(), any());
+        Mockito.verify(client, Mockito.never()).execute(any(), any(), any());
+    }
+
+    @Test
+    public void testRunWithWrappedQuery() {
+        // this query should be wrapped liked "{\"query\": " + query + "}"
+        String inputString = "{\"index\": \".plugins-ml-model\", \"query\": {\"match_all\": {}}}";
+        Map<String, String> parameters = Map.of("input", inputString);
+        mockedSearchIndexTool.run(parameters, null);
+        Mockito.verify(client, never()).search(any(), any());
+        Mockito.verify(client, times(1)).execute(eq(MLModelSearchAction.INSTANCE), any(), any());
     }
 
     @Test
