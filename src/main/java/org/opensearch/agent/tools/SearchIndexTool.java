@@ -48,7 +48,7 @@ public class SearchIndexTool implements Tool {
 
     public static final String TYPE = "SearchIndexTool";
     private static final String DEFAULT_DESCRIPTION =
-        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query.";
+        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query. Only use this tool when a DSL query is available.";
 
     private String name = TYPE;
 
@@ -97,15 +97,9 @@ public class SearchIndexTool implements Tool {
             try {
                 searchRequest = getSearchRequest(index, query);
             } catch (Exception e1) {
-                try {
-                    // try different json parsing method
-                    query = jsonObject.get(QUERY_FIELD).getAsString();
-                    searchRequest = getSearchRequest(index, query);
-                } catch (Exception e2) {
-                    // try wrapped query
-                    query = "{\"query\": " + query + "}";
-                    searchRequest = getSearchRequest(index, query);
-                }
+                // try different json parsing method
+                query = jsonObject.get(QUERY_FIELD).getAsString();
+                searchRequest = getSearchRequest(index, query);
             }
 
             ActionListener<SearchResponse> actionListener = ActionListener.<SearchResponse>wrap(r -> {
