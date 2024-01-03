@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.Collections;
@@ -153,6 +154,23 @@ public class PPLToolTests {
             assertEquals("source=demo|head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
 
+    }
+
+    @Test
+    public void testTool_querySystemIndex() {
+        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tool.run(ImmutableMap.of("index", ML_CONNECTOR_INDEX, "question", "demo"), ActionListener.<String>wrap(ppl -> {
+                assertEquals(pplResult, "ppl result");
+            }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
+        );
+        assertEquals(
+            "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                + ML_CONNECTOR_INDEX,
+            exception.getMessage()
+        );
     }
 
     @Test
