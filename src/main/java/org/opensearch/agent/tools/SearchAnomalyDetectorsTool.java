@@ -179,7 +179,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
 
                 for (GetAnomalyDetectorResponse profileResponse : profileResponses) {
                     if (profileResponse != null && profileResponse.getDetector() != null) {
-                        String detectorId = profileResponse.getDetector().getId();
+                        String detectorId = profileResponse.getDetector().getDetectorId();
 
                         // We follow the existing logic as the frontend to determine overall detector state
                         // https://github.com/opensearch-project/anomaly-detection-dashboards-plugin/blob/main/server/routes/utils/adHelpers.ts#L437
