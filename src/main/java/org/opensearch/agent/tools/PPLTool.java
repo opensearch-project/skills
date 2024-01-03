@@ -283,7 +283,9 @@ public class PPLTool implements Tool {
             if (v instanceof Map) {
                 Map<String, Object> vMap = (Map<String, Object>) v;
                 if (vMap.containsKey("type")) {
-                    fieldsToType.put(prefix + n, (String) vMap.get("type"));
+                    if (!((vMap.getOrDefault("type", "")).equals("alias"))) {
+                        fieldsToType.put(prefix + n, (String) vMap.get("type"));
+                    }
                 } else if (vMap.containsKey("properties")) {
                     extractNamesTypes((Map<String, Object>) vMap.get("properties"), fieldsToType, prefix + n);
                 }
