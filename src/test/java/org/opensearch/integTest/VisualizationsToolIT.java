@@ -26,21 +26,21 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
     List<PromptHandler> promptHandlers() {
         return List.of(new PromptHandler() {
             @Override
-            ToolInput toolInput() {
-                return ToolInput
+            LLMThought llmThought() {
+                return LLMThought
                     .builder()
-                    .toolType(VisualizationsTool.TYPE)
-                    .toolInput("RAM")
+                    .action(VisualizationsTool.TYPE)
+                    .actionInput("RAM")
                     .question("can you show me RAM info with visualization?")
                     .build();
             }
         }, new PromptHandler() {
             @Override
-            ToolInput toolInput() {
-                return ToolInput
+            LLMThought llmThought() {
+                return LLMThought
                     .builder()
-                    .toolType(VisualizationsTool.TYPE)
-                    .toolInput("sales")
+                    .action(VisualizationsTool.TYPE)
+                    .actionInput("sales")
                     .question("how about the sales about this month?")
                     .build();
             }

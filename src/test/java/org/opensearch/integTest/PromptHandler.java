@@ -15,11 +15,11 @@ import lombok.NoArgsConstructor;
 public class PromptHandler {
 
     boolean apply(String prompt) {
-        return prompt.contains(toolInput().getQuestion());
+        return prompt.contains(llmThought().getQuestion());
     }
 
-    ToolInput toolInput() {
-        return new ToolInput();
+    LLMThought llmThought() {
+        return new LLMThought();
     }
 
     String response(String prompt) {
@@ -32,10 +32,10 @@ public class PromptHandler {
             return "```json{\n"
                 + "    \"thought\": \"Thought: Let me use tool to figure out\",\n"
                 + "    \"action\": \""
-                + this.toolInput().getToolType()
+                + this.llmThought().getAction()
                 + "\",\n"
                 + "    \"action_input\": \""
-                + this.toolInput().getToolInput()
+                + this.llmThought().getActionInput()
                 + "\"\n"
                 + "}```";
         }
@@ -45,10 +45,10 @@ public class PromptHandler {
     @NoArgsConstructor
     @AllArgsConstructor
     @Data
-    static class ToolInput {
+    static class LLMThought {
         String question;
-        String toolType;
-        String toolInput;
+        String action;
+        String actionInput;
     }
 
     @Data

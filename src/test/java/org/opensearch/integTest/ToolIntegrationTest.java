@@ -5,9 +5,8 @@
 
 package org.opensearch.integTest;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -213,14 +212,8 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
     }
 
     public static String readResponse(Response response) throws IOException {
-        StringBuilder sb = new StringBuilder();
-
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                sb.append(line);
-            }
+        try (InputStream ins = response.getEntity().getContent()) {
+            return String.join("", org.opensearch.common.io.Streams.readAllLines(ins));
         }
-        return sb.toString();
     }
 }
