@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.*;
+
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -95,6 +97,12 @@ public class PPLTool implements Tool {
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
+        }
+        if (indexName.startsWith(".")) {
+            throw new IllegalArgumentException(
+                "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                    + indexName
+            );
         }
         SearchRequest searchRequest = buildSearchRequest(indexName);
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
