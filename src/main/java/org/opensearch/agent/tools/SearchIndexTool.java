@@ -96,7 +96,7 @@ public class SearchIndexTool implements Tool {
             SearchRequest searchRequest;
             try {
                 searchRequest = getSearchRequest(index, query);
-            } catch (Exception e1) {
+            } catch (Exception e) {
                 // try different json parsing method
                 query = jsonObject.get(QUERY_FIELD).getAsString();
                 searchRequest = getSearchRequest(index, query);
