@@ -115,8 +115,7 @@ public class PPLToolIT extends ToolIntegrationTest {
         prepareIndex();
         String agentId = registerAgent();
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
-        MatcherAssert
-            .assertThat(exception.getMessage(), allOf(containsString("Parameter index and question can not be null or empty.")));
+        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("Parameter index and question can not be null or empty.")));
     }
 
     @SneakyThrows
