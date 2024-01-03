@@ -92,15 +92,7 @@ public class SearchIndexTool implements Tool {
             JsonObject jsonObject = StringUtils.gson.fromJson(input, JsonObject.class);
             String index = jsonObject.get(INDEX_FIELD).getAsString();
             String query = jsonObject.get(QUERY_FIELD).toString();
-
-            SearchRequest searchRequest;
-            try {
-                searchRequest = getSearchRequest(index, query);
-            } catch (Exception e) {
-                // try different json parsing method
-                query = jsonObject.get(QUERY_FIELD).getAsString();
-                searchRequest = getSearchRequest(index, query);
-            }
+            SearchRequest searchRequest = getSearchRequest(index, query);
 
             ActionListener<SearchResponse> actionListener = ActionListener.<SearchResponse>wrap(r -> {
                 SearchHit[] hits = r.getHits().getHits();

@@ -85,7 +85,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithNormalIndex() {
-        String inputString = "{\"index\": \"test-index\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \"test-index\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, times(1)).search(any(), any());
@@ -94,7 +94,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithConnectorIndex() {
-        String inputString = "{\"index\": \".plugins-ml-connector\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \".plugins-ml-connector\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, never()).search(any(), any());
@@ -103,7 +103,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithModelIndex() {
-        String inputString = "{\"index\": \".plugins-ml-model\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \".plugins-ml-model\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, never()).search(any(), any());
@@ -112,7 +112,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithModelGroupIndex() {
-        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \".plugins-ml-model-group\", \"query\": {\"query\": {\"match_all\": {}}}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, never()).search(any(), any());
@@ -133,7 +133,7 @@ public class SearchIndexToolTests {
             return null;
         }).when(client).search(any(), any());
 
-        String inputString = "{\"index\": \"test-index\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \"test-index\", \"query\": {\"query\": {\"match_all\": {}}}}";
         final CompletableFuture<String> future = new CompletableFuture<>();
         ActionListener<String> listener = ActionListener.wrap(r -> { future.complete(r); }, e -> { future.completeExceptionally(e); });
         Map<String, String> parameters = Map.of("input", inputString);
@@ -168,8 +168,7 @@ public class SearchIndexToolTests {
 
     @Test
     public void testRunWithEmptyQueryBody() {
-        // this empty query should be parsed with jsonObject.get(QUERY_FIELD).getAsString();
-        String inputString = "{\"index\": \"test-index\", \"query\": \"{}\"}";
+        String inputString = "{\"index\": \"test-index\", \"query\": {}}";
         Map<String, String> parameters = Map.of("input", inputString);
         mockedSearchIndexTool.run(parameters, null);
         Mockito.verify(client, times(1)).search(any(), any());
