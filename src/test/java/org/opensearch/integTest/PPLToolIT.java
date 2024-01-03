@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.hamcrest.MatcherAssert;
 import org.opensearch.agent.tools.PPLTool;
 import org.opensearch.client.ResponseException;
 
@@ -66,7 +67,7 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"wrong\", \"index\": \"employee\"}}")
         );
-        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("execute ppl:source=employee| asd, get error")));
+        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("execute ppl:source=employee| asd, get error")));
 
     }
 
@@ -77,7 +78,7 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}")
         );
-        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("Failed to find model")));
+        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("Failed to find model")));
 
     }
 
@@ -88,7 +89,7 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \".employee\"}}")
         );
-        org.hamcrest.MatcherAssert
+        MatcherAssert
             .assertThat(
                 exception.getMessage(),
                 allOf(
@@ -107,14 +108,14 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee2\"}}")
         );
-        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("no such index [employee2]")));
+        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("no such index [employee2]")));
     }
 
     public void testPPLTool_withBlankInput_thenThrowException() {
         prepareIndex();
         String agentId = registerAgent();
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
-        org.hamcrest.MatcherAssert
+        MatcherAssert
             .assertThat(exception.getMessage(), allOf(containsString("Parameter index and question can not be null or empty.")));
     }
 
