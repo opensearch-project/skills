@@ -166,7 +166,10 @@ public class PPLToolTests {
                 assertEquals(pplResult, "ppl result");
             }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
         );
-        assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, exception.getMessage());
+        assertEquals(
+            "PPLTool doesn't support searching system indices, current searching index name: " + ML_CONNECTOR_INDEX,
+            exception.getMessage()
+        );
     }
 
     @Test

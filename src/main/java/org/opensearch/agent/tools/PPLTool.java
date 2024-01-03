@@ -104,7 +104,9 @@ public class PPLTool implements Tool {
         }
         for (String systemIndex : SYSTEM_INDICES) {
             if (indexName.contains(systemIndex)) {
-                throw new IllegalArgumentException("We cannot search system indices " + indexName);
+                throw new IllegalArgumentException(
+                    "PPLTool doesn't support searching system indices, current searching index name: " + indexName
+                );
             }
         }
         SearchRequest searchRequest = buildSearchRequest(indexName);
