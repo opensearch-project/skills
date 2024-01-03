@@ -28,9 +28,9 @@ public class PPLToolIT extends ToolIntegrationTest {
         PromptHandler PPLHandler = new PromptHandler() {
             @Override
             String response(String prompt) {
-                if (prompt.contains("correct")){
-                return "source=employee | where age > 56 | stats COUNT() as cnt";}
-                else {
+                if (prompt.contains("correct")) {
+                    return "source=employee | where age > 56 | stats COUNT() as cnt";
+                } else {
                     return "source=employee | asd";
                 }
             }
@@ -63,18 +63,10 @@ public class PPLToolIT extends ToolIntegrationTest {
         prepareIndex();
         String agentId = registerAgent();
         Exception exception = assertThrows(
-                ResponseException.class,
-                () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"wrong\", \"index\": \"employee\"}}")
+            ResponseException.class,
+            () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"wrong\", \"index\": \"employee\"}}")
         );
-        org.hamcrest.MatcherAssert
-                .assertThat(
-                        exception.getMessage(),
-                        allOf(
-                                containsString(
-                                        "execute ppl:source=employee| asd, get error"
-                                )
-                        )
-                );
+        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("execute ppl:source=employee| asd, get error")));
 
     }
 
@@ -82,18 +74,10 @@ public class PPLToolIT extends ToolIntegrationTest {
         prepareIndex();
         String agentId = registerAgentWithWrongModelId();
         Exception exception = assertThrows(
-                ResponseException.class,
-                () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}")
+            ResponseException.class,
+            () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}")
         );
-        org.hamcrest.MatcherAssert
-                .assertThat(
-                        exception.getMessage(),
-                        allOf(
-                                containsString(
-                                        "Failed to find model"
-                                )
-                        )
-                );
+        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("Failed to find model")));
 
     }
 
@@ -134,7 +118,6 @@ public class PPLToolIT extends ToolIntegrationTest {
             .assertThat(exception.getMessage(), allOf(containsString("Parameter index and question can not be null or empty.")));
     }
 
-
     @SneakyThrows
     private String registerAgent() {
         String registerAgentRequestBody = Files
@@ -156,16 +139,16 @@ public class PPLToolIT extends ToolIntegrationTest {
     @SneakyThrows
     private String registerAgentWithWrongModelId() {
         String registerAgentRequestBody = Files
-                .readString(
-                        Path
-                                .of(
-                                        this
-                                                .getClass()
-                                                .getClassLoader()
-                                                .getResource("org/opensearch/agent/tools/register_flow_agent_of_ppl_tool_request_body.json")
-                                                .toURI()
-                                )
-                );
+            .readString(
+                Path
+                    .of(
+                        this
+                            .getClass()
+                            .getClassLoader()
+                            .getResource("org/opensearch/agent/tools/register_flow_agent_of_ppl_tool_request_body.json")
+                            .toURI()
+                    )
+            );
         registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", "wrong_model_id");
         String agentId = createAgent(registerAgentRequestBody);
         return agentId;
