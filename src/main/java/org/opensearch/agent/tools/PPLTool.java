@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.*;
+
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -63,6 +65,9 @@ public class PPLTool implements Tool {
 
     public static final String TYPE = "PPLTool";
 
+    public static final List<String> SYSTEM_INDICES = List
+        .of(ML_MODEL_GROUP_INDEX, ML_MODEL_INDEX, ML_TASK_INDEX, ML_CONNECTOR_INDEX, ML_CONFIG_INDEX, ML_MODEL_CONTROLLER_INDEX);
+
     @Setter
     private Client client;
 
@@ -96,6 +101,11 @@ public class PPLTool implements Tool {
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
+        }
+        for (String systemIndex : SYSTEM_INDICES) {
+            if (indexName.contains(systemIndex)) {
+                throw new IllegalArgumentException("We cannot search system indices " + indexName);
+            }
         }
         SearchRequest searchRequest = buildSearchRequest(indexName);
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
