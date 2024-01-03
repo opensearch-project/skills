@@ -167,7 +167,8 @@ public class PPLToolTests {
             }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
         );
         assertEquals(
-            "PPLTool doesn't support searching system indices, current searching index name: " + ML_CONNECTOR_INDEX,
+            "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                + ML_CONNECTOR_INDEX,
             exception.getMessage()
         );
     }

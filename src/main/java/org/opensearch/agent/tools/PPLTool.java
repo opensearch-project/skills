@@ -65,9 +65,6 @@ public class PPLTool implements Tool {
 
     public static final String TYPE = "PPLTool";
 
-    public static final List<String> SYSTEM_INDICES = List
-        .of(ML_MODEL_GROUP_INDEX, ML_MODEL_INDEX, ML_TASK_INDEX, ML_CONNECTOR_INDEX, ML_CONFIG_INDEX, ML_MODEL_CONTROLLER_INDEX);
-
     @Setter
     private Client client;
 
@@ -102,12 +99,11 @@ public class PPLTool implements Tool {
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
         }
-        for (String systemIndex : SYSTEM_INDICES) {
-            if (indexName.contains(systemIndex)) {
-                throw new IllegalArgumentException(
-                    "PPLTool doesn't support searching system indices, current searching index name: " + indexName
-                );
-            }
+        if (indexName.startsWith(".")) {
+            throw new IllegalArgumentException(
+                "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                    + indexName
+            );
         }
         SearchRequest searchRequest = buildSearchRequest(indexName);
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
