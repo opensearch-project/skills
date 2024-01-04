@@ -12,6 +12,7 @@ import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
@@ -30,6 +31,7 @@ import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import lombok.Getter;
