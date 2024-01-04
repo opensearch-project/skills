@@ -16,6 +16,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
 import org.opensearch.client.Requests;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
@@ -23,9 +24,6 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -113,7 +111,6 @@ public class VisualizationsTool implements Tool {
         });
     }
 
-    @VisibleForTesting
     String trimIdPrefix(String id) {
         id = Optional.ofNullable(id).orElse("");
         if (id.startsWith(SAVED_OBJECT_TYPE)) {
