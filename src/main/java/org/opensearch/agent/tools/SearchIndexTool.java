@@ -90,8 +90,12 @@ public class SearchIndexTool implements Tool {
         try {
             String input = parameters.get(INPUT_FIELD);
             JsonObject jsonObject = StringUtils.gson.fromJson(input, JsonObject.class);
-            String index = jsonObject.get(INDEX_FIELD).getAsString();
-            String query = jsonObject.get(QUERY_FIELD).toString();
+            String index = Optional.ofNullable(jsonObject).map(x -> x.get(INDEX_FIELD)).map(JsonElement::getAsString).orElse(null);
+            String query = Optional.ofNullable(jsonObject).map(x -> x.get(QUERY_FIELD)).map(JsonElement::toString).orElse(null);
+            if (index == null || query == null) {
+                listener.onFailure(new IllegalArgumentException("SearchIndexTool's two parameter: index and query are required!"));
+                return;
+            }
             SearchRequest searchRequest = getSearchRequest(index, query);
 
             ActionListener<SearchResponse> actionListener = ActionListener.<SearchResponse>wrap(r -> {
