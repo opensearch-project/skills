@@ -12,6 +12,7 @@ import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
@@ -30,6 +31,7 @@ import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import lombok.Getter;
@@ -48,7 +50,7 @@ public class SearchIndexTool implements Tool {
 
     public static final String TYPE = "SearchIndexTool";
     private static final String DEFAULT_DESCRIPTION =
-        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query.";
+        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query. Only use this tool when a DSL query is available.";
 
     private String name = TYPE;
 
@@ -90,23 +92,13 @@ public class SearchIndexTool implements Tool {
         try {
             String input = parameters.get(INPUT_FIELD);
             JsonObject jsonObject = StringUtils.gson.fromJson(input, JsonObject.class);
-            String index = jsonObject.get(INDEX_FIELD).getAsString();
-            String query = jsonObject.get(QUERY_FIELD).toString();
-
-            SearchRequest searchRequest;
-            try {
-                searchRequest = getSearchRequest(index, query);
-            } catch (Exception e1) {
-                try {
-                    // try different json parsing method
-                    query = jsonObject.get(QUERY_FIELD).getAsString();
-                    searchRequest = getSearchRequest(index, query);
-                } catch (Exception e2) {
-                    // try wrapped query
-                    query = "{\"query\": " + query + "}";
-                    searchRequest = getSearchRequest(index, query);
-                }
+            String index = Optional.ofNullable(jsonObject).map(x -> x.get(INDEX_FIELD)).map(JsonElement::getAsString).orElse(null);
+            String query = Optional.ofNullable(jsonObject).map(x -> x.get(QUERY_FIELD)).map(JsonElement::toString).orElse(null);
+            if (index == null || query == null) {
+                listener.onFailure(new IllegalArgumentException("SearchIndexTool's two parameter: index and query are required!"));
+                return;
             }
+            SearchRequest searchRequest = getSearchRequest(index, query);
 
             ActionListener<SearchResponse> actionListener = ActionListener.<SearchResponse>wrap(r -> {
                 SearchHit[] hits = r.getHits().getHits();
