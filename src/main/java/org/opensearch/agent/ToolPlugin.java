@@ -13,6 +13,7 @@ import org.opensearch.agent.indices.IndicesHelper;
 import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
 import org.opensearch.agent.job.SkillsClusterManagerEventListener;
+import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
 import org.opensearch.agent.tools.RAGTool;
@@ -93,6 +94,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         SearchAnomalyDetectorsTool.Factory.getInstance().init(client);
         SearchAnomalyResultsTool.Factory.getInstance().init(client);
         SearchMonitorsTool.Factory.getInstance().init(client);
+        IndexRoutingTool.Factory.getInstance().init(client, clusterService, xContentRegistry);
 
         return List.of(clusterManagerEventListener);
     }
@@ -110,7 +112,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
                 SearchAlertsTool.Factory.getInstance(),
                 SearchAnomalyDetectorsTool.Factory.getInstance(),
                 SearchAnomalyResultsTool.Factory.getInstance(),
-                SearchMonitorsTool.Factory.getInstance()
+                SearchMonitorsTool.Factory.getInstance(),
+                IndexRoutingTool.Factory.getInstance()
             );
     }
 

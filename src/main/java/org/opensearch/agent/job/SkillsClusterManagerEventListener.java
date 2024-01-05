@@ -116,7 +116,8 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
                 threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
             }
 
-            if (!event.indicesDeleted().isEmpty() && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName())) {
+            if (!event.indicesDeleted().isEmpty()
+                && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName())) {
                 List<String> indexNames = event.indicesDeleted().stream().map(Index::getName).collect(Collectors.toList());
                 job.bulkDelete(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName(), indexNames);
             }

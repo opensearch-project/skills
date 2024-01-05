@@ -8,14 +8,18 @@ package org.opensearch.agent.job;
 import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DEFAULT_TIMEOUT_SECOND;
 import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.SENTENCE_EMBEDDING;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import org.opensearch.client.Client;
 import org.opensearch.common.action.ActionFuture;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
+import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.input.nlp.TextDocsMLInput;
 import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.transport.MLTaskResponse;
@@ -51,5 +55,17 @@ public class MLClients {
             log.error("Invoke ML embedding failed", ex);
             throw new RuntimeException(ex);
         }
+    }
+
+    public void inference(String inferenceModelId, String prompt, ActionListener<MLTaskResponse> listener) {
+        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
+            .builder()
+            .parameters(Collections.singletonMap("prompt", prompt))
+            .build();
+        MLPredictionTaskRequest request = new MLPredictionTaskRequest(
+            inferenceModelId,
+            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+        );
+        client.execute(MLPredictionTaskAction.INSTANCE, request, listener);
     }
 }
