@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
 import org.opensearch.client.ResponseException;
@@ -103,8 +104,7 @@ public class SearchIndexToolIT extends BaseAgentToolsIT {
             + "  }\n"
             + "}\n";
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, agentInput));
-        org.hamcrest.MatcherAssert
-            .assertThat(exception.getMessage(), containsString("SearchIndexTool's two parameter: index and query are required!"));
+        MatcherAssert.assertThat(exception.getMessage(), containsString("SearchIndexTool's two parameter: index and query are required!"));
     }
 
     public void testSearchIndexToolInFlowAgent_withEmptyQueryField_thenThrowException() {
@@ -117,8 +117,7 @@ public class SearchIndexToolIT extends BaseAgentToolsIT {
             + "  }\n"
             + "}\n";
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, agentInput));
-        org.hamcrest.MatcherAssert
-            .assertThat(exception.getMessage(), containsString("SearchIndexTool's two parameter: index and query are required!"));
+        MatcherAssert.assertThat(exception.getMessage(), containsString("SearchIndexTool's two parameter: index and query are required!"));
     }
 
     public void testSearchIndexToolInFlowAgent_withIllegalQueryField_thenThrowException() {
@@ -132,6 +131,6 @@ public class SearchIndexToolIT extends BaseAgentToolsIT {
             + "  }\n"
             + "}\n";
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, agentInput));
-        org.hamcrest.MatcherAssert.assertThat(exception.getMessage(), containsString("parsing_exception"));
+        MatcherAssert.assertThat(exception.getMessage(), containsString("parsing_exception"));
     }
 }
