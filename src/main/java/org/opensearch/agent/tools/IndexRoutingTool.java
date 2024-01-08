@@ -5,7 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,16 +16,14 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.text.StringSubstitutor;
-import org.apache.commons.text.similarity.JaccardSimilarity;
+import org.apache.commons.text.similarity.LongestCommonSubsequence;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
-import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Parser;
@@ -35,59 +32,23 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.search.SearchHit;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @ToolAnnotation(IndexRoutingTool.TYPE)
-public class IndexRoutingTool extends AbstractRetrieverTool {
-
-    public static String EMBEDDING_MODEL_ID = "embedding_model_id";
-    public static String LLM_MODEL_ID = "llm_model_id";
-
-    @Getter
-    @Setter
-    private String embeddingModelId;
-    @Getter
-    @Setter
-    private String llmModelId;
+public class IndexRoutingTool extends VectorDBTool {
 
     public static final String TYPE = "IndexRoutingTool";
-
-    private ClusterService clusterService;
-
-    private MLClients mlClients;
-
-    @Builder
-    public IndexRoutingTool(
-        Client client,
-        MLClients mlClients,
-        ClusterService clusterService,
-        NamedXContentRegistry xContentRegistry,
-        String index,
-        String[] sourceFields,
-        Integer docSize,
-        String embeddingModelId,
-        String llmModelId
-    ) {
-        super(client, xContentRegistry, index, sourceFields, docSize);
-        this.client = client;
-        this.mlClients = mlClients;
-        this.clusterService = clusterService;
-        this.embeddingModelId = embeddingModelId;
-        this.llmModelId = llmModelId;
-        outputParser = mlTaskResponse -> {
-            ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
-            ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
-            return (String) modelTensor.getDataAsMap().get("response");
-        };
-    }
 
     private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for your question, "
         + "This tool take user question as input and return list of most related indexes or `Not sure`. "
         + "If the tool returns `Not sure`, mark it as final answer and ask Human to input exact index name";
+
+    public static final int DEFAULT_K = 5;
+    public static String EMBEDDING_MODEL_ID = "embedding_model_id";
+    public static String INFERENCE_MODEL_ID = "inference_model_id";
 
     @Setter
     @Getter
@@ -95,10 +56,48 @@ public class IndexRoutingTool extends AbstractRetrieverTool {
     @Getter
     @Setter
     private String description = DEFAULT_DESCRIPTION;
-    @Getter
-    private String version;
 
-    private Parser<MLTaskResponse, String> outputParser;
+    private Parser outputParser;
+
+    @Getter
+    @Setter
+    private String inferenceModelId;
+
+    private final ClusterService clusterService;
+
+    private final MLClients mlClients;
+
+    public IndexRoutingTool(
+        Client client,
+        ClusterService clusterService,
+        NamedXContentRegistry xContentRegistry,
+        Integer docSize,
+        Integer k,
+        String embeddingModelId,
+        String inferenceModelId
+    ) {
+        super(
+            client,
+            xContentRegistry,
+            IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_INDEX,
+            IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + embeddingModelId,
+            new String[] { IndexSummaryEmbeddingJob.INDEX_NAME_FIELD, IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD },
+            Optional.ofNullable(docSize).orElse(DEFAULT_K),
+            embeddingModelId,
+            Optional.ofNullable(k).orElse(DEFAULT_K)
+        );
+        this.mlClients = new MLClients(client);
+        this.clusterService = clusterService;
+        this.inferenceModelId = inferenceModelId;
+        outputParser = object -> {
+            MLTaskResponse mlTaskResponse = (MLTaskResponse) object;
+            ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
+            ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
+            String response = (String) modelTensor.getDataAsMap().get("response");
+            List<String> validIndexes = findMatchedIndex(response);
+            return String.join(",", validIndexes);
+        };
+    }
 
     @Override
     public String getType() {
@@ -106,31 +105,8 @@ public class IndexRoutingTool extends AbstractRetrieverTool {
     }
 
     @Override
-    protected String getQueryBody(String queryText) {
-        try {
-            Number[] vector = mlClients.getEmbeddingResult(embeddingModelId, List.of(queryText), mlTaskResponse -> {
-                ModelTensorOutput tensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
-                return tensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getData();
-            });
-
-            XContentBuilder xContentBuilder = XContentFactory
-                .jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("knn")
-                .startObject(IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + embeddingModelId)
-                .field("vector", vector)
-                .field("k", docSize)
-                .endObject()
-                .endObject()
-                .endObject()
-                .endObject();
-
-            return xContentBuilder.toString();
-        } catch (IOException e) {
-            log.error("Can't build query to vector index");
-            throw new RuntimeException(e);
-        }
+    public void setOutputParser(Parser<?, ?> parser) {
+        this.outputParser = parser;
     }
 
     @Override
@@ -176,11 +152,15 @@ public class IndexRoutingTool extends AbstractRetrieverTool {
             // call LLM, MLModelTool
             String question = parameters.get(INPUT_FIELD);
             String prompt = buildPrompt(summaryStr, question);
-            mlClients.inference(llmModelId, prompt, ActionListener.wrap(r -> {
-                String result = outputParser.parse(r);
-                List<String> validIndexes = findMatchedIndex(result);
-                listener.onResponse((T) String.join(",", validIndexes));
-            }, exception -> { listener.onResponse((T) "Not sure"); }));
+            // TODO use MLModelTool
+            mlClients
+                .inference(
+                    inferenceModelId,
+                    prompt,
+                    ActionListener.wrap(r -> { listener.onResponse((T) outputParser.parse(r)); }, exception -> {
+                        listener.onResponse((T) "Not sure");
+                    })
+                );
         }, exception -> {
             log.error("Failed to query index");
             listener.onFailure(exception);
@@ -204,13 +184,13 @@ public class IndexRoutingTool extends AbstractRetrieverTool {
     }
 
     private Optional<String> findWithSimilarity(String predictedIndex, Set<String> allIndexes) {
-        JaccardSimilarity similarity = new JaccardSimilarity();
-        return allIndexes
-            .stream()
-            .map(index -> Pair.of(index, similarity.apply(index, predictedIndex)))
-            .filter(pair -> pair.getValue() > 0.9)
-            .max(Map.Entry.comparingByValue())
-            .map(Pair::getKey);
+        LongestCommonSubsequence lcs = new LongestCommonSubsequence();
+        return allIndexes.stream().map(index -> {
+            CharSequence lcsResult = lcs.longestCommonSubsequence(index, predictedIndex);
+            // Ratio = 2.0 * M / T
+            Double ratio = (2.0 * lcsResult.length()) / (index.length() + predictedIndex.length());
+            return Pair.of(index, ratio);
+        }).filter(pair -> pair.getValue() > 0.9).max(Map.Entry.comparingByValue()).map(Pair::getKey);
     }
 
     private String buildPrompt(String summaryString, String question) {
@@ -287,18 +267,10 @@ public class IndexRoutingTool extends AbstractRetrieverTool {
         @Override
         public IndexRoutingTool create(Map<String, Object> params) {
             String embeddingModelId = (String) params.get(EMBEDDING_MODEL_ID);
-            String llmModelId = (String) params.get(LLM_MODEL_ID);
-            return IndexRoutingTool
-                .builder()
-                .client(client)
-                .xContentRegistry(xContentRegistry)
-                .mlClients(new MLClients(client))
-                .clusterService(clusterService)
-                .embeddingModelId(embeddingModelId)
-                .llmModelId(llmModelId)
-                .index(IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_INDEX)
-                .sourceFields(new String[] { IndexSummaryEmbeddingJob.INDEX_NAME_FIELD, IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD })
-                .build();
+            String inferenceModelId = (String) params.get(INFERENCE_MODEL_ID);
+            Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_K;
+            Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
+            return new IndexRoutingTool(client, clusterService, xContentRegistry, docSize, k, embeddingModelId, inferenceModelId);
         }
 
         @Override
