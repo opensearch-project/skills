@@ -13,6 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
+import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
@@ -131,8 +132,9 @@ public class SearchAnomalyResultsTool implements Tool {
             .sort(sortString, sortOrder);
 
         // In the future we may support custom result indices. For now default to the default AD result system indices.
-        String resultIndices = ".opendistro-anomaly-results*";
-        SearchRequest searchAnomalyResultsRequest = new SearchRequest().source(searchSourceBuilder).indices(resultIndices);
+        SearchRequest searchAnomalyResultsRequest = new SearchRequest()
+            .source(searchSourceBuilder)
+            .indices(ToolConstants.AD_RESULTS_INDEX_PATTERN);
 
         ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
             StringBuilder sb = new StringBuilder();

@@ -32,6 +32,7 @@ import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
+import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.client.AdminClient;
 import org.opensearch.client.ClusterAdminClient;
 import org.opensearch.client.IndicesAdminClient;
@@ -196,7 +197,7 @@ public class SearchAnomalyResultsToolTests {
             String[] indices = generatedRequest.indices();
             assertNotNull(indices);
             assertEquals(1, indices.length);
-            assertEquals(".opendistro-anomaly-results*", indices[0]);
+            assertEquals(ToolConstants.AD_RESULTS_INDEX_PATTERN, indices[0]);
             return null;
         }).when(nodeClient).execute(any(ActionType.class), any(), any());
 

@@ -16,4 +16,8 @@ public class ToolConstants {
         Failed,
         Initializing
     }
+
+    // System indices constants are not cleanly exposed from the AD plugin, so we persist our
+    // own constant here.
+    public static final String AD_RESULTS_INDEX_PATTERN = ".opendistro-anomaly-results*";
 }
