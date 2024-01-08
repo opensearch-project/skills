@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -28,8 +29,10 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionType;
+import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
+import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.client.AdminClient;
 import org.opensearch.client.ClusterAdminClient;
 import org.opensearch.client.IndicesAdminClient;
@@ -180,6 +183,25 @@ public class SearchAnomalyResultsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         assertEquals(expectedResponseStr, responseCaptor.getValue());
+    }
+
+    @Test
+    public void testDefaultIndexPatternIsSet() throws Exception {
+        Tool tool = SearchAnomalyResultsTool.Factory.getInstance().create(Collections.emptyMap());
+
+        @SuppressWarnings("unchecked")
+        ActionListener<String> listener = Mockito.mock(ActionListener.class);
+
+        doAnswer((invocation) -> {
+            SearchRequest generatedRequest = invocation.getArgument(1);
+            String[] indices = generatedRequest.indices();
+            assertNotNull(indices);
+            assertEquals(1, indices.length);
+            assertEquals(ToolConstants.AD_RESULTS_INDEX_PATTERN, indices[0]);
+            return null;
+        }).when(nodeClient).execute(any(ActionType.class), any(), any());
+
+        tool.run(emptyParams, listener);
     }
 
     @Test
