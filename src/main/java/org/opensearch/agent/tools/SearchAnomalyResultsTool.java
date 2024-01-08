@@ -130,7 +130,9 @@ public class SearchAnomalyResultsTool implements Tool {
             .from(startIndex)
             .sort(sortString, sortOrder);
 
-        SearchRequest searchAnomalyResultsRequest = new SearchRequest().source(searchSourceBuilder);
+        // In the future we may support custom result indices. For now default to the default AD result system indices.
+        String resultIndices = ".opendistro-anomaly-results*";
+        SearchRequest searchAnomalyResultsRequest = new SearchRequest().source(searchSourceBuilder).indices(resultIndices);
 
         ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
             StringBuilder sb = new StringBuilder();
