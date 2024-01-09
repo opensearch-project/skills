@@ -94,7 +94,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         SearchAnomalyDetectorsTool.Factory.getInstance().init(client);
         SearchAnomalyResultsTool.Factory.getInstance().init(client);
         SearchMonitorsTool.Factory.getInstance().init(client);
-        IndexRoutingTool.Factory.getInstance().init(client, clusterService, xContentRegistry);
+        IndexRoutingTool.Factory.getInstance().init(client, xContentRegistry);
 
         return List.of(clusterManagerEventListener);
     }
