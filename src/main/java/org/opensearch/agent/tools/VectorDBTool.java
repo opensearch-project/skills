@@ -115,5 +115,15 @@ public class VectorDBTool extends AbstractRetrieverTool {
                 .k(k)
                 .build();
         }
+
+        @Override
+        public String getDefaultType() {
+            return TYPE;
+        }
+
+        @Override
+        public String getDefaultVersion() {
+            return null;
+        }
     }
 }
