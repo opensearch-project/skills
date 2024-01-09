@@ -5,8 +5,14 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DATA_STREAM;
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_NAME;
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_PATTERNS;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,7 +27,6 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
 import org.opensearch.client.Client;
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.output.model.ModelTensor;
@@ -29,7 +34,6 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
-import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.search.SearchHit;
 
 import lombok.Getter;
@@ -42,9 +46,9 @@ public class IndexRoutingTool extends VectorDBTool {
 
     public static final String TYPE = "IndexRoutingTool";
 
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for your question, "
-        + "This tool take user question as input and return list of most related indexes or `Not sure`. "
-        + "If the tool returns `Not sure`, mark it as final answer and ask Human to input exact index name";
+    private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for user question, "
+        + "This tool take user plain original question as input and return list of most related indexes or `Not sure`. "
+        + "If the tool returns `Not sure`, mark it as final answer and ask Human to provide index name";
 
     public static final int DEFAULT_K = 5;
     public static String EMBEDDING_MODEL_ID = "embedding_model_id";
@@ -57,19 +61,14 @@ public class IndexRoutingTool extends VectorDBTool {
     @Setter
     private String description = DEFAULT_DESCRIPTION;
 
-    private Parser outputParser;
-
     @Getter
     @Setter
     private String inferenceModelId;
-
-    private final ClusterService clusterService;
 
     private final MLClients mlClients;
 
     public IndexRoutingTool(
         Client client,
-        ClusterService clusterService,
         NamedXContentRegistry xContentRegistry,
         Integer docSize,
         Integer k,
@@ -81,32 +80,23 @@ public class IndexRoutingTool extends VectorDBTool {
             xContentRegistry,
             IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_INDEX,
             IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + embeddingModelId,
-            new String[] { IndexSummaryEmbeddingJob.INDEX_NAME_FIELD, IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD },
+            new String[] {
+                IndexSummaryEmbeddingJob.INDEX_NAME_FIELD,
+                IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD,
+                IndexSummaryEmbeddingJob.INDEX_PATTERNS_FIELD,
+                IndexSummaryEmbeddingJob.DATA_STREAM_FIELD,
+                IndexSummaryEmbeddingJob.ALIAS_FIELD },
             Optional.ofNullable(docSize).orElse(DEFAULT_K),
             embeddingModelId,
             Optional.ofNullable(k).orElse(DEFAULT_K)
         );
         this.mlClients = new MLClients(client);
-        this.clusterService = clusterService;
         this.inferenceModelId = inferenceModelId;
-        outputParser = object -> {
-            MLTaskResponse mlTaskResponse = (MLTaskResponse) object;
-            ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
-            ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
-            String response = (String) modelTensor.getDataAsMap().get("response");
-            List<String> validIndexes = findMatchedIndex(response);
-            return String.join(",", validIndexes);
-        };
     }
 
     @Override
     public String getType() {
         return TYPE;
-    }
-
-    @Override
-    public void setOutputParser(Parser<?, ?> parser) {
-        this.outputParser = parser;
     }
 
     @Override
@@ -153,37 +143,61 @@ public class IndexRoutingTool extends VectorDBTool {
             String question = parameters.get(INPUT_FIELD);
             String prompt = buildPrompt(summaryStr, question);
             // TODO use MLModelTool
-            mlClients
-                .inference(
-                    inferenceModelId,
-                    prompt,
-                    ActionListener.wrap(r -> { listener.onResponse((T) outputParser.parse(r)); }, exception -> {
-                        listener.onResponse((T) "Not sure");
-                    })
-                );
+            mlClients.inference(inferenceModelId, prompt, ActionListener.wrap(r -> {
+                ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
+                ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
+                String response = (String) modelTensor.getDataAsMap().get("response");
+                List<String> validIndexes = findMatchedIndex(response, summaries);
+                listener.onResponse((T) String.join(",", validIndexes));
+            }, exception -> { listener.onResponse((T) "Not sure"); }));
         }, exception -> {
             log.error("Failed to query index");
             listener.onFailure(exception);
         }));
     }
 
-    private List<String> findMatchedIndex(String result) {
+    private List<String> findMatchedIndex(String result, List<Map<String, Object>> candidates) {
         List<String> validIndexes = new ArrayList<>();
-        Set<String> allIndexes = clusterService.state().metadata().indices().keySet();
+
+        Map<String, Map<String, Object>> candidateIndexMap = candidates
+            .stream()
+            .collect(Collectors.toMap(m -> (String) m.get(INDEX_NAME), m -> m));
+
+        Set<String> allCandidates = candidateIndexMap.keySet();
         List<String> predictedIndexes = Arrays.stream(result.split(",")).map(String::trim).collect(Collectors.toList());
 
         for (String predictedIndex : predictedIndexes) {
-            if (allIndexes.contains(predictedIndex) || predictedIndex.equals("Not sure")) {
+            if (allCandidates.contains(predictedIndex)) {
+                Map<String, Object> map = candidateIndexMap.get(predictedIndex);
+                // data stream back index
+                Optional<Object> dataStreamName = Optional.ofNullable(map.get(DATA_STREAM));
+                List<String> patterns = (List<String>) map.get(INDEX_PATTERNS);
+                String indexPattern = getIndexPattern(patterns, predictedIndex);
+                validIndexes.add((String) dataStreamName.orElse(indexPattern));
+            } else if (predictedIndex.equals("Not sure")) {
                 validIndexes.add(predictedIndex);
             } else {
-                Optional<String> similarityIndex = findWithSimilarity(predictedIndex, allIndexes);
+                Optional<String> similarityIndex = findWithSimilarity(predictedIndex, allCandidates);
                 similarityIndex.ifPresent(validIndexes::add);
             }
         }
         return validIndexes;
     }
 
-    private Optional<String> findWithSimilarity(String predictedIndex, Set<String> allIndexes) {
+    private String getIndexPattern(List<String> patterns, String predictedIndex) {
+        // if index name is short, we might don't need to use index pattern
+        if (!patterns.isEmpty() && predictedIndex.length() >= 10) {
+            patterns.sort(Comparator.comparing(String::length).reversed());
+            String longestPattern = patterns.get(0);
+            // index pattern can't be * or too generic
+            if (!longestPattern.equals("*") && (longestPattern.length() * 2 > predictedIndex.length())) {
+                return longestPattern;
+            }
+        }
+        return predictedIndex;
+    }
+
+    private Optional<String> findWithSimilarity(String predictedIndex, Collection<String> allIndexes) {
         LongestCommonSubsequence lcs = new LongestCommonSubsequence();
         return allIndexes.stream().map(index -> {
             CharSequence lcsResult = lcs.longestCommonSubsequence(index, predictedIndex);
@@ -240,7 +254,6 @@ public class IndexRoutingTool extends VectorDBTool {
 
     public static class Factory implements Tool.Factory<IndexRoutingTool> {
         private Client client;
-        private ClusterService clusterService;
         private NamedXContentRegistry xContentRegistry;
 
         private static IndexRoutingTool.Factory INSTANCE;
@@ -258,9 +271,8 @@ public class IndexRoutingTool extends VectorDBTool {
             }
         }
 
-        public void init(Client client, ClusterService clusterService, NamedXContentRegistry xContentRegistry) {
+        public void init(Client client, NamedXContentRegistry xContentRegistry) {
             this.client = client;
-            this.clusterService = clusterService;
             this.xContentRegistry = xContentRegistry;
         }
 
@@ -270,7 +282,7 @@ public class IndexRoutingTool extends VectorDBTool {
             String inferenceModelId = (String) params.get(INFERENCE_MODEL_ID);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_K;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
-            return new IndexRoutingTool(client, clusterService, xContentRegistry, docSize, k, embeddingModelId, inferenceModelId);
+            return new IndexRoutingTool(client, xContentRegistry, docSize, k, embeddingModelId, inferenceModelId);
         }
 
         @Override

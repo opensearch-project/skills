@@ -6,7 +6,7 @@
     "index_summary": {
       "type": "text"
     },
-    "index_template": {
+    "index_patterns": {
       "type": "keyword"
     },
     "alias": {

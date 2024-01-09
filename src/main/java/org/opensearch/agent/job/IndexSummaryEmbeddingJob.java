@@ -8,8 +8,6 @@ package org.opensearch.agent.job;
 import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX;
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 
-import java.security.AccessController;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,14 +30,20 @@ import org.opensearch.agent.indices.IndicesHelper;
 import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.client.Client;
 import org.opensearch.client.Requests;
+import org.opensearch.cluster.metadata.ComposableIndexTemplate;
+import org.opensearch.cluster.metadata.DataStream;
 import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.IndexTemplateMetadata;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.action.ActionFuture;
+import org.opensearch.common.regex.Regex;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
+import org.opensearch.core.index.Index;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -55,8 +59,6 @@ import org.opensearch.ml.common.transport.agent.MLSearchAgentAction;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
-
-import com.google.gson.Gson;
 
 import lombok.Builder;
 import lombok.Setter;
@@ -74,9 +76,15 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     public static String INDEX_SUMMARY_EMBEDDING_INDEX = ".index_summary_embedding_index";
     public static String INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX = "index_summary_embedding";
     public static String INDEX_NAME_FIELD = "index_name";
+    public static String DATA_STREAM_FIELD = "data_stream";
+    public static String INDEX_PATTERNS_FIELD = "index_patterns";
+    public static String ALIAS_FIELD = "alias";
     public static String INDEX_SUMMARY_FIELD = "index_summary";
 
     public static String INDEX_NAME = "index";
+    public static String DATA_STREAM = "data_stream";
+    public static String ALIASES = "aliases";
+    public static String INDEX_PATTERNS = "index_patterns";
     public static String INDEX_SUMMARY = "summary";
     public static String INDEX_EMBEDDING = "embedding";
     public static String SENTENCE_EMBEDDING = "sentence_embedding";
@@ -179,7 +187,8 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     }
 
     private List<Map<String, Object>> getAllIndexMappingAndSampleData() {
-        Map<String, IndexMetadata> indices = clusterService.state().metadata().indices();
+        Metadata metadata = clusterService.state().metadata();
+        Map<String, IndexMetadata> indices = metadata.indices();
 
         if (Objects.nonNull(this.adhocIndexName) && !adhocIndexName.isEmpty()) {
             Map<String, IndexMetadata> adhocIndices = new HashMap<>();
@@ -188,25 +197,51 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             }
             indices = adhocIndices;
         }
+        // data streams
+        Map<String, DataStream> dataStreamMap = metadata.dataStreams();
+        Map<String, String> indexDataStreamLookup = new HashMap<>();
+        dataStreamMap.values().forEach(dataStream -> {
+            String dsName = dataStream.getName();
+            dataStream.getIndices().stream().map(Index::getName).forEach(it -> indexDataStreamLookup.put(it, dsName));
+        });
+
+        // index patterns from index template
+        List<String> patterns = new ArrayList<>();
+        for (final IndexTemplateMetadata template : metadata.templates().values()) {
+            patterns.addAll(template.patterns());
+        }
+        for (ComposableIndexTemplate composableIndexTemplate : metadata.templatesV2().values()) {
+            patterns.addAll(composableIndexTemplate.indexPatterns());
+        }
 
         List<Map<String, Object>> indexSummaryList = new ArrayList<>();
 
         for (Map.Entry<String, IndexMetadata> indexEntry : indices.entrySet()) {
             Map<String, Object> indexSummaryMap = new HashMap<>();
             String indexName = indexEntry.getKey();
-            IndexMetadata metadata = indexEntry.getValue();
+            IndexMetadata indexMetadata = indexEntry.getValue();
+
+            indexSummaryMap.put(INDEX_NAME, indexName);
 
             // ignore system index or index name start with dot
-            if (metadata.isSystem() || indexName.startsWith(".")) {
+            if (indexMetadata.isSystem() || (indexName.startsWith(".") && !indexDataStreamLookup.containsKey(indexName))) {
                 log.debug("Skip system index {}", indexName);
                 continue;
             }
-            // TODO group by index template, alias and data stream
+            indexSummaryMap.put(DATA_STREAM, indexDataStreamLookup.get(indexName));
 
-            Map<String, Object> sourceAsMap = metadata.mapping().getSourceAsMap();
+            List<String> indexPatterns = patterns
+                .stream()
+                .filter(pattern -> Regex.simpleMatch(pattern, indexName))
+                .collect(Collectors.toList());
+            indexSummaryMap.put(INDEX_PATTERNS, indexPatterns);
+            indexSummaryMap.put(ALIASES, indexMetadata.getAliases().keySet());
+
+            Map<String, Object> sourceAsMap = indexMetadata.mapping().getSourceAsMap();
             try (XContentBuilder builder = MediaTypeRegistry.contentBuilder(MediaTypeRegistry.JSON)) {
                 builder.map(sourceAsMap);
-                String mapping = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> new Gson().toJson(sourceAsMap));
+                // String mapping = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> new Gson().toJson(sourceAsMap));
+                String mapping = builder.toString();
 
                 // sample data
                 SearchRequest indexSearchRequest = Requests.searchRequest(indexName);
@@ -224,14 +259,15 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
                 String indexSummary = String.format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, documents);
 
-                indexSummaryMap.put(INDEX_NAME, indexName);
                 indexSummaryMap.put(INDEX_SUMMARY, indexSummary);
 
-                indexSummaryList.add(indexSummaryMap);
             } catch (Exception e) {
                 log.error("Get index mapping and sample data failed for index {}", indexName, e);
             }
+
+            indexSummaryList.add(indexSummaryMap);
         }
+
         return indexSummaryList;
     }
 
@@ -268,6 +304,9 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             Map<String, Object> docMap = new HashMap<>();
             String indexName = (String) doc.get(INDEX_NAME);
             docMap.put(INDEX_NAME_FIELD, indexName);
+            docMap.put(INDEX_PATTERNS_FIELD, doc.get(INDEX_PATTERNS));
+            docMap.put(DATA_STREAM_FIELD, doc.get(DATA_STREAM));
+            docMap.put(ALIASES, doc.get(ALIAS_FIELD));
             docMap.put(INDEX_SUMMARY_FIELD, doc.get(INDEX_SUMMARY));
             docMap.put(INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + modelId, embedding);
 
