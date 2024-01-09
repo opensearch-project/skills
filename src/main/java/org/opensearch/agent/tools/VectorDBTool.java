@@ -7,16 +7,19 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.io.IOException;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.client.Client;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -55,6 +58,7 @@ public class VectorDBTool extends AbstractRetrieverTool {
         this.k = k;
     }
 
+    @SneakyThrows(IOException.class)
     @Override
     protected String getQueryBody(String queryText) {
         if (StringUtils.isBlank(embeddingField) || StringUtils.isBlank(modelId)) {
@@ -62,16 +66,20 @@ public class VectorDBTool extends AbstractRetrieverTool {
                 "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
-        return "{\"query\":{\"neural\":{\""
-            + embeddingField
-            + "\":{\"query_text\":\""
-            + queryText
-            + "\",\"model_id\":\""
-            + modelId
-            + "\",\"k\":"
-            + k
-            + "}}}"
-            + " }";
+        return XContentFactory
+            .jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("neural")
+            .startObject(embeddingField)
+            .field("query_text", queryText)
+            .field("model_id", modelId)
+            .field("k", k)
+            .endObject()
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
     }
 
     @Override
