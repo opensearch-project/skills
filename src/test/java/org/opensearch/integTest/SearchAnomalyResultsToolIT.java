@@ -12,14 +12,14 @@ import java.util.Locale;
 
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.agent.tools.utils.ToolConstants;
 
 import lombok.SneakyThrows;
 
 public class SearchAnomalyResultsToolIT extends BaseAgentToolsIT {
     private String registerAgentRequestBody;
     private static final String detectorId = "foo-id";
-    private static final String detectorName = "foo-name";
+    private static final double anomalyGrade = 0.5;
+    private static final double confidence = 0.6;
     private static final String resultsSystemIndexName = ".opendistro-anomaly-results-1";
 
     @Before
@@ -37,7 +37,7 @@ public class SearchAnomalyResultsToolIT extends BaseAgentToolsIT {
                             .toURI()
                     )
             );
-        createAnomalyResultsSystemIndex(detectorId, detectorName);
+        createAnomalyResultsSystemIndex(detectorId, anomalyGrade, confidence);
     }
 
     @After
@@ -57,40 +57,53 @@ public class SearchAnomalyResultsToolIT extends BaseAgentToolsIT {
         assertEquals("AnomalyResults=[]TotalAnomalyResults=0", result);
     }
 
-    // @SneakyThrows
-    // public void testSearchAnomalyResultsToolInFlowAgent_noMatching() {
-    //     String agentId = createAgent(registerAgentRequestBody);
-    //     String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "foo" + "\"}}";
-    //     String result = executeAgent(agentId, agentInput);
-    //     assertEquals("AnomalyResults=[]TotalAnomalyResults=0", result);
-    // }
-
-    // @SneakyThrows
-    // public void testSearchAnomalyResultsToolInFlowAgent_matching() {
-    //     String agentId = createAgent(registerAgentRequestBody);
-    //     String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
-    //     String result = executeAgent(agentId, agentInput);
-    //     assertEquals(
-    //         String.format(Locale.ROOT, "AnomalyResults=[{id=%s,name=%s}]TotalAnomalyResults=%d", detectorId, detectorName, 1),
-    //         result
-    //     );
-    // }
+    @SneakyThrows
+    public void testSearchAnomalyResultsToolInFlowAgent_noMatching() {
+        String agentId = createAgent(registerAgentRequestBody);
+        String agentInput = "{\"parameters\":{\"detectorId\": \"" + detectorId + "foo" + "\"}}";
+        String result = executeAgent(agentId, agentInput);
+        assertEquals("AnomalyResults=[]TotalAnomalyResults=0", result);
+    }
 
     @SneakyThrows
-    private void createAnomalyResultsSystemIndex(String detectorId, String detectorName) {
+    public void testSearchAnomalyResultsToolInFlowAgent_matching() {
+        String agentId = createAgent(registerAgentRequestBody);
+        String agentInput = "{\"parameters\":{\"detectorId\": \"" + detectorId + "\"}}";
+        String result = executeAgent(agentId, agentInput);
+        assertEquals(
+            String
+                .format(
+                    Locale.ROOT,
+                    "AnomalyResults=[{detectorId=%s,grade=%2.1f,confidence=%2.1f}]TotalAnomalyResults=%d",
+                    detectorId,
+                    anomalyGrade,
+                    confidence,
+                    1
+                ),
+            result
+        );
+    }
+
+    @SneakyThrows
+    private void createAnomalyResultsSystemIndex(String detectorId, double anomalyGrade, double confidence) {
         createIndexWithConfiguration(
             resultsSystemIndexName,
             "{\n"
                 + "  \"mappings\": {\n"
                 + "    \"properties\": {\n"
-                + "      \"name\": {\n"
-                + "        \"type\": \"text\",\n"
-                + "             \"fields\": { \"keyword\": { \"type\": \"keyword\", \"ignore_above\": 256 }}"
-                + "      }\n"
+                + "      \"detector_id\": {\"type\": \"keyword\"},"
+                + "      \"anomaly_grade\": {\"type\": \"double\"},"
+                + "      \"confidence\": {\"type\": \"double\"},"
+                + "      \"data_start_time\": {\"type\": \"date\", \"format\": \"strict_date_time||epoch_millis\"}"
                 + "    }\n"
                 + "  }\n"
                 + "}"
         );
-        addDocToIndex(ToolConstants.AD_DETECTORS_INDEX, detectorId, List.of("name"), List.of(detectorName));
+        addDocToIndex(
+            resultsSystemIndexName,
+            "foo-id",
+            List.of("detector_id", "anomaly_grade", "confidence"),
+            List.of(detectorId, anomalyGrade, confidence)
+        );
     }
 }

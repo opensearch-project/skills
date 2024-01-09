@@ -93,7 +93,7 @@ public class SearchAnomalyResultsTool implements Tool {
             : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
         final SortOrder sortOrder = sortOrderStr.equalsIgnoreCase("asc") ? SortOrder.ASC : SortOrder.DESC;
-        final String sortString = parameters.getOrDefault("sortString", "name.keyword");
+        final String sortString = parameters.getOrDefault("sortString", "data_start_time");
         final int size = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
         final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
 
@@ -139,6 +139,9 @@ public class SearchAnomalyResultsTool implements Tool {
         SearchRequest searchAnomalyResultsRequest = new SearchRequest()
             .source(searchSourceBuilder)
             .indices(ToolConstants.AD_RESULTS_INDEX_PATTERN);
+
+        log.info("SEARCH REQUEST");
+        log.info(searchAnomalyResultsRequest);
 
         ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
             processHits(response.getHits(), listener);
