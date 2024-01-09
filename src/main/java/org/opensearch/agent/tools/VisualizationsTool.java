@@ -164,5 +164,15 @@ public class VisualizationsTool implements Tool {
         public String getDefaultDescription() {
             return DEFAULT_DESCRIPTION;
         }
+
+        @Override
+        public String getDefaultType() {
+            return TYPE;
+        }
+
+        @Override
+        public String getDefaultVersion() {
+            return null;
+        }
     }
 }

@@ -221,6 +221,16 @@ public class AbstractRetrieverToolTests {
             public AbstractRetrieverTool create(Map<String, Object> params) {
                 return null;
             }
+
+            @Override
+            public String getDefaultType() {
+                return null;
+            }
+
+            @Override
+            public String getDefaultVersion() {
+                return null;
+            }
         };
 
         factoryMock.init(client, TEST_XCONTENT_REGISTRY_FOR_QUERY);

@@ -106,5 +106,15 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
                 .docSize(docSize)
                 .build();
         }
+
+        @Override
+        public String getDefaultType() {
+            return TYPE;
+        }
+
+        @Override
+        public String getDefaultVersion() {
+            return null;
+        }
     }
 }
