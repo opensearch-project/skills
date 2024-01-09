@@ -140,12 +140,10 @@ public class SearchAnomalyResultsTool implements Tool {
             .source(searchSourceBuilder)
             .indices(ToolConstants.AD_RESULTS_INDEX_PATTERN);
 
-        log.info("SEARCH REQUEST");
-        log.info(searchAnomalyResultsRequest);
-
         ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
             processHits(response.getHits(), listener);
         }, e -> {
+            // System index isn't initialized by default, so ignore such errors
             if (e instanceof IndexNotFoundException) {
                 processHits(SearchHits.empty(), listener);
             } else {
