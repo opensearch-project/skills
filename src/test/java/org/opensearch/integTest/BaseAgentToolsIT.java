@@ -5,9 +5,12 @@
 
 package org.opensearch.integTest;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
@@ -23,7 +26,11 @@ import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.core.xcontent.DeprecationHandler;
+import org.opensearch.core.xcontent.MediaType;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
@@ -144,6 +151,40 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         Map<String, Object> responseInMap = parseResponseToMap(response);
         assertEquals("true", responseInMap.get("acknowledged").toString());
         assertEquals(indexName, responseInMap.get("index").toString());
+    }
+
+    // Similar to deleteExternalIndices, but including indices with "." prefix vs. excluding them
+    protected void deleteSystemIndices() throws IOException {
+        final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
+        final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
+        try (
+            final XContentParser parser = xContentType
+                .xContent()
+                .createParser(
+                    NamedXContentRegistry.EMPTY,
+                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+                    response.getEntity().getContent()
+                )
+        ) {
+            final XContentParser.Token token = parser.nextToken();
+            final List<Map<String, Object>> parserList;
+            if (token == XContentParser.Token.START_ARRAY) {
+                parserList = parser.listOrderedMap().stream().map(obj -> (Map<String, Object>) obj).collect(Collectors.toList());
+            } else {
+                parserList = Collections.singletonList(parser.mapOrdered());
+            }
+
+            final List<String> externalIndices = parserList
+                .stream()
+                .map(index -> (String) index.get("index"))
+                .filter(indexName -> indexName != null)
+                .filter(indexName -> indexName.startsWith("."))
+                .collect(Collectors.toList());
+
+            for (final String indexName : externalIndices) {
+                adminClient().performRequest(new Request("DELETE", "/" + indexName));
+            }
+        }
     }
 
     @SneakyThrows

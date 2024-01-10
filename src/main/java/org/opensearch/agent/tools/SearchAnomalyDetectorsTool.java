@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -20,10 +21,12 @@ import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.transport.GetAnomalyDetectorRequest;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
+import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
 import org.opensearch.client.Client;
 import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
@@ -130,7 +133,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
             .from(startIndex)
             .sort(sortString, sortOrder);
 
-        SearchRequest searchDetectorRequest = new SearchRequest().source(searchSourceBuilder);
+        SearchRequest searchDetectorRequest = new SearchRequest().source(searchSourceBuilder).indices(ToolConstants.AD_DETECTORS_INDEX);
 
         ActionListener<SearchResponse> searchDetectorListener = ActionListener.<SearchResponse>wrap(response -> {
             StringBuilder sb = new StringBuilder();
@@ -209,19 +212,16 @@ public class SearchAnomalyDetectorsTool implements Tool {
                 }
             }
 
-            sb.append("AnomalyDetectors=[");
-            for (SearchHit hit : hitsAsMap.values()) {
-                sb.append("{");
-                sb.append("id=").append(hit.getId()).append(",");
-                sb.append("name=").append(hit.getSourceAsMap().get("name"));
-                sb.append("}");
-            }
-            sb.append("]");
-            sb.append("TotalAnomalyDetectors=").append(hitsAsMap.size());
-            listener.onResponse((T) sb.toString());
+            processHits(hitsAsMap, listener);
         }, e -> {
-            log.error("Failed to search anomaly detectors.", e);
-            listener.onFailure(e);
+            // System index isn't initialized by default, so ignore such errors
+            if (e instanceof IndexNotFoundException) {
+                processHits(Collections.emptyMap(), listener);
+            } else {
+                log.error("Failed to search anomaly detectors.", e);
+                listener.onFailure(e);
+            }
+
         });
 
         adClient.searchAnomalyDetectors(searchDetectorRequest, searchDetectorListener);
@@ -235,6 +235,20 @@ public class SearchAnomalyDetectorsTool implements Tool {
     @Override
     public String getType() {
         return TYPE;
+    }
+
+    private <T> void processHits(Map<String, SearchHit> hitsAsMap, ActionListener<T> listener) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("AnomalyDetectors=[");
+        for (SearchHit hit : hitsAsMap.values()) {
+            sb.append("{");
+            sb.append("id=").append(hit.getId()).append(",");
+            sb.append("name=").append(hit.getSourceAsMap().get("name"));
+            sb.append("}");
+        }
+        sb.append("]");
+        sb.append("TotalAnomalyDetectors=").append(hitsAsMap.size());
+        listener.onResponse((T) sb.toString());
     }
 
     /**
