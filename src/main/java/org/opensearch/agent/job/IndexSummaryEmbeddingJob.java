@@ -6,16 +6,14 @@
 package org.opensearch.agent.job;
 
 import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX;
-import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -27,7 +25,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.agent.indices.IndicesHelper;
-import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.client.Client;
 import org.opensearch.client.Requests;
 import org.opensearch.cluster.metadata.ComposableIndexTemplate;
@@ -38,27 +35,18 @@ import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.action.ActionFuture;
 import org.opensearch.common.regex.Regex;
-import org.opensearch.common.xcontent.LoggingDeprecationHandler;
-import org.opensearch.common.xcontent.XContentHelper;
-import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.index.Index;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
-import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.query.MatchAllQueryBuilder;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.index.query.TermQueryBuilder;
-import org.opensearch.ml.common.agent.MLAgent;
-import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.transport.agent.MLSearchAgentAction;
 import org.opensearch.search.SearchHit;
-import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
+
+import com.google.common.hash.Hashing;
 
 import lombok.Builder;
 import lombok.Setter;
@@ -69,7 +57,6 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
     private Client client;
     private ClusterService clusterService;
-    private NamedXContentRegistry xContentRegistry;
     private IndicesHelper indicesHelper;
     private MLClients mlClients;
 
@@ -93,17 +80,13 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     @Setter
     private List<String> adhocIndexName;
 
+    @Setter
+    private List<String> adhocModelIds;
+
     @Builder
-    public IndexSummaryEmbeddingJob(
-        Client client,
-        ClusterService clusterService,
-        NamedXContentRegistry xContentRegistry,
-        IndicesHelper indicesHelper,
-        MLClients mlClients
-    ) {
+    public IndexSummaryEmbeddingJob(Client client, ClusterService clusterService, IndicesHelper indicesHelper, MLClients mlClients) {
         this.client = client;
         this.clusterService = clusterService;
-        this.xContentRegistry = xContentRegistry;
         this.indicesHelper = indicesHelper;
         this.mlClients = mlClients;
     }
@@ -111,25 +94,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     @Override
     public void run() {
         // search agent with IndexRoutingTool
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        String termQueryKey = String.format(Locale.ROOT, "%s.%s", MLAgent.TOOLS_FIELD, MLToolSpec.TOOL_TYPE_FIELD);
-        TermQueryBuilder termQueryBuilder = QueryBuilders.termQuery(termQueryKey, IndexRoutingTool.TYPE);
-        searchSourceBuilder.query(termQueryBuilder);
-        SearchRequest searchRequest = Requests.searchRequest().source(searchSourceBuilder);
-
-        // search
-        client.execute(MLSearchAgentAction.INSTANCE, searchRequest, ActionListener.wrap(r -> {
-            SearchHits hits = r.getHits();
-            log.debug("total {} agent found with tool {}", hits.getTotalHits().value, IndexRoutingTool.TYPE);
-            // no agent with IndexRoutingTool
-            if (hits.getTotalHits().value == 0L) {
-                return;
-            }
-            Set<String> embeddingModelIds = new HashSet<>();
-            for (SearchHit hit : hits) {
-                embeddingModelIds.addAll(extractModelIdFromAgent(hit));
-            }
-
+        mlClients.getModelIdsForIndexRoutingTool(adhocModelIds, ActionListener.wrap(embeddingModelIds -> {
             // no embedding model
             if (embeddingModelIds.isEmpty()) {
                 return;
@@ -162,28 +127,9 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                 // write to k-NN index
                 indexSummaryVector(INDEX_SUMMARY_EMBEDDING_INDEX, indexMetaAndSamples, modelId);
             }
-        }, e -> log.error("Search agent error happened", e)));
-    }
 
-    private Set<String> extractModelIdFromAgent(SearchHit hit) {
-        try (
-            XContentParser parser = XContentHelper
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.getSourceRef(), XContentType.JSON);
-        ) {
-            ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-            MLAgent mlAgent = MLAgent.parse(parser);
-            return mlAgent
-                .getTools()
-                .stream()
-                .filter(mlToolSpec -> mlToolSpec.getType().equals(IndexRoutingTool.TYPE) && mlToolSpec.getParameters() != null)
-                .map(MLToolSpec::getParameters)
-                .map(params -> params.get(IndexRoutingTool.EMBEDDING_MODEL_ID))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        } catch (Exception e) {
-            log.error("Failed to parse ml agent from {}", hit, e);
-            return Set.of();
-        }
+            AgentMonitorJob.setProcessedModelIds(embeddingModelIds, adhocModelIds == null);
+        }, e -> log.error("Search agent error happened", e)));
     }
 
     private List<Map<String, Object>> getAllIndexMappingAndSampleData() {
@@ -310,7 +256,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             docMap.put(INDEX_SUMMARY_FIELD, doc.get(INDEX_SUMMARY));
             docMap.put(INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + modelId, embedding);
 
-            String docId = String.valueOf(indexName.hashCode());
+            String docId = Hashing.sha256().hashString(indexName, StandardCharsets.UTF_8).toString();
 
             bulkRequest.add(new UpdateRequest(writeIndex, docId).doc(docMap, MediaTypeRegistry.JSON).docAsUpsert(true));
         }

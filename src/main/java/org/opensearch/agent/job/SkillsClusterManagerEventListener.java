@@ -50,6 +50,7 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
 
     private final ThreadPool threadPool;
     private Scheduler.Cancellable jobcron;
+    private Scheduler.Cancellable jobCronForAgent;
 
     private volatile Integer jobInterval;
     private volatile Boolean jobEnabled;
@@ -76,6 +77,7 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
         clusterService.getClusterSettings().addSettingsUpdateConsumer(SKILLS_INDEX_SUMMARY_JOB_INTERVAL, it -> {
             jobInterval = it;
             cancel(jobcron);
+            cancel(jobCronForAgent);
             startJob();
         });
 
@@ -83,6 +85,7 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
             jobEnabled = it;
             if (!jobEnabled) {
                 cancel(jobcron);
+                cancel(jobCronForAgent);
             } else {
                 startJob();
             }
@@ -102,6 +105,9 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
         isClusterManager = false;
         cancel(jobcron);
         jobcron = null;
+
+        cancel(jobCronForAgent);
+        jobCronForAgent = null;
     }
 
     @Override
@@ -110,7 +116,7 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
 
         // additional check for index deleted and created
         if (isClusterManager) {
-            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, xContentRegistry, indicesHelper, mlClients);
+            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
             if (!event.indicesCreated().isEmpty()) {
                 job.setAdhocIndexName(event.indicesCreated());
                 threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
@@ -128,19 +134,24 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
         if (!isClusterManager || !jobEnabled)
             return;
         if (jobInterval > 0) {
-            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, xContentRegistry, indicesHelper, mlClients);
+            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
+            AgentMonitorJob agentMonitorJob = new AgentMonitorJob(clusterService, client, indicesHelper, mlClients, threadPool);
             // trigger the one-shot job
             threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
 
             // schedule the cron job
             log.debug("Scheduling index summary embedding job...");
             jobcron = threadPool.scheduleWithFixedDelay(job, TimeValue.timeValueMinutes(jobInterval), GENERIC);
+            jobCronForAgent = threadPool.scheduleWithFixedDelay(agentMonitorJob, TimeValue.timeValueMinutes(5), GENERIC);
         }
         clusterService.addLifecycleListener(new LifecycleListener() {
             @Override
             public void beforeStop() {
                 cancel(jobcron);
                 jobcron = null;
+
+                cancel(jobCronForAgent);
+                jobCronForAgent = null;
             }
         });
     }

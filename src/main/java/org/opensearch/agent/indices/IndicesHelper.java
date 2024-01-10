@@ -29,6 +29,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.ml.common.CommonValue;
 import org.opensearch.ml.common.exception.MLException;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -83,10 +84,10 @@ public class IndicesHelper {
 
                 CreateIndexRequest request = new CreateIndexRequest(skillsIndexEnum.getIndexName())
                     .mapping(mapping)
-                    .settings(setting, XContentType.JSON.xContent().mediaType());
+                    .settings(setting, MediaTypeRegistry.JSON);
                 client.admin().indices().create(request, actionListener);
             } else {
-                log.debug("skillsIndexEnum:{} is already created", skillsIndexEnum);
+                log.debug("index:{} is already created", skillsIndexEnum.getIndexName());
                 if (indexMappingUpdated.containsKey(skillsIndexEnum.getIndexName())
                     && !indexMappingUpdated.get(skillsIndexEnum.getIndexName()).get()) {
                     shouldUpdateIndex(skillsIndexEnum.getIndexName(), skillsIndexEnum.getVersion(), ActionListener.wrap(r -> {
@@ -96,7 +97,7 @@ public class IndicesHelper {
                                 .admin()
                                 .indices()
                                 .putMapping(
-                                    new PutMappingRequest().indices(skillsIndexEnum.getIndexName()).source(mapping, XContentType.JSON),
+                                    new PutMappingRequest().indices(skillsIndexEnum.getIndexName()).source(mapping, MediaTypeRegistry.JSON),
                                     ActionListener.wrap(response -> {
                                         if (response.isAcknowledged()) {
                                             internalListener.onResponse(true);

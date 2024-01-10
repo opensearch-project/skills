@@ -9,13 +9,17 @@ import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DATA_STREAM;
 import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_NAME;
 import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_PATTERNS;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,7 +30,9 @@ import org.apache.commons.text.similarity.LongestCommonSubsequence;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
+import org.opensearch.agent.tools.utils.LLMProvider;
 import org.opensearch.client.Client;
+import org.opensearch.common.io.Streams;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.output.model.ModelTensor;
@@ -47,52 +53,14 @@ public class IndexRoutingTool extends VectorDBTool {
     public static final String TYPE = "IndexRoutingTool";
 
     private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for user question, "
-        + "This tool take user plain original question as input and return list of most related indexes or `Not sure`. "
+        + "This tool take user plain input and return list of most related indexes or `Not sure`. "
         + "If the tool returns `Not sure`, mark it as final answer and ask Human to provide index name";
-
-    private static final String DEFAULT_PROMPT_TEMPLATE = String
-        .format(
-            Locale.ROOT,
-            "Human: %s\\nAssistant:",
-            "You are an experienced engineer in OpenSearch and ElasticSearch. \n"
-                + "\n"
-                + "Given a question, your task is to choose the relevant indexes from a list of indexes.\n"
-                + "\n"
-                + "For every index, you will be given the index mapping, followed by sample data from the index.\n"
-                + "\n"
-                + "The data format is like:\n"
-                + "\n"
-                + "index-1: Index Mappings:\n"
-                + "mappings of index-1\n"
-                + "Sample data:\n"
-                + "data from index-1\n"
-                + "---\n"
-                + "index-2: Index Mappings:\n"
-                + "mappings of index-2\n"
-                + "Sample data:\n"
-                + "data from index-2\n"
-                + "---\n"
-                + "...\n"
-                + "\n"
-                + "Now the actual index mappings and sample data begins:\n"
-                + "{summaries}\n"
-                + "\n"
-                + "-------------------\n"
-                + "\n"
-                + "Format the output as a comma-separated sequence, e.g. index-1, index-2, index-3. If no indexes \n"
-                + "appear relevant to the question, return the empty string ''.\n"
-                + "\n"
-                + "Just return the index names, nothing else. \n"
-                + "If you are not sure, just return 'Not sure', nothing else.\n"
-                + "\n"
-                + "Question: {question}\n"
-                + "Answer:"
-        );
 
     public static final int DEFAULT_K = 5;
     public static String EMBEDDING_MODEL_ID = "embedding_model_id";
     public static String INFERENCE_MODEL_ID = "inference_model_id";
     public static String PROMPT_TEMPLATE = "prompt_template";
+    public static String LLM_PROVIDER = "llm_provider";
 
     @Setter
     @Getter
@@ -108,7 +76,7 @@ public class IndexRoutingTool extends VectorDBTool {
     private final MLClients mlClients;
 
     @Setter
-    private String promptTemplate;
+    private String prompt;
 
     public IndexRoutingTool(
         Client client,
@@ -133,7 +101,7 @@ public class IndexRoutingTool extends VectorDBTool {
             embeddingModelId,
             Optional.ofNullable(k).orElse(DEFAULT_K)
         );
-        this.mlClients = new MLClients(client);
+        this.mlClients = new MLClients(client, xContentRegistry);
         this.inferenceModelId = inferenceModelId;
     }
 
@@ -184,14 +152,14 @@ public class IndexRoutingTool extends VectorDBTool {
 
             // call LLM, MLModelTool
             String question = parameters.get(INPUT_FIELD);
-            String prompt = buildPrompt(summaryStr, question);
+            String prompt = buildFinalPrompt(summaryStr, question);
             // TODO use MLModelTool
             mlClients.inference(inferenceModelId, prompt, ActionListener.wrap(r -> {
                 ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
                 ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
                 String response = (String) modelTensor.getDataAsMap().get("response");
-                List<String> validIndexes = findMatchedIndex(response, summaries);
-                listener.onResponse((T) String.join(",", validIndexes));
+                Set<String> validIndexes = findMatchedIndex(response, summaries);
+                listener.onResponse((T) (validIndexes.isEmpty() ? "Not sure" : validIndexes.iterator().next()));
             }, exception -> { listener.onResponse((T) "Not sure"); }));
         }, exception -> {
             log.error("Failed to query index");
@@ -199,8 +167,8 @@ public class IndexRoutingTool extends VectorDBTool {
         }));
     }
 
-    private List<String> findMatchedIndex(String result, List<Map<String, Object>> candidates) {
-        List<String> validIndexes = new ArrayList<>();
+    private Set<String> findMatchedIndex(String result, List<Map<String, Object>> candidates) {
+        Set<String> validIndexes = new HashSet<>();
 
         Map<String, Map<String, Object>> candidateIndexMap = candidates
             .stream()
@@ -228,12 +196,16 @@ public class IndexRoutingTool extends VectorDBTool {
     }
 
     private String getIndexPattern(List<String> patterns, String predictedIndex) {
-        // if index name is short, we might don't need to use index pattern
-        if (!patterns.isEmpty() && predictedIndex.length() >= 10) {
+        /*
+         * we might need to add more check here,
+         * for example if index name length is short, e.g.<test>, that should be good enough we don't need to get index pattern for it
+         * if index pattern is too generic, that also not we want, we can discard the index pattern and use index itself.
+         */
+        if (!patterns.isEmpty()) {
             patterns.sort(Comparator.comparing(String::length).reversed());
             String longestPattern = patterns.get(0);
             // index pattern can't be * or too generic
-            if (!longestPattern.equals("*") && (longestPattern.length() * 2 > predictedIndex.length())) {
+            if (!longestPattern.equals("*")) {
                 return longestPattern;
             }
         }
@@ -244,15 +216,15 @@ public class IndexRoutingTool extends VectorDBTool {
         LongestCommonSubsequence lcs = new LongestCommonSubsequence();
         return allIndexes.stream().map(index -> {
             CharSequence lcsResult = lcs.longestCommonSubsequence(index, predictedIndex);
-            // Ratio = 2.0 * M / T
+            // ratio = 2.0 * M / T, M - matched characters, T - total characters
             Double ratio = (2.0 * lcsResult.length()) / (index.length() + predictedIndex.length());
             return Pair.of(index, ratio);
         }).filter(pair -> pair.getValue() > 0.9).max(Map.Entry.comparingByValue()).map(Pair::getKey);
     }
 
-    private String buildPrompt(String summaryString, String question) {
+    private String buildFinalPrompt(String summaryString, String question) {
         Map<String, String> params = Map.of("question", question, "summaries", summaryString);
-        return new StringSubstitutor(params).replace(promptTemplate);
+        return new StringSubstitutor(params).replace(prompt);
     }
 
     @Override
@@ -288,11 +260,26 @@ public class IndexRoutingTool extends VectorDBTool {
         public IndexRoutingTool create(Map<String, Object> params) {
             String embeddingModelId = (String) params.get(EMBEDDING_MODEL_ID);
             String inferenceModelId = (String) params.get(INFERENCE_MODEL_ID);
-            String promptTemplate = params.get(PROMPT_TEMPLATE) == null ? DEFAULT_PROMPT_TEMPLATE : (String) params.get(PROMPT_TEMPLATE);
+            LLMProvider llmProvider = Optional
+                .ofNullable(params.get(LLM_PROVIDER))
+                .map(it -> LLMProvider.fromProvider((String) it))
+                .orElse(LLMProvider.NONE);
+            String promptTemplate;
+            if (params.get(PROMPT_TEMPLATE) == null) {
+                try (InputStream ins = this.getClass().getResourceAsStream("/index_routing_tool_prompt.txt")) {
+                    promptTemplate = Streams.readFully(Objects.requireNonNull(ins)).utf8ToString();
+                } catch (IOException e) {
+                    log.error("Can't find default prompt template for index routing tool");
+                    throw new RuntimeException(e);
+                }
+            } else {
+                promptTemplate = (String) params.get(PROMPT_TEMPLATE);
+            }
+
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_K;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
             IndexRoutingTool tool = new IndexRoutingTool(client, xContentRegistry, docSize, k, embeddingModelId, inferenceModelId);
-            tool.setPromptTemplate(promptTemplate);
+            tool.setPrompt(llmProvider.getPromptFormat().replace("${prompt}", promptTemplate));
 
             return tool;
         }

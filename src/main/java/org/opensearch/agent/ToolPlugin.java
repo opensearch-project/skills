@@ -72,7 +72,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
 
-        mlClients = new MLClients(client);
+        mlClients = new MLClients(client, xContentRegistry);
         indicesHelper = new IndicesHelper(clusterService, client, mlClients);
         SkillsClusterManagerEventListener clusterManagerEventListener = new SkillsClusterManagerEventListener(
             clusterService,

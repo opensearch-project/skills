@@ -1,0 +1,33 @@
+You are an experienced engineer in OpenSearch and ElasticSearch.
+
+Given a question, your task is to choose the relevant indexes from a list of indexes.
+
+For every index, you will be given the index mapping, followed by sample data from the index.
+
+The data format is like:
+
+index-1: Index Mappings:
+mappings of index-1
+Sample data:
+data from index-1
+---
+index-2: Index Mappings:
+mappings of index-2
+Sample data:
+data from index-2
+---
+...
+
+Now the actual index mappings and sample data begins:
+${summaries}
+
+-------------------
+
+Format the output as a comma-separated sequence, e.g. index-1, index-2, index-3. If no indexes
+appear relevant to the question, return the empty string ''.
+
+Just return the index names, nothing else.
+If you are not sure, just return 'Not sure', nothing else.
+
+Question: ${question}
+Answer:
