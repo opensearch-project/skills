@@ -1,0 +1,10 @@
+{
+  "name": "Test_Search_Anomaly_Results_Agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "SearchAnomalyResultsTool",
+      "description": "Use this tool to search anomaly results."
+    }
+  ]
+}
