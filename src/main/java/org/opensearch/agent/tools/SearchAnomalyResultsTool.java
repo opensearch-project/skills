@@ -16,6 +16,7 @@ import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.ExistsQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
@@ -26,12 +27,15 @@ import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHit;
+import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
+@Log4j2
 @ToolAnnotation(SearchAnomalyResultsTool.TYPE)
 public class SearchAnomalyResultsTool implements Tool {
     public static final String TYPE = "SearchAnomalyResultsTool";
@@ -89,7 +93,7 @@ public class SearchAnomalyResultsTool implements Tool {
             : null;
         final String sortOrderStr = parameters.getOrDefault("sortOrder", "asc");
         final SortOrder sortOrder = sortOrderStr.equalsIgnoreCase("asc") ? SortOrder.ASC : SortOrder.DESC;
-        final String sortString = parameters.getOrDefault("sortString", "name.keyword");
+        final String sortString = parameters.getOrDefault("sortString", "data_start_time");
         final int size = parameters.containsKey("size") ? Integer.parseInt(parameters.get("size")) : 20;
         final int startIndex = parameters.containsKey("startIndex") ? Integer.parseInt(parameters.get("startIndex")) : 0;
 
@@ -137,20 +141,17 @@ public class SearchAnomalyResultsTool implements Tool {
             .indices(ToolConstants.AD_RESULTS_INDEX_PATTERN);
 
         ActionListener<SearchResponse> searchAnomalyResultsListener = ActionListener.<SearchResponse>wrap(response -> {
-            StringBuilder sb = new StringBuilder();
-            SearchHit[] hits = response.getHits().getHits();
-            sb.append("AnomalyResults=[");
-            for (SearchHit hit : hits) {
-                sb.append("{");
-                sb.append("detectorId=").append(hit.getSourceAsMap().get("detector_id")).append(",");
-                sb.append("grade=").append(hit.getSourceAsMap().get("anomaly_grade")).append(",");
-                sb.append("confidence=").append(hit.getSourceAsMap().get("confidence"));
-                sb.append("}");
+            processHits(response.getHits(), listener);
+        }, e -> {
+            // System index isn't initialized by default, so ignore such errors
+            if (e instanceof IndexNotFoundException) {
+                processHits(SearchHits.empty(), listener);
+            } else {
+                log.error("Failed to search anomaly results.", e);
+                listener.onFailure(e);
+
             }
-            sb.append("]");
-            sb.append("TotalAnomalyResults=").append(response.getHits().getTotalHits().value);
-            listener.onResponse((T) sb.toString());
-        }, e -> { listener.onFailure(e); });
+        });
 
         adClient.searchAnomalyResults(searchAnomalyResultsRequest, searchAnomalyResultsListener);
     }
@@ -163,6 +164,23 @@ public class SearchAnomalyResultsTool implements Tool {
     @Override
     public String getType() {
         return TYPE;
+    }
+
+    private <T> void processHits(SearchHits searchHits, ActionListener<T> listener) {
+        SearchHit[] hits = searchHits.getHits();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("AnomalyResults=[");
+        for (SearchHit hit : hits) {
+            sb.append("{");
+            sb.append("detectorId=").append(hit.getSourceAsMap().get("detector_id")).append(",");
+            sb.append("grade=").append(hit.getSourceAsMap().get("anomaly_grade")).append(",");
+            sb.append("confidence=").append(hit.getSourceAsMap().get("confidence"));
+            sb.append("}");
+        }
+        sb.append("]");
+        sb.append("TotalAnomalyResults=").append(searchHits.getTotalHits().value);
+        listener.onResponse((T) sb.toString());
     }
 
     /**
