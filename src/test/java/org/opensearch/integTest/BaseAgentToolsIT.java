@@ -25,9 +25,9 @@ import org.opensearch.client.*;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.DeprecationHandler;
-import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
@@ -156,10 +156,8 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     // Similar to deleteExternalIndices, but including indices with "." prefix vs. excluding them
     protected void deleteSystemIndices() throws IOException {
         final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
-        final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (
-            final XContentParser parser = xContentType
-                .xContent()
+            final XContentParser parser = JsonXContent.jsonXContent
                 .createParser(
                     NamedXContentRegistry.EMPTY,
                     DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
