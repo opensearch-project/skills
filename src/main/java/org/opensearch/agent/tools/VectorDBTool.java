@@ -28,6 +28,9 @@ import lombok.extern.log4j.Log4j2;
 @ToolAnnotation(VectorDBTool.TYPE)
 public class VectorDBTool extends AbstractRetrieverTool {
     public static final String TYPE = "VectorDBTool";
+
+    public static String DEFAULT_DESCRIPTION =
+        "Use this tool to performs knn-based dense retrieval. It takes 1 argument named input which is a string query for dense retrieval. The tool returns the dense retrieval results for the query.";
     public static final String MODEL_ID_FIELD = "model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String K_FIELD = "k";
