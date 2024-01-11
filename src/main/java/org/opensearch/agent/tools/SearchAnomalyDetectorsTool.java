@@ -48,7 +48,7 @@ import lombok.extern.log4j.Log4j2;
 @ToolAnnotation(SearchAnomalyDetectorsTool.TYPE)
 public class SearchAnomalyDetectorsTool implements Tool {
     public static final String TYPE = "SearchAnomalyDetectorsTool";
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to search anomaly detectors.";
+    private static final String DEFAULT_DESCRIPTION = "This is a tool that searches anomaly detectors. It takes 12 optional arguments named detectorName which is the explicit name of the monitor (default is null), and detectorNamePattern which is a wildcard query to match detector name (default is null), and indices which defines the index being detected (default is null), and highCardinality which defines whether the anomaly detector is high cardinality (default is null), and lastUpdateTime which defines the latest update time of the anomaly detector (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the index to start from (default is 0), and running which defines whether the anomaly detector is running (default is null, indicating both), and disabled which defines whether the anomaly detector is disabled (default is null, indicating both), and failed which defines whether the anomaly detector has failed (default is null, indicating both). The tool returns the a list of anomaly detectors.";
 
     @Setter
     @Getter
