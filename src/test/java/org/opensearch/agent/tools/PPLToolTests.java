@@ -140,6 +140,20 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_with_DefaultPrompt() {
+        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+
+    @Test
     public void testTool_withPPLTag() {
         Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
@@ -174,6 +188,17 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_WrongModelType() {
+        Exception exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "wrong_model_type")) );
+        assertEquals(
+                "Wrong PPL Model type, should be CLAUDE or FINETUNE",
+                exception.getMessage()
+        );
+    }
+
+    @Test
     public void testTool_getMappingFailure() {
         Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
@@ -192,6 +217,7 @@ public class PPLToolTests {
                 })
             );
     }
+
 
     @Test
     public void testTool_predictModelFailure() {

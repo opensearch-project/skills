@@ -410,7 +410,6 @@ public class PPLTool implements Tool {
             if (searchResponseIns != null) {
                 String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
                 Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
-                String defaultPrompt = defaultPromptDict.get(pplModelType.toString());
                 return defaultPromptDict.get(pplModelType.toString());
             }
         } catch (Exception e) {
