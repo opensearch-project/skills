@@ -117,7 +117,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                     .map(sample -> (String) sample.get(INDEX_SUMMARY))
                     .collect(Collectors.toList());
 
-                List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, mlTaskResponse -> {
+                List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, true, mlTaskResponse -> {
                     ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
                     return output.getMlModelOutputs();
                 });
@@ -186,12 +186,12 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             indexSummaryMap.put(INDEX_PATTERNS, indexPatterns);
             indexSummaryMap.put(ALIASES, indexMetadata.getAliases().keySet());
 
-            Map<String, Object> sourceAsMap = indexMetadata.mapping().getSourceAsMap();
-            // if index don't have any mapping, ignore
-            if (sourceAsMap == null || sourceAsMap.isEmpty()) {
+            // if index have no mapping at all
+            if (indexMetadata.mapping() == null) {
                 log.debug("No mapping for index {}", indexName);
                 continue;
             }
+            Map<String, Object> sourceAsMap = indexMetadata.mapping().getSourceAsMap();
             try (XContentBuilder builder = MediaTypeRegistry.contentBuilder(MediaTypeRegistry.JSON)) {
                 builder.map(sourceAsMap);
                 String mapping = builder.toString();

@@ -183,7 +183,7 @@ public class IndicesHelper {
     }
 
     private Long getDimension(String modelId) {
-        return mlClients.getEmbeddingResult(modelId, List.of("today is sunny"), mlTaskResponse -> {
+        return mlClients.getEmbeddingResult(modelId, List.of("today is sunny"), true, mlTaskResponse -> {
             ModelTensorOutput tensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
             return tensorOutput.getMlModelOutputs().get(0).getMlModelTensors().get(0).getShape()[0];
         });

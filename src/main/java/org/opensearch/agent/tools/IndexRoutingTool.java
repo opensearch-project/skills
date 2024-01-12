@@ -5,9 +5,9 @@
 
 package org.opensearch.agent.tools;
 
-import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DATA_STREAM;
-import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_NAME;
-import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_PATTERNS;
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DATA_STREAM_FIELD;
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_NAME_FIELD;
+import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.INDEX_PATTERNS_FIELD;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,7 +53,7 @@ public class IndexRoutingTool extends VectorDBTool {
     public static final String TYPE = "IndexRoutingTool";
 
     private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for user question, "
-        + "This tool take user plain input and return list of most related indexes or `Not sure`. "
+        + "It takes 1 argument which is a string of user question and return list of most related indexes or `Not sure`. "
         + "If the tool returns `Not sure`, mark it as final answer and ask Human to provide index name";
 
     public static final int DEFAULT_K = 5;
@@ -127,6 +127,7 @@ public class IndexRoutingTool extends VectorDBTool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        log.debug("input={}", parameters.get(INPUT_FIELD));
         // get index of knn-index
         super.run(parameters, ActionListener.wrap(res -> {
             List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;
@@ -153,11 +154,13 @@ public class IndexRoutingTool extends VectorDBTool {
             // call LLM, MLModelTool
             String question = parameters.get(INPUT_FIELD);
             String prompt = buildFinalPrompt(summaryStr, question);
+            log.debug("prompt send to inference is {}", prompt);
             // TODO use MLModelTool
             mlClients.inference(inferenceModelId, prompt, ActionListener.wrap(r -> {
                 ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
                 ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
                 String response = (String) modelTensor.getDataAsMap().get("response");
+                log.debug("response back from inference mode is {}", response);
                 Set<String> validIndexes = findMatchedIndex(response, summaries);
                 listener.onResponse((T) (validIndexes.isEmpty() ? "Not sure" : validIndexes.iterator().next()));
             }, exception -> { listener.onResponse((T) "Not sure"); }));
@@ -172,17 +175,18 @@ public class IndexRoutingTool extends VectorDBTool {
 
         Map<String, Map<String, Object>> candidateIndexMap = candidates
             .stream()
-            .collect(Collectors.toMap(m -> (String) m.get(INDEX_NAME), m -> m));
+            .collect(Collectors.toMap(m -> (String) m.get(INDEX_NAME_FIELD), m -> m));
 
         Set<String> allCandidates = candidateIndexMap.keySet();
         List<String> predictedIndexes = Arrays.stream(result.split(",")).map(String::trim).collect(Collectors.toList());
+        log.debug("all candidates are {}, predictedIndexes are {}", allCandidates, predictedIndexes);
 
         for (String predictedIndex : predictedIndexes) {
             if (allCandidates.contains(predictedIndex)) {
                 Map<String, Object> map = candidateIndexMap.get(predictedIndex);
                 // data stream back index
-                Optional<Object> dataStreamName = Optional.ofNullable(map.get(DATA_STREAM));
-                List<String> patterns = (List<String>) map.get(INDEX_PATTERNS);
+                Optional<Object> dataStreamName = Optional.ofNullable(map.get(DATA_STREAM_FIELD));
+                List<String> patterns = (List<String>) map.get(INDEX_PATTERNS_FIELD);
                 String indexPattern = getIndexPattern(patterns, predictedIndex);
                 validIndexes.add((String) dataStreamName.orElse(indexPattern));
             } else if (predictedIndex.equals("Not sure")) {

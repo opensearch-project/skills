@@ -36,6 +36,7 @@ import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.agent.MLAgent;
 import org.opensearch.ml.common.agent.MLToolSpec;
 import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
@@ -45,6 +46,9 @@ import org.opensearch.ml.common.input.nlp.TextDocsMLInput;
 import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.agent.MLSearchAgentAction;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelAction;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelRequest;
+import org.opensearch.ml.common.transport.deploy.MLDeployModelResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.search.SearchHit;
@@ -65,7 +69,7 @@ public class MLClients {
         this.xContentRegistry = xContentRegistry;
     }
 
-    public <T> T getEmbeddingResult(String modelId, List<String> texts, Function<MLTaskResponse, T> parser) {
+    public <T> T getEmbeddingResult(String modelId, List<String> texts, boolean deploy, Function<MLTaskResponse, T> parser) {
         try {
             TextDocsInputDataSet inputDataSet = TextDocsInputDataSet
                 .builder()
@@ -80,8 +84,21 @@ public class MLClients {
             MLTaskResponse mlTaskResponse = predictFuture.get(DEFAULT_TIMEOUT_SECOND, TimeUnit.SECONDS);
             return parser.apply(mlTaskResponse);
         } catch (Exception ex) {
+            if (deploy && ExceptionsHelper.stackTrace(ex).contains("Model not ready yet.")) {
+                log.info("Model {} has not deployed yet, try to deploy", modelId);
+                ActionFuture<MLDeployModelResponse> deployFuture = client
+                    .execute(MLDeployModelAction.INSTANCE, new MLDeployModelRequest(modelId, false));
+                try {
+                    MLDeployModelResponse mlDeployModelResponse = deployFuture.get(2, TimeUnit.MINUTES);
+                    if (mlDeployModelResponse.getStatus().equals(MLTaskState.COMPLETED.name())) {
+                        return getEmbeddingResult(modelId, texts, false, parser);
+                    }
+                } catch (Exception e) {
+                    throw ExceptionsHelper.convertToRuntime(e);
+                }
+            }
             log.error("Invoke ML embedding failed", ex);
-            throw new RuntimeException(ex);
+            throw ExceptionsHelper.convertToRuntime(ex);
         }
     }
 
