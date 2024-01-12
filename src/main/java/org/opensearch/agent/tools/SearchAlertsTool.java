@@ -32,7 +32,8 @@ import lombok.extern.log4j.Log4j2;
 @ToolAnnotation(SearchAlertsTool.TYPE)
 public class SearchAlertsTool implements Tool {
     public static final String TYPE = "SearchAlertsTool";
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to search alerts.";
+    private static final String DEFAULT_DESCRIPTION =
+        "This is a tool that finds alert trigger information. It takes 12 optional argument named sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is monitor_name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the index to start from (default is 0), and searchString which defines the search string to use for searching a specific alert (default is an empty String), and severityLevel which defines the severity level to filter for (default is ALL), and alertState which defines the alert state to filter for (default is ALL), and monitorId which defines the monitor ID to filter for, and alertIndex which defines the alert index to search from (default is null), and monitorIds which defines the list of monitor IDs to filter for, and workflowIds which defines the list of workflow IDs to filter for（default is null), and alertIds which defines the list of alert IDs to filter for (default is null). The tool returns an array of all alerts.";
 
     @Setter
     @Getter
