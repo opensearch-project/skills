@@ -52,6 +52,9 @@ import lombok.Builder;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
+/**
+ * Take index mapping and sample data as summary, embedding it and save to k-NN index as vector store
+ */
 @Log4j2
 public class IndexSummaryEmbeddingJob implements Runnable {
 
@@ -184,9 +187,13 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             indexSummaryMap.put(ALIASES, indexMetadata.getAliases().keySet());
 
             Map<String, Object> sourceAsMap = indexMetadata.mapping().getSourceAsMap();
+            // if index don't have any mapping, ignore
+            if (sourceAsMap == null || sourceAsMap.isEmpty()) {
+                log.debug("No mapping for index {}", indexName);
+                continue;
+            }
             try (XContentBuilder builder = MediaTypeRegistry.contentBuilder(MediaTypeRegistry.JSON)) {
                 builder.map(sourceAsMap);
-                // String mapping = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> new Gson().toJson(sourceAsMap));
                 String mapping = builder.toString();
 
                 // sample data
