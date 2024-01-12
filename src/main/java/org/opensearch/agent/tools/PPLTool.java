@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
@@ -98,7 +99,7 @@ public class PPLTool implements Tool {
                 return PPLModelType.CLAUDE;
             }
             try {
-                return PPLModelType.valueOf(value.toUpperCase());
+                return PPLModelType.valueOf(value.toUpperCase(Locale.ROOT));
             } catch (Exception e) {
                 throw new IllegalArgumentException("Wrong PPL Model type, should be CLAUDE or FINETUNE");
             }
