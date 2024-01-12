@@ -100,7 +100,7 @@ public class PPLTool implements Tool {
             try {
                 return PPLModelType.valueOf(value.toUpperCase());
             } catch (Exception e) {
-                throw new IllegalArgumentException("Wrong function name");
+                throw new IllegalArgumentException("Wrong PPL Model type, should be CLAUDE or FINETUNE");
             }
         }
 
