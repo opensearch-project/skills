@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.CommonValue.*;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
@@ -22,6 +23,7 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
@@ -90,7 +92,17 @@ public class PPLTool implements Tool {
 
     private static Gson gson = new Gson();
 
-    private enum PPLModelType {
+    private static Map<String, String> defaultPromptDict;
+
+    static {
+        try {
+            defaultPromptDict = loadDefaultPromptDict();
+        } catch (IOException e) {
+            throw new RuntimeException("fail to load default prompt dict" + e.getMessage());
+        }
+    }
+
+    private enum PPLModelType{
         CLAUDE,
         FINETUNE;
 
@@ -111,9 +123,11 @@ public class PPLTool implements Tool {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
-        if (contextPrompt.isEmpty()) {
-            this.contextPrompt = loadDefaultPrompt(this.pplModelType);
-        } else {
+        if (contextPrompt.isEmpty())
+        {
+            this.contextPrompt = this.defaultPromptDict.getOrDefault(this.pplModelType.toString(), "");
+        }
+        else {
             this.contextPrompt = contextPrompt;
         }
     }
@@ -406,20 +420,16 @@ public class PPLTool implements Tool {
         return ppl;
     }
 
-    private String loadDefaultPrompt(PPLModelType pplModelType) {
-        try (InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");) {
-            if (searchResponseIns != null) {
-                String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
-                Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
-                return defaultPromptDict.get(pplModelType.toString());
-            }
-        } catch (Exception e) {
-            IllegalArgumentException exception = new IllegalArgumentException(
-                "fail to log default prompt for ppl tool because " + e.getMessage()
-            );
-            throw exception;
+
+    private static Map<String, String> loadDefaultPromptDict() throws IOException {
+        InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");
+        if (searchResponseIns != null) {
+            String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+            log.info(defaultPromptContent);
+            Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
+            return defaultPromptDict;
         }
-        return "";
+        return new HashMap<>();
     }
 
 }
