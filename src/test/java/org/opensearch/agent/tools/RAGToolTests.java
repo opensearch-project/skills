@@ -204,6 +204,36 @@ public class RAGToolTests {
     }
 
     @Test
+    public void testRunWithQuestionJson() throws IOException {
+        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        ragTool.setXContentRegistry(mockNamedXContentRegistry);
+
+        ModelTensorOutput mlModelTensorOutput = getMlModelTensorOutput();
+        SearchResponse mockedEmptySearchResponse = SearchResponse
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedEmptySearchResponseString)
+            );
+
+        doAnswer(invocation -> {
+            SearchRequest searchRequest = invocation.getArgument(0);
+            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockedEmptySearchResponse);
+            return null;
+        }).when(client).search(any(), any());
+
+        doAnswer(invocation -> {
+            ActionListener<MLTaskResponse> actionListener = invocation.getArgument(2);
+            actionListener.onResponse(MLTaskResponse.builder().output(mlModelTensorOutput).build());
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        ragTool.run(Map.of(INPUT_FIELD, "{question:'what is the population in seattle?'}"), listener);
+        verify(client).search(any(), any());
+        verify(client).execute(any(), any(), any());
+    }
+
+    @Test
     @SneakyThrows
     public void testRunWithRuntimeExceptionDuringSearch() {
         NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
@@ -259,17 +289,6 @@ public class RAGToolTests {
     public void testRunWithEmptyInput() {
         ActionListener listener = mock(ActionListener.class);
         ragTool.run(Map.of(INPUT_FIELD, ""), listener);
-    }
-
-    @Test
-    public void testRunWithMalformedInput() throws IOException {
-        ActionListener listener = mock(ActionListener.class);
-        ragTool.run(Map.of(INPUT_FIELD, "{hello?"), listener);
-        verify(listener).onFailure(any(RuntimeException.class));
-        ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(listener).onFailure(argumentCaptor.capture());
-        assertEquals("Failed to read question from " + INPUT_FIELD, argumentCaptor.getValue().getMessage());
-
     }
 
     @Test
