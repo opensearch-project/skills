@@ -7,6 +7,8 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.CommonValue.*;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -83,12 +85,39 @@ public class PPLTool implements Tool {
 
     private String contextPrompt;
 
+    private PPLModelType pplModelType;
+
     private static Gson gson = new Gson();
 
-    public PPLTool(Client client, String modelId, String contextPrompt) {
+    private enum PPLModelType{
+        CLAUDE,
+        FINETUNE;
+
+        public static PPLModelType from(String value) {
+            if (value.isEmpty()){
+                return PPLModelType.CLAUDE;
+            }
+            try {
+                return PPLModelType.valueOf(value.toLowerCase());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Wrong function name");
+            }
+        }
+
+    }
+
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType) {
         this.client = client;
         this.modelId = modelId;
-        this.contextPrompt = contextPrompt;
+        this.pplModelType = PPLModelType.from(pplModelType);
+        if (contextPrompt.isEmpty())
+        {
+            this.contextPrompt = loadDefaultPrompt(this.pplModelType);
+        }
+        else {
+            this.contextPrompt = contextPrompt;
+        }
+        log.info(this.contextPrompt);
     }
 
     @Override
@@ -208,7 +237,7 @@ public class PPLTool implements Tool {
 
         @Override
         public PPLTool create(Map<String, Object> map) {
-            return new PPLTool(client, (String) map.get("model_id"), (String) map.get("prompt"));
+            return new PPLTool(client, (String) map.get("model_id"), (String) map.getOrDefault("prompt", ""), (String) map.getOrDefault("model_type", ""));
         }
 
         @Override
@@ -225,6 +254,7 @@ public class PPLTool implements Tool {
         public String getDefaultVersion() {
             return null;
         }
+
     }
 
     private SearchRequest buildSearchRequest(String indexName) {
@@ -371,6 +401,25 @@ public class PPLTool implements Tool {
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         return ppl;
+    }
+
+    private String loadDefaultPrompt(PPLModelType pplModelType)
+    {
+        try (InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");) {
+            if (searchResponseIns != null)
+            {
+                String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+                Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
+                return defaultPromptDict.get(pplModelType.toString());
+            }
+        } catch (Exception e)
+        {
+            IllegalArgumentException exception = new IllegalArgumentException("fail to log default prompt for ppl tool because " + e.getMessage());
+            throw exception;
+        }
+        finally {
+            throw new IllegalArgumentException("fail to load default prompt for ppl tool");
+        }
     }
 
 }
