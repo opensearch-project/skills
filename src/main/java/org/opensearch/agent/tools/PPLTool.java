@@ -89,12 +89,12 @@ public class PPLTool implements Tool {
 
     private static Gson gson = new Gson();
 
-    private enum PPLModelType{
+    private enum PPLModelType {
         CLAUDE,
         FINETUNE;
 
         public static PPLModelType from(String value) {
-            if (value.isEmpty()){
+            if (value.isEmpty()) {
                 return PPLModelType.CLAUDE;
             }
             try {
@@ -110,14 +110,11 @@ public class PPLTool implements Tool {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
-        if (contextPrompt.isEmpty())
-        {
+        if (contextPrompt.isEmpty()) {
             this.contextPrompt = loadDefaultPrompt(this.pplModelType);
-        }
-        else {
+        } else {
             this.contextPrompt = contextPrompt;
         }
-        log.info(this.contextPrompt);
     }
 
     @Override
@@ -237,7 +234,12 @@ public class PPLTool implements Tool {
 
         @Override
         public PPLTool create(Map<String, Object> map) {
-            return new PPLTool(client, (String) map.get("model_id"), (String) map.getOrDefault("prompt", ""), (String) map.getOrDefault("model_type", ""));
+            return new PPLTool(
+                client,
+                (String) map.get("model_id"),
+                (String) map.getOrDefault("prompt", ""),
+                (String) map.getOrDefault("model_type", "")
+            );
         }
 
         @Override
@@ -403,22 +405,18 @@ public class PPLTool implements Tool {
         return ppl;
     }
 
-    private String loadDefaultPrompt(PPLModelType pplModelType)
-    {
+    private String loadDefaultPrompt(PPLModelType pplModelType) {
         try (InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");) {
-            if (searchResponseIns != null)
-            {
+            if (searchResponseIns != null) {
                 String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
-                log.info(defaultPromptContent);
                 Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
-                log.info(defaultPromptDict);
                 String defaultPrompt = defaultPromptDict.get(pplModelType.toString());
-                log.info(defaultPrompt);
                 return defaultPromptDict.get(pplModelType.toString());
             }
-        } catch (Exception e)
-        {
-            IllegalArgumentException exception = new IllegalArgumentException("fail to log default prompt for ppl tool because " + e.getMessage());
+        } catch (Exception e) {
+            IllegalArgumentException exception = new IllegalArgumentException(
+                "fail to log default prompt for ppl tool because " + e.getMessage()
+            );
             throw exception;
         }
         return "";
