@@ -152,7 +152,6 @@ public class PPLToolTests {
 
     }
 
-
     @Test
     public void testTool_withPPLTag() {
         Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
@@ -190,12 +189,10 @@ public class PPLToolTests {
     @Test
     public void testTool_WrongModelType() {
         Exception exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "wrong_model_type")) );
-        assertEquals(
-                "Wrong PPL Model type, should be CLAUDE or FINETUNE",
-                exception.getMessage()
+            IllegalArgumentException.class,
+            () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "wrong_model_type"))
         );
+        assertEquals("Wrong PPL Model type, should be CLAUDE or FINETUNE", exception.getMessage());
     }
 
     @Test
@@ -217,7 +214,6 @@ public class PPLToolTests {
                 })
             );
     }
-
 
     @Test
     public void testTool_predictModelFailure() {
