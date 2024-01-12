@@ -23,7 +23,6 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
@@ -102,7 +101,7 @@ public class PPLTool implements Tool {
         }
     }
 
-    private enum PPLModelType{
+    private enum PPLModelType {
         CLAUDE,
         FINETUNE;
 
@@ -123,11 +122,9 @@ public class PPLTool implements Tool {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
-        if (contextPrompt.isEmpty())
-        {
+        if (contextPrompt.isEmpty()) {
             this.contextPrompt = this.defaultPromptDict.getOrDefault(this.pplModelType.toString(), "");
-        }
-        else {
+        } else {
             this.contextPrompt = contextPrompt;
         }
     }
@@ -419,7 +416,6 @@ public class PPLTool implements Tool {
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         return ppl;
     }
-
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {
         InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");
