@@ -98,7 +98,7 @@ public class PPLTool implements Tool {
                 return PPLModelType.CLAUDE;
             }
             try {
-                return PPLModelType.valueOf(value.toLowerCase());
+                return PPLModelType.valueOf(value.toUpperCase());
             } catch (Exception e) {
                 throw new IllegalArgumentException("Wrong function name");
             }
@@ -409,7 +409,11 @@ public class PPLTool implements Tool {
             if (searchResponseIns != null)
             {
                 String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+                log.info(defaultPromptContent);
                 Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
+                log.info(defaultPromptDict);
+                String defaultPrompt = defaultPromptDict.get(pplModelType.toString());
+                log.info(defaultPrompt);
                 return defaultPromptDict.get(pplModelType.toString());
             }
         } catch (Exception e)
@@ -417,9 +421,7 @@ public class PPLTool implements Tool {
             IllegalArgumentException exception = new IllegalArgumentException("fail to log default prompt for ppl tool because " + e.getMessage());
             throw exception;
         }
-        finally {
-            throw new IllegalArgumentException("fail to load default prompt for ppl tool");
-        }
+        return "";
     }
 
 }
