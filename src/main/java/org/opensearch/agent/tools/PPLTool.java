@@ -97,7 +97,8 @@ public class PPLTool implements Tool {
         try {
             defaultPromptDict = loadDefaultPromptDict();
         } catch (IOException e) {
-            throw new RuntimeException("fail to load default prompt dict" + e.getMessage());
+            log.error("fail to load default prompt dict" + e.getMessage());
+            defaultPromptDict = new HashMap<>();
         }
     }
 
