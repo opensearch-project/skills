@@ -56,6 +56,7 @@ public class AgentMonitorJob implements Runnable {
             embeddingModelIds.removeAll(EMBEDDING_MODEL_IDS);
             if (!embeddingModelIds.isEmpty()) {
                 IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
+                job.setAdhocModelIds(embeddingModelIds);
                 threadPool.schedule(job, TimeValue.timeValueSeconds(5), GENERIC);
             }
         }, exception -> log.info("Query agent for index routing tool failed.", exception)));

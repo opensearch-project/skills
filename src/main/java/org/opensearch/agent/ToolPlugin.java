@@ -72,7 +72,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
 
-        mlClients = new MLClients(client, xContentRegistry);
+        mlClients = new MLClients(client, xContentRegistry, clusterService);
         indicesHelper = new IndicesHelper(clusterService, client, mlClients);
         SkillsClusterManagerEventListener clusterManagerEventListener = new SkillsClusterManagerEventListener(
             clusterService,
@@ -94,7 +94,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         SearchAnomalyDetectorsTool.Factory.getInstance().init(client);
         SearchAnomalyResultsTool.Factory.getInstance().init(client);
         SearchMonitorsTool.Factory.getInstance().init(client);
-        IndexRoutingTool.Factory.getInstance().init(client, xContentRegistry);
+        IndexRoutingTool.Factory.getInstance().init(client, xContentRegistry, clusterService);
 
         return List.of(clusterManagerEventListener);
     }

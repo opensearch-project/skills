@@ -25,6 +25,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.client.Client;
 import org.opensearch.client.Requests;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.action.ActionFuture;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -35,6 +36,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.query.TermQueryBuilder;
+import org.opensearch.ml.common.CommonValue;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.agent.MLAgent;
@@ -64,9 +66,12 @@ public class MLClients {
 
     private NamedXContentRegistry xContentRegistry;
 
-    public MLClients(Client client, NamedXContentRegistry xContentRegistry) {
+    private ClusterService clusterService;
+
+    public MLClients(Client client, NamedXContentRegistry xContentRegistry, ClusterService clusterService) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
+        this.clusterService = clusterService;
     }
 
     public <T> T getEmbeddingResult(String modelId, List<String> texts, boolean deploy, Function<MLTaskResponse, T> parser) {
@@ -123,6 +128,10 @@ public class MLClients {
     }
 
     public void getModelIdsForIndexRoutingTool(ActionListener<List<String>> listener) {
+        if (!clusterService.state().metadata().hasIndex(CommonValue.ML_AGENT_INDEX)) {
+            listener.onResponse(Collections.emptyList());
+            return;
+        }
         // search agent with IndexRoutingTool
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         String termQueryKey = String.format(Locale.ROOT, "%s.%s", MLAgent.TOOLS_FIELD, MLToolSpec.TOOL_TYPE_FIELD);
@@ -143,7 +152,7 @@ public class MLClients {
             }
             listener.onResponse(new ArrayList<>(embeddingModelIds));
         }, ex -> {
-            if (ExceptionsHelper.unwrap(ex) instanceof IndexNotFoundException) {
+            if (ExceptionsHelper.unwrapCause(ex) instanceof IndexNotFoundException) {
                 listener.onResponse(Collections.emptyList());
             } else {
                 listener.onFailure(ex);

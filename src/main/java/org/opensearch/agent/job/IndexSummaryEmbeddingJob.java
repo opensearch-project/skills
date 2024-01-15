@@ -5,7 +5,7 @@
 
 package org.opensearch.agent.job;
 
-import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX;
+import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     private IndicesHelper indicesHelper;
     private MLClients mlClients;
 
-    public static String INDEX_SUMMARY_EMBEDDING_INDEX = ".index_summary_embedding_index";
+    public static String INDEX_SUMMARY_EMBEDDING_INDEX = SKILLS_INDEX_SUMMARY.getIndexName();
     public static String INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX = "index_summary_embedding";
     public static String INDEX_NAME_FIELD = "index_name";
     public static String DATA_STREAM_FIELD = "data_stream";
@@ -79,6 +79,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     public static String INDEX_EMBEDDING = "embedding";
     public static String SENTENCE_EMBEDDING = "sentence_embedding";
     public static int DEFAULT_TIMEOUT_SECOND = 30;
+    public static int TOKEN_LIMIT = 8192;
 
     @Setter
     private List<String> adhocIndexName;
@@ -96,6 +97,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
     @Override
     public void run() {
+        // TODO to distribute to other nodes to execute the workload other than cluster manager node
         // search agent with IndexRoutingTool
         mlClients.getModelIdsForIndexRoutingTool(adhocModelIds, ActionListener.wrap(embeddingModelIds -> {
             // no embedding model
@@ -205,9 +207,19 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                 SearchResponse searchResponse = searchFuture.get(DEFAULT_TIMEOUT_SECOND, TimeUnit.SECONDS);
 
                 List<String> documents = new ArrayList<>();
-                // TODO add token limit check
+                int tokenNumber = 0;
                 for (SearchHit hit : searchResponse.getHits()) {
-                    documents.add(Strings.toString(MediaTypeRegistry.JSON, hit));
+                    String docContent = Strings.toString(MediaTypeRegistry.JSON, hit);
+                    int tokens = countToken(docContent);
+                    if (tokenNumber + tokens > TOKEN_LIMIT) {
+                        // at least 1 sample data
+                        if (documents.isEmpty()) {
+                            documents.add(docContent);
+                        }
+                        break;
+                    }
+                    documents.add(docContent);
+                    tokenNumber += tokens;
                 }
 
                 String indexSummary = String.format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, documents);
@@ -222,6 +234,20 @@ public class IndexSummaryEmbeddingJob implements Runnable {
         }
 
         return indexSummaryList;
+    }
+
+    /**
+     * 1 token ~= 4 chars in English
+     * 1 token ~= ¾ words
+     * 100 tokens ~= 75 words
+     * @param sentence
+     * @return
+     */
+    private int countToken(String sentence) {
+        if (sentence == null) {
+            return 0;
+        }
+        return sentence.getBytes(StandardCharsets.UTF_8).length / 4;
     }
 
     private void indexSummaryVector(String writeIndex, List<Map<String, Object>> docs, String modelId) {
@@ -240,7 +266,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     }
 
     private void BulkUpdateVectorField(String writeIndex, List<Map<String, Object>> docs, String modelId) {
-        indicesHelper.addNewVectorField(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName(), modelId, ActionListener.wrap(r -> {
+        indicesHelper.addNewVectorField(SKILLS_INDEX_SUMMARY.getIndexName(), modelId, ActionListener.wrap(r -> {
             if (r) {
                 bulkWrite(writeIndex, docs, modelId);
             } else {

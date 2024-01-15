@@ -5,7 +5,7 @@
 
 package org.opensearch.agent.job;
 
-import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX;
+import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY;
 import static org.opensearch.threadpool.ThreadPool.Names.GENERIC;
 
 import java.util.List;
@@ -122,10 +122,9 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
                 threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
             }
 
-            if (!event.indicesDeleted().isEmpty()
-                && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName())) {
+            if (!event.indicesDeleted().isEmpty() && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY.getIndexName())) {
                 List<String> indexNames = event.indicesDeleted().stream().map(Index::getName).collect(Collectors.toList());
-                job.bulkDelete(SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX.getIndexName(), indexNames);
+                job.bulkDelete(SKILLS_INDEX_SUMMARY.getIndexName(), indexNames);
             }
         }
     }

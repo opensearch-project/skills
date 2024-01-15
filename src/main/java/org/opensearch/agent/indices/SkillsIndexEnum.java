@@ -15,10 +15,10 @@ import lombok.experimental.FieldDefaults;
 @Getter
 public enum SkillsIndexEnum {
 
-    SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX(
-        ".index_summary_embedding_index",
-        "/.index_summary_embedding_index_setting.json",
-        "/.index_summary_embedding_index_mapping.json",
+    SKILLS_INDEX_SUMMARY(
+        ".plugins-skills-index-summary",
+        "/.plugins-skills-index-summary-setting.json",
+        "/.plugins-skills-index-summary-mapping.json",
         0
     );
 

@@ -32,6 +32,7 @@ import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
 import org.opensearch.agent.tools.utils.LLMProvider;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -75,6 +76,8 @@ public class IndexRoutingTool extends VectorDBTool {
 
     private final MLClients mlClients;
 
+    private final ClusterService clusterService;
+
     @Setter
     private String prompt;
 
@@ -84,7 +87,8 @@ public class IndexRoutingTool extends VectorDBTool {
         Integer docSize,
         Integer k,
         String embeddingModelId,
-        String inferenceModelId
+        String inferenceModelId,
+        ClusterService clusterService
     ) {
         super(
             client,
@@ -101,8 +105,9 @@ public class IndexRoutingTool extends VectorDBTool {
             embeddingModelId,
             Optional.ofNullable(k).orElse(DEFAULT_K)
         );
-        this.mlClients = new MLClients(client, xContentRegistry);
+        this.mlClients = new MLClients(client, xContentRegistry, clusterService);
         this.inferenceModelId = inferenceModelId;
+        this.clusterService = clusterService;
     }
 
     @Override
@@ -128,6 +133,11 @@ public class IndexRoutingTool extends VectorDBTool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         log.debug("input={}", parameters.get(INPUT_FIELD));
+        if (!clusterService.state().metadata().hasIndex(IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_INDEX)) {
+            log.debug("Index summary index not exists, return not sure directly");
+            listener.onResponse((T) "Not sure");
+            return;
+        }
         // get index of knn-index
         super.run(parameters, ActionListener.wrap(res -> {
             List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;
@@ -240,6 +250,8 @@ public class IndexRoutingTool extends VectorDBTool {
         private Client client;
         private NamedXContentRegistry xContentRegistry;
 
+        private ClusterService clusterService;
+
         private static IndexRoutingTool.Factory INSTANCE;
 
         public static IndexRoutingTool.Factory getInstance() {
@@ -255,9 +267,10 @@ public class IndexRoutingTool extends VectorDBTool {
             }
         }
 
-        public void init(Client client, NamedXContentRegistry xContentRegistry) {
+        public void init(Client client, NamedXContentRegistry xContentRegistry, ClusterService clusterService) {
             this.client = client;
             this.xContentRegistry = xContentRegistry;
+            this.clusterService = clusterService;
         }
 
         @Override
@@ -282,7 +295,15 @@ public class IndexRoutingTool extends VectorDBTool {
 
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_K;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
-            IndexRoutingTool tool = new IndexRoutingTool(client, xContentRegistry, docSize, k, embeddingModelId, inferenceModelId);
+            IndexRoutingTool tool = new IndexRoutingTool(
+                client,
+                xContentRegistry,
+                docSize,
+                k,
+                embeddingModelId,
+                inferenceModelId,
+                clusterService
+            );
             tool.setPrompt(llmProvider.getPromptFormat().replace("${prompt}", promptTemplate));
 
             return tool;

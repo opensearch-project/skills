@@ -56,7 +56,7 @@ public class IndicesHelper {
     }
 
     public void initIndexSummaryEmbeddingIndex(ActionListener<Boolean> listener) {
-        initIndexIfAbsent(SkillsIndexEnum.SKILLS_INDEX_SUMMARY_EMBEDDING_INDEX, listener);
+        initIndexIfAbsent(SkillsIndexEnum.SKILLS_INDEX_SUMMARY, listener);
     }
 
     public void initIndexIfAbsent(SkillsIndexEnum skillsIndexEnum, ActionListener<Boolean> listener) {

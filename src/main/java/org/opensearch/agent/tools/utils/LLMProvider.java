@@ -17,7 +17,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public enum LLMProvider {
     OPENAI("${prompt}"),
-    ANTHROPIC("\\n\\nHuman: ${prompt} \\n\\nAssistant:"),
+    ANTHROPIC("\n\nHuman: ${prompt} \n\nAssistant:"),
     MISTRAL("<s>[INST] ${prompt} [/INST]"),
     NONE("${prompt}");
 
