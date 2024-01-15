@@ -102,7 +102,7 @@ public class PPLTool implements Tool {
         }
     }
 
-    private enum PPLModelType {
+    public enum PPLModelType {
         CLAUDE,
         FINETUNE;
 
@@ -113,7 +113,8 @@ public class PPLTool implements Tool {
             try {
                 return PPLModelType.valueOf(value.toUpperCase(Locale.ROOT));
             } catch (Exception e) {
-                throw new IllegalArgumentException("Wrong PPL Model type, should be CLAUDE or FINETUNE");
+                log.error("Wrong PPL Model type, should be CLAUDE or FINETUNE");
+                return PPLModelType.CLAUDE;
             }
         }
 
@@ -422,7 +423,6 @@ public class PPLTool implements Tool {
         InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");
         if (searchResponseIns != null) {
             String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
-            log.info(defaultPromptContent);
             Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
             return defaultPromptDict;
         }
