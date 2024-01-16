@@ -72,6 +72,7 @@ apply plugin: 'opensearch.pluginzip'
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
 def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
+// def alertingJarDirectory = "$buildDir/dependencies/alerting"
 
 configurations {
     zipArchive
@@ -101,6 +102,11 @@ task addJarsToClasspath(type: Copy) {
         include "opensearch-time-series-analytics-${version}.jar"
     }
     into("$buildDir/classes")
+
+    //     from(fileTree(dir: alertingJarDirectory)) {
+    //     include "alerting-${version}.jar"
+    // }
+    // into("$buildDir/classes")
 }
 
 dependencies {
@@ -116,10 +122,12 @@ dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
     implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
+    // implementation fileTree(dir: alertingJarDirectory, include: ["alerting-${version}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${version}"
+    // compileOnly "org.opensearch.plugin:alerting:${version}"
 
 
     // ZipArchive dependencies used for integration tests
@@ -129,6 +137,7 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${version}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
@@ -164,9 +173,16 @@ task extractAdJar(type: Copy) {
     into adJarDirectory
 }
 
+// task extractAlertingJar(type: Copy) {
+//     mustRunAfter()
+//     from(zipTree(configurations.zipArchive.find { it.name.startsWith("alerting")}))
+//     into alertingJarDirectory
+// }
+
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
 tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
+// tasks.addJarsToClasspath.dependsOn(extractAlertingJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
@@ -212,6 +228,7 @@ compileJava {
     dependsOn extractSqlJar
     dependsOn extractJsJar
     dependsOn extractAdJar
+    // dependsOn extractAlertingJar
     dependsOn delombok
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }

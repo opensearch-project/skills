@@ -20,6 +20,7 @@ import org.opensearch.commons.alerting.action.GetMonitorRequest;
 import org.opensearch.commons.alerting.action.GetMonitorResponse;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
 import org.opensearch.commons.alerting.model.Monitor;
+import org.opensearch.commons.alerting.model.ScheduledJob;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.ExistsQueryBuilder;
@@ -167,7 +168,8 @@ public class SearchMonitorsTool implements Tool {
                 .from(startIndex)
                 .sort(sortString, sortOrder);
 
-            SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(new SearchRequest().source(searchSourceBuilder));
+            SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(ScheduledJob.SCHEDULED_JOBS_INDEX);
+            SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(searchRequest);
 
             ActionListener<SearchResponse> searchMonitorListener = ActionListener.<SearchResponse>wrap(response -> {
                 StringBuilder sb = new StringBuilder();
