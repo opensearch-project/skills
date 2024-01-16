@@ -7,6 +7,9 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.CommonValue.*;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -14,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
@@ -83,12 +87,48 @@ public class PPLTool implements Tool {
 
     private String contextPrompt;
 
+    private PPLModelType pplModelType;
+
     private static Gson gson = new Gson();
 
-    public PPLTool(Client client, String modelId, String contextPrompt) {
+    private static Map<String, String> defaultPromptDict;
+
+    static {
+        try {
+            defaultPromptDict = loadDefaultPromptDict();
+        } catch (IOException e) {
+            log.error("fail to load default prompt dict" + e.getMessage());
+            defaultPromptDict = new HashMap<>();
+        }
+    }
+
+    public enum PPLModelType {
+        CLAUDE,
+        FINETUNE;
+
+        public static PPLModelType from(String value) {
+            if (value.isEmpty()) {
+                return PPLModelType.CLAUDE;
+            }
+            try {
+                return PPLModelType.valueOf(value.toUpperCase(Locale.ROOT));
+            } catch (Exception e) {
+                log.error("Wrong PPL Model type, should be CLAUDE or FINETUNE");
+                return PPLModelType.CLAUDE;
+            }
+        }
+
+    }
+
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType) {
         this.client = client;
         this.modelId = modelId;
-        this.contextPrompt = contextPrompt;
+        this.pplModelType = PPLModelType.from(pplModelType);
+        if (contextPrompt.isEmpty()) {
+            this.contextPrompt = this.defaultPromptDict.getOrDefault(this.pplModelType.toString(), "");
+        } else {
+            this.contextPrompt = contextPrompt;
+        }
     }
 
     @Override
@@ -206,7 +246,12 @@ public class PPLTool implements Tool {
 
         @Override
         public PPLTool create(Map<String, Object> map) {
-            return new PPLTool(client, (String) map.get("model_id"), (String) map.get("prompt"));
+            return new PPLTool(
+                client,
+                (String) map.get("model_id"),
+                (String) map.getOrDefault("prompt", ""),
+                (String) map.getOrDefault("model_type", "")
+            );
         }
 
         @Override
@@ -223,6 +268,7 @@ public class PPLTool implements Tool {
         public String getDefaultVersion() {
             return null;
         }
+
     }
 
     private SearchRequest buildSearchRequest(String indexName) {
@@ -369,6 +415,16 @@ public class PPLTool implements Tool {
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         return ppl;
+    }
+
+    private static Map<String, String> loadDefaultPromptDict() throws IOException {
+        InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");
+        if (searchResponseIns != null) {
+            String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+            Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
+            return defaultPromptDict;
+        }
+        return new HashMap<>();
     }
 
 }

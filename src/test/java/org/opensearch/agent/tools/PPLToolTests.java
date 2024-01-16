@@ -35,7 +35,6 @@ import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.search.SearchHit;
@@ -128,7 +127,20 @@ public class PPLToolTests {
 
     @Test
     public void testTool() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testTool_with_DefaultPrompt() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
@@ -141,7 +153,7 @@ public class PPLToolTests {
 
     @Test
     public void testTool_withPPLTag() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         pplReturns = Collections.singletonMap("response", "<ppl>source=demo\n|\n\rhead 1</ppl>");
@@ -158,7 +170,7 @@ public class PPLToolTests {
 
     @Test
     public void testTool_querySystemIndex() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = assertThrows(
             IllegalArgumentException.class,
@@ -174,8 +186,14 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_WrongModelType() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "wrong_model_type"));
+        assertEquals(PPLTool.PPLModelType.CLAUDE, tool.getPplModelType());
+    }
+
+    @Test
     public void testTool_getMappingFailure() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = new Exception("get mapping error");
         doAnswer(invocation -> {
@@ -195,7 +213,7 @@ public class PPLToolTests {
 
     @Test
     public void testTool_predictModelFailure() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = new Exception("predict model error");
         doAnswer(invocation -> {
@@ -215,7 +233,7 @@ public class PPLToolTests {
 
     @Test
     public void testTool_searchFailure() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = new Exception("search error");
         doAnswer(invocation -> {
@@ -235,7 +253,7 @@ public class PPLToolTests {
 
     @Test
     public void testTool_executePPLFailure() {
-        Tool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = new Exception("execute ppl error");
         doAnswer(invocation -> {
