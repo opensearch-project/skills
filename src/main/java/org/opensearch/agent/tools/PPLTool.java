@@ -89,6 +89,8 @@ public class PPLTool implements Tool {
 
     private PPLModelType pplModelType;
 
+    private String previousToolKey;
+
     private static Gson gson = new Gson();
 
     private static Map<String, String> defaultPromptDict;
@@ -120,7 +122,7 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType) {
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -129,12 +131,22 @@ public class PPLTool implements Tool {
         } else {
             this.contextPrompt = contextPrompt;
         }
+        this.previousToolKey = previousToolKey;
     }
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        log.info("for ppl tool input");
+        log.info(parameters);
         parameters = extractFromChatParameters(parameters);
-        String indexName = parameters.get("index");
+        String indexName;
+        if (parameters.containsKey("index")) {
+            indexName = parameters.get("index");
+        } else if (!StringUtils.isBlank(this.previousToolKey) && parameters.containsKey(this.previousToolKey + ".output")) {
+            indexName = parameters.get(this.previousToolKey + ".output"); // read index name from previous key
+        } else {
+            indexName = "";
+        }
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
@@ -252,7 +264,8 @@ public class PPLTool implements Tool {
                 client,
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
-                (String) map.getOrDefault("model_type", "")
+                (String) map.getOrDefault("model_type", ""),
+                (String) map.getOrDefault("previous_tool_name", "")
             );
         }
 
