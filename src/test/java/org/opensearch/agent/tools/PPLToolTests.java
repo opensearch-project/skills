@@ -139,6 +139,21 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_withPreviousInput() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("previousTool.output", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
     public void testTool_with_DefaultPrompt() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude"));
         assertEquals(PPLTool.TYPE, tool.getName());
@@ -183,6 +198,19 @@ public class PPLToolTests {
                 + ML_CONNECTOR_INDEX,
             exception.getMessage()
         );
+    }
+
+    @Test
+    public void testTool_queryEmptyIndex() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tool.run(ImmutableMap.of("question", "demo"), ActionListener.<String>wrap(ppl -> {
+                assertEquals(pplResult, "ppl result");
+            }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
+        );
+        assertEquals("Parameter index and question can not be null or empty.", exception.getMessage());
     }
 
     @Test
