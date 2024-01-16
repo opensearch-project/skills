@@ -53,6 +53,7 @@ public class RAGToolTests {
     public static final String TEST_EMBEDDING_FIELD = "test_embedding";
     public static final String TEST_EMBEDDING_MODEL_ID = "1234";
     public static final String TEST_INFERENCE_MODEL_ID = "1234";
+    public static final String TEST_PROMPT = "test_prompt";
 
     public static final String TEST_NEURAL_QUERY = "{\"query\":{\"neural\":{\""
         + TEST_EMBEDDING_FIELD
@@ -101,6 +102,7 @@ public class RAGToolTests {
         params.put(RAGTool.INFERENCE_MODEL_ID_FIELD, TEST_INFERENCE_MODEL_ID);
         params.put(RAGTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
         params.put(VectorDBTool.K_FIELD, DEFAULT_K);
+        params.put(RAGTool.PROMPT_FIELD, TEST_PROMPT);
         ragTool = RAGTool.Factory.getInstance().create(params);
     }
 
@@ -311,7 +313,8 @@ public class RAGToolTests {
             DEFAULT_K,
             TEST_DOC_SIZE,
             TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID
+            TEST_INFERENCE_MODEL_ID,
+            TEST_PROMPT
         );
 
         assertEquals(rAGtool1.getClient(), rAGtool2.getClient());
@@ -324,6 +327,7 @@ public class RAGToolTests {
         assertEquals(rAGtool1.getEmbeddingField(), rAGtool2.getEmbeddingField());
         assertEquals(rAGtool1.getSourceFields(), rAGtool2.getSourceFields());
         assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
+        assertEquals(rAGtool1.getPrompt(), rAGtool2.getPrompt());
 
     }
 
