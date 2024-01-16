@@ -136,8 +136,6 @@ public class PPLTool implements Tool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        log.info("for ppl tool input");
-        log.info(parameters);
         parameters = extractFromChatParameters(parameters);
         String indexName;
         if (parameters.containsKey("index")) {
