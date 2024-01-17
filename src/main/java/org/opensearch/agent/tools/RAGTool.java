@@ -51,7 +51,7 @@ public class RAGTool extends AbstractRetrieverTool {
     public static final String INFERENCE_MODEL_ID_FIELD = "inference_model_id";
     public static final String EMBEDDING_MODEL_ID_FIELD = "embedding_model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
-    public static final String OUTPUT_FIELD = "output_field";
+    public static final String OUTPUT_FIELD = "output";
     public static final String PROMPT_FIELD = "prompt";
     private String name = TYPE;
     private String description = DEFAULT_DESCRIPTION;
@@ -84,6 +84,9 @@ public class RAGTool extends AbstractRetrieverTool {
         String prompt
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
+        if (prompt == null || prompt.trim().isEmpty()) {
+            throw new IllegalArgumentException("prompt cannot be empty");
+        }
         this.client = client;
         this.xContentRegistry = xContentRegistry;
         this.index = index;
@@ -255,13 +258,13 @@ public class RAGTool extends AbstractRetrieverTool {
 
         @Override
         public RAGTool create(Map<String, Object> params) {
+            String prompt = (String) params.get(PROMPT_FIELD);
             String embeddingModelId = (String) params.get(EMBEDDING_MODEL_ID_FIELD);
             String index = (String) params.get(INDEX_FIELD);
             String embeddingField = (String) params.get(EMBEDDING_FIELD);
             String[] sourceFields = gson.fromJson((String) params.get(SOURCE_FIELD), String[].class);
             String inferenceModelId = (String) params.get(INFERENCE_MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : 2;
-            String prompt = (String) params.get(PROMPT_FIELD);
             return RAGTool
                 .builder()
                 .client(client)
