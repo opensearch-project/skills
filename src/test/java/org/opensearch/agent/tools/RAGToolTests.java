@@ -350,4 +350,20 @@ public class RAGToolTests {
         ModelTensorOutput mlModelTensorOutput = ModelTensorOutput.builder().mlModelOutputs(Arrays.asList(modelTensors)).build();
         return mlModelTensorOutput;
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRunWithEmptyPrompt() {
+        new RAGTool(
+            client,
+            TEST_XCONTENT_REGISTRY_FOR_QUERY,
+            TEST_INDEX,
+            TEST_EMBEDDING_FIELD,
+            TEST_SOURCE_FIELDS,
+            DEFAULT_K,
+            TEST_DOC_SIZE,
+            TEST_EMBEDDING_MODEL_ID,
+            TEST_INFERENCE_MODEL_ID,
+            " "
+        );
+    }
 }
