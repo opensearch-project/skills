@@ -51,6 +51,8 @@ public abstract class AbstractRetrieverTool implements Tool {
     protected Integer docSize;
     protected String version;
 
+    protected Parser inputParser;
+
     protected AbstractRetrieverTool(
         Client client,
         NamedXContentRegistry xContentRegistry,
@@ -99,7 +101,12 @@ public abstract class AbstractRetrieverTool implements Tool {
             throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
         }
 
-        String query = getQueryBody(question);
+        String finalInput = question;
+        if (inputParser != null) {
+            finalInput = (String) inputParser.parse(question);
+        }
+
+        String query = getQueryBody(finalInput);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
         searchSourceBuilder.parseXContent(queryParser);

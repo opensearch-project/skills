@@ -43,6 +43,8 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHit;
 
+import com.google.gson.Gson;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -53,6 +55,7 @@ public class IndexRoutingTool extends VectorDBTool {
 
     public static final String TYPE = "IndexRoutingTool";
 
+    public static final String QUESTION_INPUT = "question";
     private static final String DEFAULT_DESCRIPTION = "Use this tool to select an appropriate index for user question, "
         + "It takes 1 argument which is a string of user question and return list of most related indexes or `Not sure`. "
         + "If the tool returns `Not sure`, mark it as final answer and ask Human to provide index name";
@@ -108,6 +111,18 @@ public class IndexRoutingTool extends VectorDBTool {
         this.mlClients = new MLClients(client, xContentRegistry, clusterService);
         this.inferenceModelId = inferenceModelId;
         this.clusterService = clusterService;
+
+        this.inputParser = (Parser<Object, Object>) input -> {
+            try {
+                Map params = new Gson().fromJson((String) input, Map.class);
+                if (params.containsKey(QUESTION_INPUT)) {
+                    return params.get(QUESTION_INPUT);
+                }
+                return input;
+            } catch (Throwable t) {
+                return input;
+            }
+        };
     }
 
     @Override
@@ -138,6 +153,7 @@ public class IndexRoutingTool extends VectorDBTool {
             listener.onResponse((T) "Not sure");
             return;
         }
+
         // get index of knn-index
         super.run(parameters, ActionListener.wrap(res -> {
             List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;

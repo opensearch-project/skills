@@ -79,7 +79,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
             client,
             environment.settings(),
             threadPool,
-            xContentRegistry,
             indicesHelper,
             mlClients
         );

@@ -25,6 +25,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.agent.indices.IndicesHelper;
+import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.client.Client;
 import org.opensearch.client.Requests;
 import org.opensearch.cluster.metadata.ComposableIndexTemplate;
@@ -47,6 +48,10 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import com.google.common.hash.Hashing;
+import com.knuddels.jtokkit.Encodings;
+import com.knuddels.jtokkit.api.Encoding;
+import com.knuddels.jtokkit.api.EncodingRegistry;
+import com.knuddels.jtokkit.api.EncodingType;
 
 import lombok.Builder;
 import lombok.Setter;
@@ -76,10 +81,14 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     public static String ALIASES = "aliases";
     public static String INDEX_PATTERNS = "index_patterns";
     public static String INDEX_SUMMARY = "summary";
+    public static String SAMPLE_DATA = "sample_data";
+    public static String MAPPING = "mapping";
     public static String INDEX_EMBEDDING = "embedding";
     public static String SENTENCE_EMBEDDING = "sentence_embedding";
     public static int DEFAULT_TIMEOUT_SECOND = 30;
     public static int TOKEN_LIMIT = 8192;
+
+    public static int DEFAULT_N_SAMPLE_DATA = 5;
 
     @Setter
     private List<String> adhocIndexName;
@@ -97,6 +106,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
     @Override
     public void run() {
+        log.debug("IndexSummaryEmbeddingJob starts");
         // TODO to distribute to other nodes to execute the workload other than cluster manager node
         // search agent with IndexRoutingTool
         mlClients.getModelIdsForIndexRoutingTool(adhocModelIds, ActionListener.wrap(embeddingModelIds -> {
@@ -114,26 +124,31 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             }
 
             for (String modelId : embeddingModelIds) {
-                List<String> embeddingDocs = indexMetaAndSamples
-                    .stream()
-                    .map(sample -> (String) sample.get(INDEX_SUMMARY))
-                    .collect(Collectors.toList());
+                try {
+                    List<String> embeddingDocs = indexMetaAndSamples
+                        .stream()
+                        .map(sample -> (String) sample.get(INDEX_SUMMARY))
+                        .collect(Collectors.toList());
 
-                List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, true, mlTaskResponse -> {
-                    ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
-                    return output.getMlModelOutputs();
-                });
+                    List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, true, mlTaskResponse -> {
+                        ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
+                        return output.getMlModelOutputs();
+                    });
 
-                for (int i = 0; i < mlModelOutputs.size(); i++) {
-                    Number[] vector = mlModelOutputs.get(i).getMlModelTensors().get(0).getData();
-                    indexMetaAndSamples.get(i).put(INDEX_EMBEDDING, vector);
+                    for (int i = 0; i < mlModelOutputs.size(); i++) {
+                        Number[] vector = mlModelOutputs.get(i).getMlModelTensors().get(0).getData();
+                        indexMetaAndSamples.get(i).put(INDEX_EMBEDDING, vector);
+                    }
+
+                    // write to k-NN index
+                    indexSummaryVector(INDEX_SUMMARY_EMBEDDING_INDEX, indexMetaAndSamples, modelId);
+                } catch (Exception e) {
+                    log.error("Failed to embedding index summary for model {}", modelId);
                 }
-
-                // write to k-NN index
-                indexSummaryVector(INDEX_SUMMARY_EMBEDDING_INDEX, indexMetaAndSamples, modelId);
             }
 
             AgentMonitorJob.setProcessedModelIds(embeddingModelIds, adhocModelIds == null);
+            log.debug("IndexSummaryEmbeddingJob finished");
         }, e -> log.error("Search agent error happened", e)));
     }
 
@@ -166,6 +181,8 @@ public class IndexSummaryEmbeddingJob implements Runnable {
         }
 
         List<Map<String, Object>> indexSummaryList = new ArrayList<>();
+
+        int totalTokens = 0;
 
         for (Map.Entry<String, IndexMetadata> indexEntry : indices.entrySet()) {
             Map<String, Object> indexSummaryMap = new HashMap<>();
@@ -200,31 +217,24 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
                 // sample data
                 SearchRequest indexSearchRequest = Requests.searchRequest(indexName);
-                SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(5);
+                SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(DEFAULT_N_SAMPLE_DATA);
                 indexSearchRequest.source(sourceBuilder);
 
                 ActionFuture<SearchResponse> searchFuture = client.search(indexSearchRequest);
                 SearchResponse searchResponse = searchFuture.get(DEFAULT_TIMEOUT_SECOND, TimeUnit.SECONDS);
 
-                List<String> documents = new ArrayList<>();
-                int tokenNumber = 0;
+                List<String> sampleDataList = new ArrayList<>();
+
                 for (SearchHit hit : searchResponse.getHits()) {
                     String docContent = Strings.toString(MediaTypeRegistry.JSON, hit);
-                    int tokens = countToken(docContent);
-                    if (tokenNumber + tokens > TOKEN_LIMIT) {
-                        // at least 1 sample data
-                        if (documents.isEmpty()) {
-                            documents.add(docContent);
-                        }
-                        break;
-                    }
-                    documents.add(docContent);
-                    tokenNumber += tokens;
+                    sampleDataList.add(docContent);
                 }
 
-                String indexSummary = String.format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, documents);
+                String indexSummary = String.format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, sampleDataList);
+                totalTokens += countToken(indexSummary);
 
-                indexSummaryMap.put(INDEX_SUMMARY, indexSummary);
+                indexSummaryMap.put(MAPPING, mapping);
+                indexSummaryMap.put(SAMPLE_DATA, sampleDataList);
 
             } catch (Exception e) {
                 log.error("Get index mapping and sample data failed for index {}", indexName, e);
@@ -233,21 +243,46 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             indexSummaryList.add(indexSummaryMap);
         }
 
+        int nSample = adjustNSample(totalTokens, indices.size());
+
+        for (Map<String, Object> map : indexSummaryList) {
+            List<String> sampleDataList = (List<String>) map.get(SAMPLE_DATA);
+            String mapping = (String) map.get(MAPPING);
+            String indexSummary = String
+                .format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, sampleDataList.subList(0, nSample));
+            map.put(INDEX_SUMMARY, indexSummary);
+        }
+
         return indexSummaryList;
     }
 
     /**
-     * 1 token ~= 4 chars in English
-     * 1 token ~= ¾ words
-     * 100 tokens ~= 75 words
-     * @param sentence
-     * @return
+     * Adjust the number of document for sampling, if top k index summary token are too large(exceed limit 8K), we will try use 1 doc instead of 5 docs
+     * @param totalTokens total tokens
+     * @param indexNumber total index number
+     * @return adjusted number of documents for sampling
+     */
+    private static int adjustNSample(int totalTokens, int indexNumber) {
+        // top k * singleIndexAverage token
+        int singleIndexAverage = totalTokens / indexNumber;
+
+        int nSample = DEFAULT_N_SAMPLE_DATA;
+        if (singleIndexAverage * IndexRoutingTool.DEFAULT_K > TOKEN_LIMIT) {
+            nSample = 1;
+        }
+        return nSample;
+    }
+
+    /**
+     * encoding name: cl100k_base, model: gpt-4, gpt-3.5-turbo, text-embedding-ada-002
+     * @param sentence input need to encode
+     * @return token numbers
      */
     private int countToken(String sentence) {
-        if (sentence == null) {
-            return 0;
-        }
-        return sentence.getBytes(StandardCharsets.UTF_8).length / 4;
+        EncodingRegistry registry = Encodings.newDefaultEncodingRegistry();
+        Encoding enc = registry.getEncoding(EncodingType.CL100K_BASE);
+        List<Integer> encoded = enc.encode(sentence);
+        return encoded.size();
     }
 
     private void indexSummaryVector(String writeIndex, List<Map<String, Object>> docs, String modelId) {

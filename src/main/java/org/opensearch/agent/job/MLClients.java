@@ -129,6 +129,7 @@ public class MLClients {
 
     public void getModelIdsForIndexRoutingTool(ActionListener<List<String>> listener) {
         if (!clusterService.state().metadata().hasIndex(CommonValue.ML_AGENT_INDEX)) {
+            log.debug("No agent index found, return empty model list");
             listener.onResponse(Collections.emptyList());
             return;
         }

@@ -21,7 +21,6 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.index.Index;
-import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.threadpool.Scheduler;
 import org.opensearch.threadpool.ThreadPool;
 
@@ -43,7 +42,6 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
         .boolSetting("plugins.skills.index_summary_embedding_job_enabled", true, Setting.Property.NodeScope, Setting.Property.Dynamic);
 
     private final ClusterService clusterService;
-    private final NamedXContentRegistry xContentRegistry;
     private final Client client;
     private final IndicesHelper indicesHelper;
     private final MLClients mlClients;
@@ -53,15 +51,14 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
     private Scheduler.Cancellable jobCronForAgent;
 
     private volatile Integer jobInterval;
-    private volatile Boolean jobEnabled;
-    private volatile Boolean isClusterManager;
+    private volatile boolean jobEnabled;
+    private volatile boolean isClusterManager;
 
     public SkillsClusterManagerEventListener(
         ClusterService clusterService,
         Client client,
         Settings settings,
         ThreadPool threadPool,
-        NamedXContentRegistry xContentRegistry,
         IndicesHelper indicesHelper,
         MLClients mlClients
     ) {
@@ -69,7 +66,6 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
         this.client = client;
         this.threadPool = threadPool;
         this.clusterService.addListener(this);
-        this.xContentRegistry = xContentRegistry;
         this.indicesHelper = indicesHelper;
         this.mlClients = mlClients;
 
