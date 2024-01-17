@@ -66,6 +66,8 @@ public class IndexRoutingTool extends VectorDBTool {
     public static String PROMPT_TEMPLATE = "prompt_template";
     public static String LLM_PROVIDER = "llm_provider";
 
+    public static final String NOT_SURE = "Not sure";
+
     @Setter
     @Getter
     private String name = TYPE;
@@ -150,7 +152,7 @@ public class IndexRoutingTool extends VectorDBTool {
         log.debug("input={}", parameters.get(INPUT_FIELD));
         if (!clusterService.state().metadata().hasIndex(IndexSummaryEmbeddingJob.INDEX_SUMMARY_EMBEDDING_INDEX)) {
             log.debug("Index summary index not exists, return not sure directly");
-            listener.onResponse((T) "Not sure");
+            listener.onResponse((T) NOT_SURE);
             return;
         }
 
@@ -159,7 +161,7 @@ public class IndexRoutingTool extends VectorDBTool {
             List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;
 
             if (summaries.isEmpty()) {
-                listener.onResponse((T) "No index found");
+                listener.onResponse((T) NOT_SURE);
                 return;
             }
 
@@ -188,8 +190,8 @@ public class IndexRoutingTool extends VectorDBTool {
                 String response = (String) modelTensor.getDataAsMap().get("response");
                 log.debug("response back from inference mode is {}", response);
                 Set<String> validIndexes = findMatchedIndex(response, summaries);
-                listener.onResponse((T) (validIndexes.isEmpty() ? "Not sure" : validIndexes.iterator().next()));
-            }, exception -> { listener.onResponse((T) "Not sure"); }));
+                listener.onResponse((T) (validIndexes.isEmpty() ? NOT_SURE : validIndexes.iterator().next()));
+            }, exception -> { listener.onResponse((T) NOT_SURE); }));
         }, exception -> {
             log.error("Failed to query index");
             listener.onFailure(exception);
@@ -215,7 +217,7 @@ public class IndexRoutingTool extends VectorDBTool {
                 List<String> patterns = (List<String>) map.get(INDEX_PATTERNS_FIELD);
                 String indexPattern = getIndexPattern(patterns, predictedIndex);
                 validIndexes.add((String) dataStreamName.orElse(indexPattern));
-            } else if (predictedIndex.equals("Not sure")) {
+            } else if (predictedIndex.equals(NOT_SURE)) {
                 validIndexes.add(predictedIndex);
             } else {
                 Optional<String> similarityIndex = findWithSimilarity(predictedIndex, allCandidates);
