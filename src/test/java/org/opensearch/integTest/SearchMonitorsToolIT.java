@@ -55,25 +55,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         assertEquals("Monitors=[]TotalMonitors=0", result);
     }
 
-    // @SneakyThrows
-    // public void testSearchAnomalyDetectorsToolInFlowAgent_noMatching() {
-    // String agentId = createAgent(registerAgentRequestBody);
-    // String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "foo" + "\"}}";
-    // String result = executeAgent(agentId, agentInput);
-    // assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
-    // }
-
-    // @SneakyThrows
-    // public void testSearchAnomalyDetectorsToolInFlowAgent_matching() {
-    // String agentId = createAgent(registerAgentRequestBody);
-    // String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
-    // String result = executeAgent(agentId, agentInput);
-    // assertEquals(
-    // String.format(Locale.ROOT, "AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, 1),
-    // result
-    // );
-    // }
-
     @SneakyThrows
     private void createMonitorsSystemIndex(String monitorId, String monitorName) {
         createIndexWithConfiguration(
