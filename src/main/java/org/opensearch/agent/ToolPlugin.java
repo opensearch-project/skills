@@ -5,6 +5,8 @@
 
 package org.opensearch.agent;
 
+import static org.opensearch.agent.job.Constants.INDEX_SUMMARY_JOB_THREAD_POOL;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
@@ -29,6 +31,7 @@ import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
@@ -40,6 +43,8 @@ import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
+import org.opensearch.threadpool.ExecutorBuilder;
+import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.watcher.ResourceWatcherService;
 
@@ -134,5 +139,18 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
                     "System index for storing index meta and simple data embedding"
                 )
             );
+    }
+
+    @Override
+    public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
+        FixedExecutorBuilder indexSummaryJobThreadPool = new FixedExecutorBuilder(
+            settings,
+            INDEX_SUMMARY_JOB_THREAD_POOL,
+            OpenSearchExecutors.allocatedProcessors(settings) * 2,
+            100,
+            INDEX_SUMMARY_JOB_THREAD_POOL,
+            false
+        );
+        return List.of(indexSummaryJobThreadPool);
     }
 }

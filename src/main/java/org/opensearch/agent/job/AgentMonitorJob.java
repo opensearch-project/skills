@@ -5,7 +5,7 @@
 
 package org.opensearch.agent.job;
 
-import static org.opensearch.threadpool.ThreadPool.Names.GENERIC;
+import static org.opensearch.agent.job.Constants.INDEX_SUMMARY_JOB_THREAD_POOL;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +57,7 @@ public class AgentMonitorJob implements Runnable {
             if (!embeddingModelIds.isEmpty()) {
                 IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
                 job.setAdhocModelIds(embeddingModelIds);
-                threadPool.schedule(job, TimeValue.timeValueSeconds(5), GENERIC);
+                threadPool.schedule(job, TimeValue.timeValueSeconds(5), INDEX_SUMMARY_JOB_THREAD_POOL);
             }
         }, exception -> log.info("Query agent for index routing tool failed.", exception)));
     }

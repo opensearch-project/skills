@@ -6,7 +6,7 @@
 package org.opensearch.agent.job;
 
 import static org.opensearch.agent.indices.SkillsIndexEnum.SKILLS_INDEX_SUMMARY;
-import static org.opensearch.threadpool.ThreadPool.Names.GENERIC;
+import static org.opensearch.agent.job.Constants.INDEX_SUMMARY_JOB_THREAD_POOL;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -115,7 +115,7 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
             IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
             if (!event.indicesCreated().isEmpty()) {
                 job.setAdhocIndexName(event.indicesCreated());
-                threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
+                threadPool.schedule(job, TimeValue.timeValueSeconds(30), INDEX_SUMMARY_JOB_THREAD_POOL);
             }
 
             if (!event.indicesDeleted().isEmpty() && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY.getIndexName())) {
@@ -132,12 +132,13 @@ public class SkillsClusterManagerEventListener implements LocalNodeClusterManage
             IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(client, clusterService, indicesHelper, mlClients);
             AgentMonitorJob agentMonitorJob = new AgentMonitorJob(clusterService, client, indicesHelper, mlClients, threadPool);
             // trigger the one-shot job
-            threadPool.schedule(job, TimeValue.timeValueSeconds(30), GENERIC);
+            threadPool.schedule(job, TimeValue.timeValueSeconds(30), INDEX_SUMMARY_JOB_THREAD_POOL);
 
             // schedule the cron job
             log.debug("Scheduling index summary embedding job...");
-            jobcron = threadPool.scheduleWithFixedDelay(job, TimeValue.timeValueMinutes(jobInterval), GENERIC);
-            jobCronForAgent = threadPool.scheduleWithFixedDelay(agentMonitorJob, TimeValue.timeValueMinutes(5), GENERIC);
+            jobcron = threadPool.scheduleWithFixedDelay(job, TimeValue.timeValueMinutes(jobInterval), INDEX_SUMMARY_JOB_THREAD_POOL);
+            jobCronForAgent = threadPool
+                .scheduleWithFixedDelay(agentMonitorJob, TimeValue.timeValueMinutes(5), INDEX_SUMMARY_JOB_THREAD_POOL);
         }
         clusterService.addLifecycleListener(new LifecycleListener() {
             @Override
