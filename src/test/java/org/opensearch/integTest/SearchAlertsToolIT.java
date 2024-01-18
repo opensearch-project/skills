@@ -7,11 +7,9 @@ package org.opensearch.integTest;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.agent.tools.utils.ToolConstants;
 
 import lombok.SneakyThrows;
 
@@ -35,7 +33,6 @@ public class SearchAlertsToolIT extends BaseAgentToolsIT {
                             .toURI()
                     )
             );
-        createAlertsSystemIndex(monitorId, monitorName);
     }
 
     @After
@@ -55,21 +52,6 @@ public class SearchAlertsToolIT extends BaseAgentToolsIT {
         assertEquals("Alerts=[]TotalAlerts=0", result);
     }
 
-    @SneakyThrows
-    private void createAlertsSystemIndex(String monitorId, String monitorName) {
-        createIndexWithConfiguration(
-            ToolConstants.ALERTING_CONFIG_INDEX,
-            "{\n"
-                + "  \"mappings\": {\n"
-                + "    \"properties\": {\n"
-                + "      \"name\": {\n"
-                + "        \"type\": \"text\",\n"
-                + "             \"fields\": { \"keyword\": { \"type\": \"keyword\", \"ignore_above\": 256 }}"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}"
-        );
-        addDocToIndex(ToolConstants.ALERTING_CONFIG_INDEX, monitorId, List.of("name"), List.of(monitorName));
-    }
+    // TODO: Add IT to test against sample alerts data
+    // https://github.com/opensearch-project/skills/issues/136
 }

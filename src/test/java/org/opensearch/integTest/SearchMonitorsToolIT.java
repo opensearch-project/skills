@@ -5,6 +5,8 @@
 
 package org.opensearch.integTest;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -54,6 +56,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, agentInput);
         assertEquals("Monitors=[]TotalMonitors=0", result);
     }
+
+    // TODO: Add IT to test against sample monitor data
 
     @SneakyThrows
     private void createMonitorsSystemIndex(String monitorId, String monitorName) {

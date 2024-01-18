@@ -129,6 +129,7 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${version}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
