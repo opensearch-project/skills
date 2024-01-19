@@ -47,6 +47,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
+import com.google.common.collect.Lists;
 import com.google.common.hash.Hashing;
 import com.knuddels.jtokkit.Encodings;
 import com.knuddels.jtokkit.api.Encoding;
@@ -125,23 +126,26 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
             for (String modelId : embeddingModelIds) {
                 try {
-                    List<String> embeddingDocs = indexMetaAndSamples
-                        .stream()
-                        .map(sample -> (String) sample.get(INDEX_SUMMARY))
-                        .collect(Collectors.toList());
+                    List<List<Map<String, Object>>> partitions = Lists.partition(indexMetaAndSamples, 1000);
+                    for (List<Map<String, Object>> partition : partitions) {
+                        List<String> embeddingDocs = partition
+                            .stream()
+                            .map(sample -> (String) sample.get(INDEX_SUMMARY))
+                            .collect(Collectors.toList());
 
-                    List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, true, mlTaskResponse -> {
-                        ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
-                        return output.getMlModelOutputs();
-                    });
+                        List<ModelTensors> mlModelOutputs = mlClients.getEmbeddingResult(modelId, embeddingDocs, true, mlTaskResponse -> {
+                            ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
+                            return output.getMlModelOutputs();
+                        });
 
-                    for (int i = 0; i < mlModelOutputs.size(); i++) {
-                        Number[] vector = mlModelOutputs.get(i).getMlModelTensors().get(0).getData();
-                        indexMetaAndSamples.get(i).put(INDEX_EMBEDDING, vector);
+                        for (int i = 0; i < mlModelOutputs.size(); i++) {
+                            Number[] vector = mlModelOutputs.get(i).getMlModelTensors().get(0).getData();
+                            partition.get(i).put(INDEX_EMBEDDING, vector);
+                        }
+
+                        // write to k-NN index
+                        indexSummaryVector(INDEX_SUMMARY_EMBEDDING_INDEX, partition, modelId);
                     }
-
-                    // write to k-NN index
-                    indexSummaryVector(INDEX_SUMMARY_EMBEDDING_INDEX, indexMetaAndSamples, modelId);
                 } catch (Exception e) {
                     log.error("Failed to embedding index summary for model {}", modelId);
                 }
@@ -179,6 +183,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
         for (ComposableIndexTemplate composableIndexTemplate : metadata.templatesV2().values()) {
             patterns.addAll(composableIndexTemplate.indexPatterns());
         }
+        // TODO leverage index-pattern in OSD
 
         List<Map<String, Object>> indexSummaryList = new ArrayList<>();
 
@@ -227,6 +232,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
                 for (SearchHit hit : searchResponse.getHits()) {
                     String docContent = Strings.toString(MediaTypeRegistry.JSON, hit);
+                    // TODO Remove long content field and knn field
                     sampleDataList.add(docContent);
                 }
 
@@ -251,6 +257,9 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             String indexSummary = String
                 .format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, sampleDataList.subList(0, nSample));
             map.put(INDEX_SUMMARY, indexSummary);
+            // remove keys are not used
+            map.remove(MAPPING);
+            map.remove(SAMPLE_DATA);
         }
 
         return indexSummaryList;
@@ -324,9 +333,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             docMap.put(INDEX_SUMMARY_FIELD, doc.get(INDEX_SUMMARY));
             docMap.put(INDEX_SUMMARY_EMBEDDING_FIELD_PREFIX + "_" + modelId, embedding);
 
-            String docId = Hashing.sha256().hashString(indexName, StandardCharsets.UTF_8).toString();
-
-            bulkRequest.add(new UpdateRequest(writeIndex, docId).doc(docMap, MediaTypeRegistry.JSON).docAsUpsert(true));
+            bulkRequest.add(new UpdateRequest(writeIndex, generateDocId(indexName)).doc(docMap, MediaTypeRegistry.JSON).docAsUpsert(true));
         }
         client.bulk(bulkRequest, ActionListener.wrap(r -> {
             if (r.hasFailures()) {
@@ -340,8 +347,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
     public void bulkDelete(String writeIndex, List<String> indexNames) {
         BulkRequest bulkRequest = Requests.bulkRequest();
         for (String indexName : indexNames) {
-            String docId = String.valueOf(indexName.hashCode());
-            bulkRequest.add(new DeleteRequest(writeIndex, docId));
+            bulkRequest.add(new DeleteRequest(writeIndex, generateDocId(indexName)));
         }
         client.bulk(bulkRequest, ActionListener.wrap(r -> {
             if (r.hasFailures()) {
@@ -350,5 +356,9 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                 log.debug("Bulk delete index summary embedding finished with {}", r.getTook());
             }
         }, exception -> log.error("Bulk delete index summary embedding failed", exception)));
+    }
+
+    private String generateDocId(String indexName) {
+        return Hashing.sha256().hashString(indexName, StandardCharsets.UTF_8).toString();
     }
 }
