@@ -149,9 +149,12 @@ public class PPLTool implements Tool {
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
+            if (mappings.size() == 0){
+                throw new IllegalArgumentException("No matching index with index name: " + indexName);
+            }
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
-                String tableInfo = constructTableInfo(searchHits, mappings, indexName);
+                String tableInfo = constructTableInfo(searchHits, mappings);
                 String prompt = constructPrompt(tableInfo, question, indexName);
                 RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                     .builder()
@@ -288,9 +291,10 @@ public class PPLTool implements Tool {
         return getMappingsRequest;
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings, String indexName)
+    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings)
         throws PrivilegedActionException {
-        MappingMetadata mappingMetadata = mappings.get(indexName);
+        String firstIndexName = (String) mappings.keySet().toArray()[0];
+        MappingMetadata mappingMetadata = mappings.get(firstIndexName);
         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
         Map<String, String> fieldsToType = new HashMap<>();
         extractNamesTypes(mappingSource, fieldsToType, "");
