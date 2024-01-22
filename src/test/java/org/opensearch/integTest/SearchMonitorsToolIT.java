@@ -37,7 +37,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
                             .toURI()
                     )
             );
-        createMonitorsSystemIndex(monitorId, monitorName);
     }
 
     @After
