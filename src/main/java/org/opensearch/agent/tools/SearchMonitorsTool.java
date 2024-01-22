@@ -6,8 +6,11 @@
 package org.opensearch.agent.tools;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.join.ScoreMode;
@@ -20,6 +23,7 @@ import org.opensearch.commons.alerting.action.GetMonitorRequest;
 import org.opensearch.commons.alerting.action.GetMonitorResponse;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
 import org.opensearch.commons.alerting.model.Monitor;
+import org.opensearch.commons.alerting.model.ScheduledJob;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.ExistsQueryBuilder;
@@ -104,22 +108,17 @@ public class SearchMonitorsTool implements Tool {
         if (monitorId != null) {
             GetMonitorRequest getMonitorRequest = new GetMonitorRequest(monitorId, 1L, RestRequest.Method.GET, null);
             ActionListener<GetMonitorResponse> getMonitorListener = ActionListener.<GetMonitorResponse>wrap(response -> {
-                StringBuilder sb = new StringBuilder();
                 Monitor monitor = response.getMonitor();
-                if (monitor != null) {
-                    sb.append("Monitors=[");
-                    sb.append("{");
-                    sb.append("id=").append(monitor.getId()).append(",");
-                    sb.append("name=").append(monitor.getName());
-                    sb.append("}]");
-                    sb.append("TotalMonitors=1");
-                } else {
-                    sb.append("Monitors=[]TotalMonitors=0");
-                }
-                listener.onResponse((T) sb.toString());
+                processGetMonitorHit(monitor, listener);
             }, e -> {
-                log.error("Failed to search monitors.", e);
-                listener.onFailure(e);
+                // System index isn't initialized by default, so ignore such errors. Alerting plugin does not return the
+                // standard IndexNotFoundException so we parse the message instead
+                if (e.getMessage().contains("Configured indices are not found")) {
+                    processGetMonitorHit(null, listener);
+                } else {
+                    log.error("Failed to get monitor.", e);
+                    listener.onFailure(e);
+                }
             });
             AlertingPluginInterface.INSTANCE.getMonitor((NodeClient) client, getMonitorRequest, getMonitorListener);
         } else {
@@ -167,24 +166,23 @@ public class SearchMonitorsTool implements Tool {
                 .from(startIndex)
                 .sort(sortString, sortOrder);
 
-            SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(new SearchRequest().source(searchSourceBuilder));
+            SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(ScheduledJob.SCHEDULED_JOBS_INDEX);
+            SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(searchRequest);
 
             ActionListener<SearchResponse> searchMonitorListener = ActionListener.<SearchResponse>wrap(response -> {
-                StringBuilder sb = new StringBuilder();
-                SearchHit[] hits = response.getHits().getHits();
-                sb.append("Monitors=[");
-                for (SearchHit hit : hits) {
-                    sb.append("{");
-                    sb.append("id=").append(hit.getId()).append(",");
-                    sb.append("name=").append(hit.getSourceAsMap().get("name"));
-                    sb.append("}");
-                }
-                sb.append("]");
-                sb.append("TotalMonitors=").append(response.getHits().getTotalHits().value);
-                listener.onResponse((T) sb.toString());
+                List<SearchHit> hits = Arrays.asList(response.getHits().getHits());
+                Map<String, SearchHit> hitsAsMap = hits.stream().collect(Collectors.toMap(SearchHit::getId, hit -> hit));
+                processHits(hitsAsMap, listener);
+
             }, e -> {
-                log.error("Failed to search monitors.", e);
-                listener.onFailure(e);
+                // System index isn't initialized by default, so ignore such errors. Alerting plugin does not return the
+                // standard IndexNotFoundException so we parse the message instead
+                if (e.getMessage().contains("Configured indices are not found")) {
+                    processHits(Collections.emptyMap(), listener);
+                } else {
+                    log.error("Failed to search monitors.", e);
+                    listener.onFailure(e);
+                }
             });
             AlertingPluginInterface.INSTANCE.searchMonitors((NodeClient) client, searchMonitorRequest, searchMonitorListener);
         }
@@ -198,6 +196,35 @@ public class SearchMonitorsTool implements Tool {
     @Override
     public String getType() {
         return TYPE;
+    }
+
+    private <T> void processHits(Map<String, SearchHit> hitsAsMap, ActionListener<T> listener) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Monitors=[");
+        for (SearchHit hit : hitsAsMap.values()) {
+            sb.append("{");
+            sb.append("id=").append(hit.getId()).append(",");
+            sb.append("name=").append(hit.getSourceAsMap().get("name"));
+            sb.append("}");
+        }
+        sb.append("]");
+        sb.append("TotalMonitors=").append(hitsAsMap.size());
+        listener.onResponse((T) sb.toString());
+    }
+
+    private <T> void processGetMonitorHit(Monitor monitor, ActionListener<T> listener) {
+        StringBuilder sb = new StringBuilder();
+        if (monitor != null) {
+            sb.append("Monitors=[");
+            sb.append("{");
+            sb.append("id=").append(monitor.getId()).append(",");
+            sb.append("name=").append(monitor.getName());
+            sb.append("}]");
+            sb.append("TotalMonitors=1");
+        } else {
+            sb.append("Monitors=[]TotalMonitors=0");
+        }
+        listener.onResponse((T) sb.toString());
     }
 
     /**
