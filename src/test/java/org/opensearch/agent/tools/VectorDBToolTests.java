@@ -48,7 +48,7 @@ public class VectorDBToolTests {
         assertEquals(TEST_K, tool.getK());
         assertEquals("VectorDBTool", tool.getType());
         assertEquals("VectorDBTool", tool.getName());
-        assertEquals("Use this tool to search data in OpenSearch index.", VectorDBTool.Factory.getInstance().getDefaultDescription());
+        assertEquals(VectorDBTool.DEFAULT_DESCRIPTION, VectorDBTool.Factory.getInstance().getDefaultDescription());
     }
 
     @Test

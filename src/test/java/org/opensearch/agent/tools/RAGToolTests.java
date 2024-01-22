@@ -53,6 +53,8 @@ public class RAGToolTests {
     public static final String TEST_EMBEDDING_FIELD = "test_embedding";
     public static final String TEST_EMBEDDING_MODEL_ID = "1234";
     public static final String TEST_INFERENCE_MODEL_ID = "1234";
+    public static final String TEST_NEURAL_QUERY_TYPE = "neural";
+    public static final String TEST_NEURAL_SPARSE_QUERY_TYPE = "neural_sparse";
 
     public static final String TEST_NEURAL_QUERY = "{\"query\":{\"neural\":{\""
         + TEST_EMBEDDING_FIELD
@@ -67,6 +69,7 @@ public class RAGToolTests {
     private RAGTool ragTool;
     private String mockedSearchResponseString;
     private String mockedEmptySearchResponseString;
+    private String mockedNeuralSparseSearchResponseString;
     @Mock
     private Parser mockOutputParser;
     @Mock
@@ -89,6 +92,11 @@ public class RAGToolTests {
             }
         }
 
+        try (InputStream searchResponseIns = AbstractRetrieverTool.class.getResourceAsStream("neural_sparse_tool_search_response.json")) {
+            if (searchResponseIns != null) {
+                mockedNeuralSparseSearchResponseString = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
         client = mock(Client.class);
         listener = mock(ActionListener.class);
         RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_QUERY);
@@ -142,7 +150,7 @@ public class RAGToolTests {
     @Test
     public void testOutputParser() throws IOException {
 
-        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         ragTool.setXContentRegistry(mockNamedXContentRegistry);
 
         ModelTensorOutput mlModelTensorOutput = getMlModelTensorOutput();
@@ -175,7 +183,7 @@ public class RAGToolTests {
 
     @Test
     public void testRunWithEmptySearchResponse() throws IOException {
-        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         ragTool.setXContentRegistry(mockNamedXContentRegistry);
 
         ModelTensorOutput mlModelTensorOutput = getMlModelTensorOutput();
@@ -204,8 +212,85 @@ public class RAGToolTests {
     }
 
     @Test
+    public void testRunWithNeuralSparseQueryType() throws IOException {
+        RAGTool rAGtoolWithNeuralSparseQuery = new RAGTool(
+            client,
+            TEST_XCONTENT_REGISTRY_FOR_QUERY,
+            TEST_INDEX,
+            TEST_EMBEDDING_FIELD,
+            TEST_SOURCE_FIELDS,
+            DEFAULT_K,
+            TEST_DOC_SIZE,
+            TEST_EMBEDDING_MODEL_ID,
+            TEST_INFERENCE_MODEL_ID,
+            TEST_NEURAL_SPARSE_QUERY_TYPE
+        );
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
+        rAGtoolWithNeuralSparseQuery.setXContentRegistry(mockNamedXContentRegistry);
+
+        ModelTensorOutput mlModelTensorOutput = getMlModelTensorOutput();
+        SearchResponse mockedNeuralSparseSearchResponse = SearchResponse
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(
+                        NamedXContentRegistry.EMPTY,
+                        DeprecationHandler.IGNORE_DEPRECATIONS,
+                        mockedNeuralSparseSearchResponseString
+                    )
+            );
+
+        doAnswer(invocation -> {
+            SearchRequest searchRequest = invocation.getArgument(0);
+            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockedNeuralSparseSearchResponse);
+            return null;
+        }).when(client).search(any(), any());
+
+        doAnswer(invocation -> {
+            ActionListener<MLTaskResponse> actionListener = invocation.getArgument(2);
+            actionListener.onResponse(MLTaskResponse.builder().output(mlModelTensorOutput).build());
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        rAGtoolWithNeuralSparseQuery.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        verify(client).search(any(), any());
+        verify(client).execute(any(), any(), any());
+    }
+
+    @Test
+    public void testRunWithInvalidQueryType() throws IOException {
+        RAGTool rAGtoolWithInvalidQueryType = new RAGTool(
+            client,
+            TEST_XCONTENT_REGISTRY_FOR_QUERY,
+            TEST_INDEX,
+            TEST_EMBEDDING_FIELD,
+            TEST_SOURCE_FIELDS,
+            DEFAULT_K,
+            TEST_DOC_SIZE,
+            TEST_EMBEDDING_MODEL_ID,
+            TEST_INFERENCE_MODEL_ID,
+            "sparse"
+        );
+
+        doAnswer(invocation -> {
+            SearchRequest searchRequest = invocation.getArgument(0);
+            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onFailure(new IllegalArgumentException("Failed to read queryType, please input neural_sparse or neural."));
+            return null;
+        }).when(client).search(any(), any());
+
+        rAGtoolWithInvalidQueryType.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        verify(listener).onFailure(any(IllegalArgumentException.class));
+        ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(argumentCaptor.capture());
+        assertEquals("Failed to read queryType, please input neural_sparse or neural.", argumentCaptor.getValue().getMessage());
+
+    }
+
+    @Test
     public void testRunWithQuestionJson() throws IOException {
-        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         ragTool.setXContentRegistry(mockNamedXContentRegistry);
 
         ModelTensorOutput mlModelTensorOutput = getMlModelTensorOutput();
@@ -236,7 +321,7 @@ public class RAGToolTests {
     @Test
     @SneakyThrows
     public void testRunWithRuntimeExceptionDuringSearch() {
-        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         ragTool.setXContentRegistry(mockNamedXContentRegistry);
         doAnswer(invocation -> {
             SearchRequest searchRequest = invocation.getArgument(0);
@@ -255,7 +340,7 @@ public class RAGToolTests {
     @Test
     @SneakyThrows
     public void testRunWithRuntimeExceptionDuringExecute() {
-        NamedXContentRegistry mockNamedXContentRegistry = getNeuralQueryNamedXContentRegistry();
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         ragTool.setXContentRegistry(mockNamedXContentRegistry);
 
         SearchResponse mockedSearchResponse = SearchResponse
@@ -311,7 +396,8 @@ public class RAGToolTests {
             DEFAULT_K,
             TEST_DOC_SIZE,
             TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID
+            TEST_INFERENCE_MODEL_ID,
+            TEST_NEURAL_QUERY_TYPE
         );
 
         assertEquals(rAGtool1.getClient(), rAGtool2.getClient());
@@ -327,15 +413,28 @@ public class RAGToolTests {
 
     }
 
-    private static NamedXContentRegistry getNeuralQueryNamedXContentRegistry() {
+    private static NamedXContentRegistry getQueryNamedXContentRegistry() {
         QueryBuilder matchAllQueryBuilder = new MatchAllQueryBuilder();
 
         List<NamedXContentRegistry.Entry> entries = new ArrayList<>();
-        NamedXContentRegistry.Entry entry = new NamedXContentRegistry.Entry(QueryBuilder.class, new ParseField("neural"), (p, c) -> {
-            p.map();
-            return matchAllQueryBuilder;
-        });
-        entries.add(entry);
+        NamedXContentRegistry.Entry neural_query_entry = new NamedXContentRegistry.Entry(
+            QueryBuilder.class,
+            new ParseField("neural"),
+            (p, c) -> {
+                p.map();
+                return matchAllQueryBuilder;
+            }
+        );
+        entries.add(neural_query_entry);
+        NamedXContentRegistry.Entry neural_sparse_query_entry = new NamedXContentRegistry.Entry(
+            QueryBuilder.class,
+            new ParseField("neural_sparse"),
+            (p, c) -> {
+                p.map();
+                return matchAllQueryBuilder;
+            }
+        );
+        entries.add(neural_sparse_query_entry);
         NamedXContentRegistry mockNamedXContentRegistry = new NamedXContentRegistry(entries);
         return mockNamedXContentRegistry;
     }
