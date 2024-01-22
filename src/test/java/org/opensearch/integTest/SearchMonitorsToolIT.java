@@ -58,22 +58,4 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
     }
 
     // TODO: Add IT to test against sample monitor data
-
-    @SneakyThrows
-    private void createMonitorsSystemIndex(String monitorId, String monitorName) {
-        createIndexWithConfiguration(
-            ToolConstants.ALERTING_CONFIG_INDEX,
-            "{\n"
-                + "  \"mappings\": {\n"
-                + "    \"properties\": {\n"
-                + "      \"name\": {\n"
-                + "        \"type\": \"text\",\n"
-                + "             \"fields\": { \"keyword\": { \"type\": \"keyword\", \"ignore_above\": 256 }}"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}"
-        );
-        addDocToIndex(ToolConstants.ALERTING_CONFIG_INDEX, monitorId, List.of("name"), List.of(monitorName));
-    }
 }
