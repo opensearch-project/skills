@@ -150,7 +150,7 @@ public class PPLTool implements Tool {
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
             if (mappings.size() == 0) {
-                throw new IllegalArgumentException("No matching index with index name: " + indexName);
+                throw new IllegalArgumentException("No matching mapping with index name: " + indexName);
             }
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
