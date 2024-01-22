@@ -149,7 +149,7 @@ public class PPLTool implements Tool {
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
-            if (mappings.size() == 0){
+            if (mappings.size() == 0) {
                 throw new IllegalArgumentException("No matching index with index name: " + indexName);
             }
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
@@ -291,8 +291,7 @@ public class PPLTool implements Tool {
         return getMappingsRequest;
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings)
-        throws PrivilegedActionException {
+    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
         String firstIndexName = (String) mappings.keySet().toArray()[0];
         MappingMetadata mappingMetadata = mappings.get(firstIndexName);
         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
