@@ -57,7 +57,7 @@ public class VectorDBToolTests {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
         assertEquals(
             "{\"query\":{\"neural\":{\"test embedding\":{\""
-                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\",\"k\":123}}} }",
+                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\",\"k\":123}}}}",
             tool.getQueryBody(TEST_QUERY_TEXT)
         );
     }

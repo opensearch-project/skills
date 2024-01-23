@@ -20,6 +20,7 @@ import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -50,6 +51,8 @@ public abstract class AbstractRetrieverTool implements Tool {
     protected Integer docSize;
     protected String version;
 
+    protected Parser inputParser;
+
     protected AbstractRetrieverTool(
         Client client,
         NamedXContentRegistry xContentRegistry,
@@ -75,20 +78,41 @@ public abstract class AbstractRetrieverTool implements Tool {
         return docContent;
     }
 
+    protected Parser<SearchResponse, Object> searchResponseParser() {
+        return r -> {
+            SearchHit[] hits = r.getHits().getHits();
+
+            if (hits != null && hits.length > 0) {
+                StringBuilder contextBuilder = new StringBuilder();
+                for (SearchHit hit : hits) {
+                    Map<String, Object> docContent = processResponse(hit);
+                    contextBuilder.append(gson.toJson(docContent)).append("\n");
+                }
+                return contextBuilder.toString();
+            } else {
+                return "Can not get any match from search result.";
+            }
+        };
+    }
+
     private <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String question = parameters.get(INPUT_FIELD);
         if (StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
         }
 
-        String query = getQueryBody(question);
+        String finalInput = question;
+        if (inputParser != null) {
+            finalInput = (String) inputParser.parse(question);
+        }
+
+        String query = getQueryBody(finalInput);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         XContentParser queryParser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, query);
         searchSourceBuilder.parseXContent(queryParser);
         searchSourceBuilder.fetchSource(sourceFields, null);
         searchSourceBuilder.size(docSize);
-        SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(index);
-        return searchRequest;
+        return new SearchRequest().source(searchSourceBuilder).indices(index);
     }
 
     @Override
@@ -102,23 +126,11 @@ public abstract class AbstractRetrieverTool implements Tool {
             return;
         }
 
-        ActionListener actionListener = ActionListener.<SearchResponse>wrap(r -> {
-            SearchHit[] hits = r.getHits().getHits();
-
-            if (hits != null && hits.length > 0) {
-                StringBuilder contextBuilder = new StringBuilder();
-                for (SearchHit hit : hits) {
-                    Map<String, Object> docContent = processResponse(hit);
-                    contextBuilder.append(gson.toJson(docContent)).append("\n");
-                }
-                listener.onResponse((T) contextBuilder.toString());
-            } else {
-                listener.onResponse((T) "Can not get any match from search result.");
-            }
-        }, e -> {
-            log.error("Failed to search index.", e);
-            listener.onFailure(e);
-        });
+        ActionListener<SearchResponse> actionListener = ActionListener
+            .wrap(r -> { listener.onResponse((T) searchResponseParser().parse(r)); }, e -> {
+                log.error("Failed to search index.", e);
+                listener.onFailure(e);
+            });
         client.search(searchRequest, actionListener);
     }
 
