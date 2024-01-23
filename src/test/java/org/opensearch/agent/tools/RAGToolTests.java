@@ -55,17 +55,7 @@ public class RAGToolTests {
     public static final String TEST_INFERENCE_MODEL_ID = "1234";
     public static final String TEST_NEURAL_QUERY_TYPE = "neural";
     public static final String TEST_NEURAL_SPARSE_QUERY_TYPE = "neural_sparse";
-
-    public static final String TEST_NEURAL_QUERY = "{\"query\":{\"neural\":{\""
-        + TEST_EMBEDDING_FIELD
-        + "\":{\"query_text\":\""
-        + TEST_QUERY_TEXT
-        + "\",\"model_id\":\""
-        + TEST_EMBEDDING_MODEL_ID
-        + "\",\"k\":"
-        + DEFAULT_K
-        + "}}}"
-        + " }";;
+    static public final NamedXContentRegistry TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY = getQueryNamedXContentRegistry();
     private RAGTool ragTool;
     private String mockedSearchResponseString;
     private String mockedEmptySearchResponseString;
@@ -99,7 +89,7 @@ public class RAGToolTests {
         }
         client = mock(Client.class);
         listener = mock(ActionListener.class);
-        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_QUERY);
+        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
 
         params = new HashMap<>();
         params.put(RAGTool.INDEX_FIELD, TEST_INDEX);
@@ -108,7 +98,8 @@ public class RAGToolTests {
         params.put(RAGTool.EMBEDDING_MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
         params.put(RAGTool.INFERENCE_MODEL_ID_FIELD, TEST_INFERENCE_MODEL_ID);
         params.put(RAGTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
-        params.put(VectorDBTool.K_FIELD, DEFAULT_K);
+        params.put(RAGTool.K_FIELD, DEFAULT_K.toString());
+        params.put(RAGTool.QUERY_TYPE, TEST_NEURAL_QUERY_TYPE);
         ragTool = RAGTool.Factory.getInstance().create(params);
     }
 
@@ -213,18 +204,12 @@ public class RAGToolTests {
 
     @Test
     public void testRunWithNeuralSparseQueryType() throws IOException {
-        RAGTool rAGtoolWithNeuralSparseQuery = new RAGTool(
-            client,
-            TEST_XCONTENT_REGISTRY_FOR_QUERY,
-            TEST_INDEX,
-            TEST_EMBEDDING_FIELD,
-            TEST_SOURCE_FIELDS,
-            DEFAULT_K,
-            TEST_DOC_SIZE,
-            TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID,
-            TEST_NEURAL_SPARSE_QUERY_TYPE
-        );
+
+        Map<String, Object> paramsWithNeuralSparse = new HashMap<>(params);
+        paramsWithNeuralSparse.put(RAGTool.QUERY_TYPE, TEST_NEURAL_SPARSE_QUERY_TYPE);
+
+        RAGTool rAGtoolWithNeuralSparseQuery = RAGTool.Factory.getInstance().create(paramsWithNeuralSparse);
+
         NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
         rAGtoolWithNeuralSparseQuery.setXContentRegistry(mockNamedXContentRegistry);
 
@@ -259,32 +244,15 @@ public class RAGToolTests {
 
     @Test
     public void testRunWithInvalidQueryType() throws IOException {
-        RAGTool rAGtoolWithInvalidQueryType = new RAGTool(
-            client,
-            TEST_XCONTENT_REGISTRY_FOR_QUERY,
-            TEST_INDEX,
-            TEST_EMBEDDING_FIELD,
-            TEST_SOURCE_FIELDS,
-            DEFAULT_K,
-            TEST_DOC_SIZE,
-            TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID,
-            "sparse"
-        );
 
-        doAnswer(invocation -> {
-            SearchRequest searchRequest = invocation.getArgument(0);
-            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onFailure(new IllegalArgumentException("Failed to read queryType, please input neural_sparse or neural."));
-            return null;
-        }).when(client).search(any(), any());
-
-        rAGtoolWithInvalidQueryType.run(Map.of(INPUT_FIELD, "hello?"), listener);
-        verify(listener).onFailure(any(IllegalArgumentException.class));
-        ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(listener).onFailure(argumentCaptor.capture());
-        assertEquals("Failed to read queryType, please input neural_sparse or neural.", argumentCaptor.getValue().getMessage());
+        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        Map<String, Object> paramsWithInvalidQueryType = new HashMap<>(params);
+        paramsWithInvalidQueryType.put(RAGTool.QUERY_TYPE, "sparse");
+        try {
+            RAGTool rAGtoolWithInvalidQueryType = RAGTool.Factory.getInstance().create(paramsWithInvalidQueryType);
+        } catch (IllegalArgumentException e) {
+            assertEquals("Failed to read queryType, please input neural_sparse or neural.", e.getMessage());
+        }
 
     }
 
@@ -377,19 +345,24 @@ public class RAGToolTests {
     }
 
     @Test
-    public void testFactory() {
+    public void testFactoryNeuralQuery() {
         RAGTool.Factory factoryMock = new RAGTool.Factory();
-        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_QUERY);
-        factoryMock.init(client, TEST_XCONTENT_REGISTRY_FOR_QUERY);
+        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        factoryMock.init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
 
         String defaultDescription = factoryMock.getDefaultDescription();
         assertEquals(RAGTool.DEFAULT_DESCRIPTION, defaultDescription);
+        assertEquals(factoryMock.getDefaultType(), RAGTool.TYPE);
+        assertEquals(factoryMock.getDefaultVersion(), null);
         assertNotNull(RAGTool.Factory.getInstance());
-        RAGTool rAGtool1 = factoryMock.create(params);
 
+        RAGTool rAGtool1 = factoryMock.create(params);
+        VectorDBTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        params.put(VectorDBTool.MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
+        VectorDBTool queryTool = VectorDBTool.Factory.getInstance().create(params);
         RAGTool rAGtool2 = new RAGTool(
             client,
-            TEST_XCONTENT_REGISTRY_FOR_QUERY,
+            TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY,
             TEST_INDEX,
             TEST_EMBEDDING_FIELD,
             TEST_SOURCE_FIELDS,
@@ -397,7 +370,50 @@ public class RAGToolTests {
             TEST_DOC_SIZE,
             TEST_EMBEDDING_MODEL_ID,
             TEST_INFERENCE_MODEL_ID,
-            TEST_NEURAL_QUERY_TYPE
+            TEST_NEURAL_QUERY_TYPE,
+            queryTool
+        );
+
+        assertEquals(rAGtool1.getClient(), rAGtool2.getClient());
+        assertEquals(rAGtool1.getK(), rAGtool2.getK());
+        assertEquals(rAGtool1.getInferenceModelId(), rAGtool2.getInferenceModelId());
+        assertEquals(rAGtool1.getName(), rAGtool2.getName());
+        assertEquals(rAGtool1.getDocSize(), rAGtool2.getDocSize());
+        assertEquals(rAGtool1.getIndex(), rAGtool2.getIndex());
+        assertEquals(rAGtool1.getEmbeddingModelId(), rAGtool2.getEmbeddingModelId());
+        assertEquals(rAGtool1.getEmbeddingField(), rAGtool2.getEmbeddingField());
+        assertEquals(rAGtool1.getSourceFields(), rAGtool2.getSourceFields());
+        assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
+
+    }
+
+    @Test
+    public void testFactoryNeuralSparseQuery() {
+        RAGTool.Factory factoryMock = new RAGTool.Factory();
+        RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        factoryMock.init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+
+        String defaultDescription = factoryMock.getDefaultDescription();
+        assertEquals(RAGTool.DEFAULT_DESCRIPTION, defaultDescription);
+        assertNotNull(RAGTool.Factory.getInstance());
+        assertEquals(factoryMock.getDefaultType(), RAGTool.TYPE);
+        assertEquals(factoryMock.getDefaultVersion(), null);
+
+        RAGTool rAGtool1 = factoryMock.create(params);
+        NeuralSparseSearchTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        NeuralSparseSearchTool queryTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
+        RAGTool rAGtool2 = new RAGTool(
+            client,
+            TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY,
+            TEST_INDEX,
+            TEST_EMBEDDING_FIELD,
+            TEST_SOURCE_FIELDS,
+            DEFAULT_K,
+            TEST_DOC_SIZE,
+            TEST_EMBEDDING_MODEL_ID,
+            TEST_INFERENCE_MODEL_ID,
+            TEST_NEURAL_SPARSE_QUERY_TYPE,
+            queryTool
         );
 
         assertEquals(rAGtool1.getClient(), rAGtool2.getClient());

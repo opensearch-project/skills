@@ -53,6 +53,8 @@ public class RAGTool extends AbstractRetrieverTool {
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String OUTPUT_FIELD = "output_field";
     public static final String QUERY_TYPE = "query_type";
+    public static final String K_FIELD = "k";
+    private final AbstractRetrieverTool queryTool;
     private String name = TYPE;
     private String description = DEFAULT_DESCRIPTION;
     private Client client;
@@ -81,7 +83,8 @@ public class RAGTool extends AbstractRetrieverTool {
         Integer docSize,
         String embeddingModelId,
         String inferenceModelId,
-        String queryType
+        String queryType,
+        AbstractRetrieverTool queryTool
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
         this.client = client;
@@ -94,6 +97,7 @@ public class RAGTool extends AbstractRetrieverTool {
         this.k = k == null ? DEFAULT_K : k;
         this.inferenceModelId = inferenceModelId;
         this.queryType = queryType;
+        this.queryTool = queryTool;
         outputParser = new Parser() {
             @Override
             public Object parse(Object o) {
@@ -127,10 +131,10 @@ public class RAGTool extends AbstractRetrieverTool {
 
         String embeddingInput = input;
         ActionListener actionListener = ActionListener.<T>wrap(r -> {
-            T vectorDBToolOutput;
+            T queryToolOutput;
 
             if (r.equals("Can not get any match from search result.")) {
-                vectorDBToolOutput = (T) "";
+                queryToolOutput = (T) "";
             } else {
                 Gson gson = new Gson();
                 String[] hits = r.toString().split("\n");
@@ -145,25 +149,25 @@ public class RAGTool extends AbstractRetrieverTool {
                     resultBuilder.append("_source: ").append(source.toString()).append("\n");
                 }
 
-                vectorDBToolOutput = (T) gson.toJson(resultBuilder.toString());
+                queryToolOutput = (T) gson.toJson(resultBuilder.toString());
             }
 
             Map<String, String> tmpParameters = new HashMap<>();
             tmpParameters.putAll(parameters);
 
-            if (vectorDBToolOutput instanceof List
-                && !((List) vectorDBToolOutput).isEmpty()
-                && ((List) vectorDBToolOutput).get(0) instanceof ModelTensors) {
-                ModelTensors tensors = (ModelTensors) ((List) vectorDBToolOutput).get(0);
+            if (queryToolOutput instanceof List
+                && !((List) queryToolOutput).isEmpty()
+                && ((List) queryToolOutput).get(0) instanceof ModelTensors) {
+                ModelTensors tensors = (ModelTensors) ((List) queryToolOutput).get(0);
                 Object response = tensors.getMlModelTensors().get(0).getDataAsMap().get("response");
                 tmpParameters.put(OUTPUT_FIELD, response + "");
-            } else if (vectorDBToolOutput instanceof ModelTensor) {
-                tmpParameters.put(OUTPUT_FIELD, escapeJson(toJson(((ModelTensor) vectorDBToolOutput).getDataAsMap())));
+            } else if (queryToolOutput instanceof ModelTensor) {
+                tmpParameters.put(OUTPUT_FIELD, escapeJson(toJson(((ModelTensor) queryToolOutput).getDataAsMap())));
             } else {
-                if (vectorDBToolOutput instanceof String) {
-                    tmpParameters.put(OUTPUT_FIELD, (String) vectorDBToolOutput);
+                if (queryToolOutput instanceof String) {
+                    tmpParameters.put(OUTPUT_FIELD, (String) queryToolOutput);
                 } else {
-                    tmpParameters.put(OUTPUT_FIELD, escapeJson(toJson(vectorDBToolOutput.toString())));
+                    tmpParameters.put(OUTPUT_FIELD, escapeJson(toJson(queryToolOutput.toString())));
                 }
             }
 
@@ -187,30 +191,7 @@ public class RAGTool extends AbstractRetrieverTool {
             log.error("Failed to search index.", e);
             listener.onFailure(e);
         });
-
-        Map<String, Object> params = new HashMap<>();
-        params.put(VectorDBTool.INDEX_FIELD, this.index);
-        params.put(VectorDBTool.EMBEDDING_FIELD, this.embeddingField);
-        params.put(VectorDBTool.SOURCE_FIELD, gson.toJson(this.sourceFields));
-        params.put(VectorDBTool.MODEL_ID_FIELD, this.embeddingModelId);
-        params.put(VectorDBTool.DOC_SIZE_FIELD, String.valueOf(this.docSize));
-
-        switch (this.queryType) {
-            case "neural_sparse":
-                NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
-                NeuralSparseSearchTool neuralSparseSearchTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
-                neuralSparseSearchTool.run(Map.of(VectorDBTool.INPUT_FIELD, embeddingInput), actionListener);
-                break;
-            case "neural":
-                VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
-                params.put(VectorDBTool.K_FIELD, String.valueOf(this.k));
-                VectorDBTool vectorDBTool = VectorDBTool.Factory.getInstance().create(params);
-                vectorDBTool.run(Map.of(VectorDBTool.INPUT_FIELD, embeddingInput), actionListener);
-                break;
-            default:
-                log.error("Failed to read queryType, please input neural_sparse or neural.");
-                listener.onFailure(new IllegalArgumentException("Failed to read queryType, please input neural_sparse or neural."));
-        }
+        this.queryTool.run(Map.of(VectorDBTool.INPUT_FIELD, embeddingInput), actionListener);
     }
 
     @Override
@@ -273,18 +254,49 @@ public class RAGTool extends AbstractRetrieverTool {
             String inferenceModelId = (String) params.get(INFERENCE_MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : 2;
             String queryType = params.containsKey(QUERY_TYPE) ? (String) params.get(QUERY_TYPE) : "neural";
-            return RAGTool
-                .builder()
-                .client(client)
-                .xContentRegistry(xContentRegistry)
-                .index(index)
-                .embeddingField(embeddingField)
-                .sourceFields(sourceFields)
-                .embeddingModelId(embeddingModelId)
-                .docSize(docSize)
-                .inferenceModelId(inferenceModelId)
-                .queryType(queryType)
-                .build();
+            Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
+            ;
+            switch (queryType) {
+                case "neural_sparse":
+                    NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
+                    NeuralSparseSearchTool neuralSparseSearchTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
+                    return RAGTool
+                        .builder()
+                        .client(client)
+                        .xContentRegistry(xContentRegistry)
+                        .index(index)
+                        .embeddingField(embeddingField)
+                        .sourceFields(sourceFields)
+                        .embeddingModelId(embeddingModelId)
+                        .k(k)
+                        .docSize(docSize)
+                        .inferenceModelId(inferenceModelId)
+                        .queryType(queryType)
+                        .queryTool(neuralSparseSearchTool)
+                        .build();
+                case "neural":
+                    VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
+                    params.put(VectorDBTool.MODEL_ID_FIELD, EMBEDDING_MODEL_ID_FIELD);
+                    VectorDBTool vectorDBTool = VectorDBTool.Factory.getInstance().create(params);
+                    return RAGTool
+                        .builder()
+                        .client(client)
+                        .xContentRegistry(xContentRegistry)
+                        .index(index)
+                        .embeddingField(embeddingField)
+                        .sourceFields(sourceFields)
+                        .embeddingModelId(embeddingModelId)
+                        .k(k)
+                        .docSize(docSize)
+                        .inferenceModelId(inferenceModelId)
+                        .queryType(queryType)
+                        .queryTool(vectorDBTool)
+                        .build();
+                default:
+                    log.error("Failed to read queryType, please input neural_sparse or neural.");
+                    throw new IllegalArgumentException("Failed to read queryType, please input neural_sparse or neural.");
+            }
+
         }
 
         @Override
