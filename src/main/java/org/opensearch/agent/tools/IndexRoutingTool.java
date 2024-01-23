@@ -84,6 +84,7 @@ public class IndexRoutingTool extends VectorDBTool {
     private final ClusterService clusterService;
 
     @Setter
+    @Getter
     private String prompt;
 
     public IndexRoutingTool(
@@ -104,8 +105,7 @@ public class IndexRoutingTool extends VectorDBTool {
                 IndexSummaryEmbeddingJob.INDEX_NAME_FIELD,
                 IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD,
                 IndexSummaryEmbeddingJob.INDEX_PATTERNS_FIELD,
-                IndexSummaryEmbeddingJob.DATA_STREAM_FIELD,
-                IndexSummaryEmbeddingJob.ALIAS_FIELD },
+                IndexSummaryEmbeddingJob.DATA_STREAM_FIELD },
             Optional.ofNullable(docSize).orElse(DEFAULT_K),
             embeddingModelId,
             Optional.ofNullable(k).orElse(DEFAULT_K)
@@ -199,6 +199,8 @@ public class IndexRoutingTool extends VectorDBTool {
     }
 
     private Set<String> findMatchedIndex(String result, List<Map<String, Object>> candidates) {
+        if (result == null)
+            return Set.of(NOT_SURE);
         Set<String> validIndexes = new HashSet<>();
 
         Map<String, Map<String, Object>> candidateIndexMap = candidates
@@ -322,7 +324,7 @@ public class IndexRoutingTool extends VectorDBTool {
                 inferenceModelId,
                 clusterService
             );
-            tool.setPrompt(llmProvider.getPromptFormat().replace("${prompt}", promptTemplate));
+            tool.setPrompt(llmProvider.formatPrompt(promptTemplate));
 
             return tool;
         }

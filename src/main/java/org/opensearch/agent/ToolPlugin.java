@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 import org.opensearch.agent.indices.IndicesHelper;
 import org.opensearch.agent.job.IndexSummaryEmbeddingJob;
 import org.opensearch.agent.job.MLClients;
-import org.opensearch.agent.job.SkillsClusterManagerEventListener;
+import org.opensearch.agent.job.SkillsClusterStateEventListener;
 import org.opensearch.agent.tools.IndexRoutingTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -33,10 +33,16 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.index.IndexModule;
+import org.opensearch.index.engine.Engine;
+import org.opensearch.index.shard.IndexingOperationListener;
 import org.opensearch.indices.SystemIndexDescriptor;
+import org.opensearch.jobscheduler.spi.utils.LockService;
+import org.opensearch.ml.common.CommonValue;
 import org.opensearch.ml.common.spi.MLCommonsExtension;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.plugins.Plugin;
@@ -55,8 +61,9 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
     private Client client;
     private ClusterService clusterService;
     private NamedXContentRegistry xContentRegistry;
-    private IndicesHelper indicesHelper;
     private MLClients mlClients;
+
+    private SkillsClusterStateEventListener clusterStateEventListener;
 
     @SneakyThrows
     @Override
@@ -78,14 +85,16 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         this.xContentRegistry = xContentRegistry;
 
         mlClients = new MLClients(client, xContentRegistry, clusterService);
-        indicesHelper = new IndicesHelper(clusterService, client, mlClients);
-        SkillsClusterManagerEventListener clusterManagerEventListener = new SkillsClusterManagerEventListener(
+        IndicesHelper indicesHelper = new IndicesHelper(clusterService, client, mlClients);
+        LockService lockService = new LockService(client, clusterService);
+        clusterStateEventListener = new SkillsClusterStateEventListener(
             clusterService,
             client,
             environment.settings(),
             threadPool,
             indicesHelper,
-            mlClients
+            mlClients,
+            lockService
         );
 
         PPLTool.Factory.getInstance().init(client);
@@ -100,7 +109,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
         SearchMonitorsTool.Factory.getInstance().init(client);
         IndexRoutingTool.Factory.getInstance().init(client, xContentRegistry, clusterService);
 
-        return List.of(clusterManagerEventListener);
+        return List.of(clusterStateEventListener);
     }
 
     @Override
@@ -125,8 +134,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
     public List<Setting<?>> getSettings() {
         return List
             .of(
-                SkillsClusterManagerEventListener.SKILLS_INDEX_SUMMARY_JOB_INTERVAL,
-                SkillsClusterManagerEventListener.SKILLS_INDEX_SUMMARY_JOB_ENABLED
+                SkillsClusterStateEventListener.SKILLS_INDEX_SUMMARY_JOB_INTERVAL,
+                SkillsClusterStateEventListener.SKILLS_INDEX_SUMMARY_JOB_ENABLED
             );
     }
 
@@ -139,6 +148,23 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, SystemInde
                     "System index for storing index meta and simple data embedding"
                 )
             );
+    }
+
+    @Override
+    public void onIndexModule(IndexModule indexModule) {
+        if (indexModule.getIndex().getName().equals(CommonValue.ML_AGENT_INDEX)) {
+            // watch on new agent created
+            indexModule.addIndexOperationListener(new IndexingOperationListener() {
+                @Override
+                public void postIndex(ShardId shardId, Engine.Index index, Engine.IndexResult result) {
+                    if (result.isCreated()) {
+                        clusterStateEventListener.onNewAgentCreated(index.id());
+                    }
+                }
+            });
+
+        }
+        super.onIndexModule(indexModule);
     }
 
     @Override

@@ -6,7 +6,6 @@
 package org.opensearch.agent.job;
 
 import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.DEFAULT_TIMEOUT_SECOND;
-import static org.opensearch.agent.job.IndexSummaryEmbeddingJob.SENTENCE_EMBEDDING;
 import static org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.util.ArrayList;
@@ -34,6 +33,8 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexNotFoundException;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.IdsQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.ml.common.CommonValue;
@@ -67,6 +68,8 @@ public class MLClients {
     private NamedXContentRegistry xContentRegistry;
 
     private ClusterService clusterService;
+
+    public static final String SENTENCE_EMBEDDING = "sentence_embedding";
 
     public MLClients(Client client, NamedXContentRegistry xContentRegistry, ClusterService clusterService) {
         this.client = client;
@@ -119,15 +122,7 @@ public class MLClients {
         client.execute(MLPredictionTaskAction.INSTANCE, request, listener);
     }
 
-    public void getModelIdsForIndexRoutingTool(List<String> adhocModelIds, ActionListener<List<String>> listener) {
-        if (adhocModelIds != null && !adhocModelIds.isEmpty()) {
-            listener.onResponse(adhocModelIds);
-        } else {
-            getModelIdsForIndexRoutingTool(listener);
-        }
-    }
-
-    public void getModelIdsForIndexRoutingTool(ActionListener<List<String>> listener) {
+    public void getModelIdsForIndexRoutingTool(String agentId, ActionListener<List<String>> listener) {
         if (!clusterService.state().metadata().hasIndex(CommonValue.ML_AGENT_INDEX)) {
             log.debug("No agent index found, return empty model list");
             listener.onResponse(Collections.emptyList());
@@ -135,9 +130,16 @@ public class MLClients {
         }
         // search agent with IndexRoutingTool
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery();
         String termQueryKey = String.format(Locale.ROOT, "%s.%s", MLAgent.TOOLS_FIELD, MLToolSpec.TOOL_TYPE_FIELD);
         TermQueryBuilder termQueryBuilder = QueryBuilders.termQuery(termQueryKey, IndexRoutingTool.TYPE);
-        searchSourceBuilder.query(termQueryBuilder);
+        boolQueryBuilder.should(termQueryBuilder);
+        if (agentId != null) {
+            IdsQueryBuilder idsQueryBuilder = QueryBuilders.idsQuery().addIds(agentId);
+            boolQueryBuilder.should(idsQueryBuilder);
+        }
+
+        searchSourceBuilder.query(boolQueryBuilder);
         SearchRequest searchRequest = Requests.searchRequest().source(searchSourceBuilder);
 
         client.execute(MLSearchAgentAction.INSTANCE, searchRequest, ActionListener.wrap(r -> {

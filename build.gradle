@@ -120,7 +120,7 @@ dependencies {
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
-    compileOnly "org.opensearch:opensearch-job-scheduler-spi:${version}"
+    implementation "org.opensearch:opensearch-job-scheduler-spi:${version}"
 
 
     // ZipArchive dependencies used for integration tests
@@ -128,8 +128,8 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
     zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
+//    zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
+//    zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"

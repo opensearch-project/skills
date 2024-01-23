@@ -6,6 +6,12 @@
     "index_summary": {
       "type": "text"
     },
+    "sample_data_included": {
+      "type": "boolean"
+    },
+    "index_summary_sign": {
+      "type": "keyword"
+    },
     "index_patterns": {
       "type": "keyword"
     },

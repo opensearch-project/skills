@@ -34,4 +34,8 @@ public enum LLMProvider {
         }
         return NONE;
     }
+
+    public String formatPrompt(String prompt) {
+        return this.getPromptFormat().replace("${prompt}", prompt);
+    }
 }
