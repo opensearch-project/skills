@@ -14,6 +14,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -27,6 +31,7 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.transport.GetAnomalyDetectorAction;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.ad.transport.SearchAnomalyDetectorAction;
@@ -39,6 +44,7 @@ import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
+import org.opensearch.timeseries.model.IntervalTimeConfiguration;
 
 public class SearchAnomalyDetectorsToolTests {
     @Mock
@@ -48,6 +54,8 @@ public class SearchAnomalyDetectorsToolTests {
     private Map<String, String> emptyParams;
     private Map<String, String> nonEmptyParams;
 
+    private AnomalyDetector testDetector;
+
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
@@ -56,6 +64,27 @@ public class SearchAnomalyDetectorsToolTests {
         nullParams = null;
         emptyParams = Collections.emptyMap();
         nonEmptyParams = Map.of("detectorName", "foo");
+
+        testDetector = new AnomalyDetector(
+            "foo-id",
+            1L,
+            "foo-name",
+            "foo-description",
+            "foo-time-field",
+            new ArrayList<String>(Arrays.asList("foo-index")),
+            Collections.emptyList(),
+            null,
+            new IntervalTimeConfiguration(5, ChronoUnit.MINUTES),
+            null,
+            1,
+            Collections.emptyMap(),
+            1,
+            Instant.now(),
+            Collections.emptyList(),
+            null,
+            null,
+            null
+        );
     }
 
     @Test
@@ -87,13 +116,16 @@ public class SearchAnomalyDetectorsToolTests {
 
         XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
         content.startObject();
-        content.field("name", detectorName);
+        content.field("name", testDetector.getName());
+        content.field("type", testDetector.getDetectorType());
+        content.field("description", testDetector.getDescription());
+        content.field("indices", testDetector.getIndices().get(0));
+        content.field("last_update_time", testDetector.getLastUpdateTime().toEpochMilli());
         content.endObject();
         SearchHit[] hits = new SearchHit[1];
-        hits[0] = new SearchHit(0, detectorId, null, null).sourceRef(BytesReference.bytes(content));
+        hits[0] = new SearchHit(0, testDetector.getId(), null, null).sourceRef(BytesReference.bytes(content));
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
-        String expectedResponseStr = String
-            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
+        String expectedResponseStr = getExpectedResponseString(testDetector);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
@@ -122,8 +154,6 @@ public class SearchAnomalyDetectorsToolTests {
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
             .generateGetAnomalyDetectorResponses(new String[] { detectorId }, new String[] { DetectorStateString.Running.name() });
-        String expectedResponseStr = String
-            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -131,7 +161,10 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("running", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertEquals(expectedResponseStr, responseCaptor.getValue());
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId)));
+        assertTrue(response.contains(String.format("name=%s", detectorName)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -169,8 +202,6 @@ public class SearchAnomalyDetectorsToolTests {
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
             .generateGetAnomalyDetectorResponses(new String[] { detectorId }, new String[] { DetectorStateString.Running.name() });
-        String expectedResponseStr = String
-            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -178,7 +209,10 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("foo", "bar"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertEquals(expectedResponseStr, responseCaptor.getValue());
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId)));
+        assertTrue(response.contains(String.format("name=%s", detectorName)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -196,8 +230,6 @@ public class SearchAnomalyDetectorsToolTests {
         // Overriding the mocked response to realtime task and setting to null. This occurs when
         // a detector is created but is never started.
         when(getDetectorProfileResponse.getRealtimeAdTask()).thenReturn(null);
-        String expectedResponseStr = String
-            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -205,7 +237,10 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("disabled", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertEquals(expectedResponseStr, responseCaptor.getValue());
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId)));
+        assertTrue(response.contains(String.format("name=%s", detectorName)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -222,8 +257,6 @@ public class SearchAnomalyDetectorsToolTests {
             .generateGetAnomalyDetectorResponses(new String[] { detectorId }, new String[] { DetectorStateString.Running.name() });
         // Overriding the mocked response to set realtime task state to CREATED
         when(getDetectorProfileResponse.getRealtimeAdTask().getState()).thenReturn("CREATED");
-        String expectedResponseStr = String
-            .format("AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, hits.length);
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -231,7 +264,10 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("running", "false"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertEquals(expectedResponseStr, responseCaptor.getValue());
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId)));
+        assertTrue(response.contains(String.format("name=%s", detectorName)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -262,7 +298,14 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("failed", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertTrue(responseCaptor.getValue().contains("TotalAnomalyDetectors=3"));
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId1)));
+        assertTrue(response.contains(String.format("name=%s", detectorName1)));
+        assertTrue(response.contains(String.format("id=%s", detectorId2)));
+        assertTrue(response.contains(String.format("name=%s", detectorName2)));
+        assertTrue(response.contains(String.format("id=%s", detectorId3)));
+        assertTrue(response.contains(String.format("name=%s", detectorName3)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -293,7 +336,14 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("running", "true", "disabled", "true", "failed", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertTrue(responseCaptor.getValue().contains("TotalAnomalyDetectors=3"));
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId1)));
+        assertTrue(response.contains(String.format("name=%s", detectorName1)));
+        assertTrue(response.contains(String.format("id=%s", detectorId2)));
+        assertTrue(response.contains(String.format("name=%s", detectorName2)));
+        assertTrue(response.contains(String.format("id=%s", detectorId3)));
+        assertTrue(response.contains(String.format("name=%s", detectorName3)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -355,7 +405,12 @@ public class SearchAnomalyDetectorsToolTests {
         tool.run(Map.of("running", "true", "disabled", "false", "failed", "true"), listener);
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
-        assertTrue(responseCaptor.getValue().contains("TotalAnomalyDetectors=2"));
+        String response = responseCaptor.getValue();
+        assertTrue(response.contains(String.format("id=%s", detectorId1)));
+        assertTrue(response.contains(String.format("name=%s", detectorName1)));
+        assertTrue(response.contains(String.format("id=%s", detectorId3)));
+        assertTrue(response.contains(String.format("name=%s", detectorName3)));
+        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", 2)));
     }
 
     @Test
@@ -402,5 +457,20 @@ public class SearchAnomalyDetectorsToolTests {
             responseListener.onResponse(getDetectorProfileResponse);
             return null;
         }).when(nodeClient).execute(any(GetAnomalyDetectorAction.class), any(), any());
+    }
+
+    private String getExpectedResponseString(AnomalyDetector testDetector) {
+        return String
+            .format(
+                "AnomalyDetectors=[{id=%s,name=%s,type=%s,description=%s,index=%s,lastUpdateTime=%d}]TotalAnomalyDetectors=%d",
+                testDetector.getId(),
+                testDetector.getName(),
+                testDetector.getDetectorType(),
+                testDetector.getDescription(),
+                testDetector.getIndices().get(0),
+                testDetector.getLastUpdateTime().toEpochMilli(),
+                1
+            );
+
     }
 }
