@@ -242,9 +242,21 @@ public class SearchAnomalyDetectorsTool implements Tool {
         StringBuilder sb = new StringBuilder();
         sb.append("AnomalyDetectors=[");
         for (SearchHit hit : hitsAsMap.values()) {
+            // String indexStr;
+            // List<String> indices = (List<String>) hit.getSourceAsMap().get("indices");
+            // if (indices == null || indices.size() == 0) {
+            // indexStr = "";
+            // } else {
+            // indexStr = indices.get(0);
+            // }
+            // String indexStr = (String) hit.getSourceAsMap().get("indices");
             sb.append("{");
             sb.append("id=").append(hit.getId()).append(",");
-            sb.append("name=").append(hit.getSourceAsMap().get("name"));
+            sb.append("name=").append(hit.getSourceAsMap().get("name")).append(",");
+            sb.append("type=").append(hit.getSourceAsMap().get("type")).append(",");
+            sb.append("description=").append(hit.getSourceAsMap().get("description")).append(",");
+            sb.append("index=").append(hit.getSourceAsMap().get("indices")).append(",");
+            sb.append("lastUpdateTime=").append(hit.getSourceAsMap().get("last_update_time"));
             sb.append("}");
         }
         sb.append("]");

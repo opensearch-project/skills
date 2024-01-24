@@ -204,7 +204,11 @@ public class SearchMonitorsTool implements Tool {
         for (SearchHit hit : hitsAsMap.values()) {
             sb.append("{");
             sb.append("id=").append(hit.getId()).append(",");
-            sb.append("name=").append(hit.getSourceAsMap().get("name"));
+            sb.append("name=").append(hit.getSourceAsMap().get("name")).append(",");
+            sb.append("type=").append(hit.getSourceAsMap().get("type")).append(",");
+            sb.append("enabled=").append(hit.getSourceAsMap().get("enabled")).append(",");
+            sb.append("enabledTime=").append(hit.getSourceAsMap().get("enabled_time")).append(",");
+            sb.append("lastUpdateTime=").append(hit.getSourceAsMap().get("last_update_time"));
             sb.append("}");
         }
         sb.append("]");
@@ -218,7 +222,11 @@ public class SearchMonitorsTool implements Tool {
             sb.append("Monitors=[");
             sb.append("{");
             sb.append("id=").append(monitor.getId()).append(",");
-            sb.append("name=").append(monitor.getName());
+            sb.append("name=").append(monitor.getName()).append(",");
+            sb.append("type=").append(monitor.getType()).append(",");
+            sb.append("enabled=").append(monitor.getEnabled()).append(",");
+            sb.append("enabledTime=").append(monitor.getEnabledTime().toEpochMilli()).append(",");
+            sb.append("lastUpdateTime=").append(monitor.getLastUpdateTime().toEpochMilli());
             sb.append("}]");
             sb.append("TotalMonitors=1");
         } else {
