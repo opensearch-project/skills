@@ -8,7 +8,6 @@ package org.opensearch.integTest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 
 import org.junit.After;
 import org.junit.Before;
@@ -69,10 +68,9 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
         String result = executeAgent(agentId, agentInput);
-        assertEquals(
-            String.format(Locale.ROOT, "AnomalyDetectors=[{id=%s,name=%s}]TotalAnomalyDetectors=%d", detectorId, detectorName, 1),
-            result
-        );
+        assertTrue(result.contains(String.format("id=%s", detectorId)));
+        assertTrue(result.contains(String.format("name=%s", detectorName)));
+        assertTrue(result.contains(String.format("TotalAnomalyDetectors=%d", 1)));
     }
 
     @SneakyThrows

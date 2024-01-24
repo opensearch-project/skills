@@ -140,9 +140,7 @@ public class SearchMonitorsToolTests {
             testMonitor,
             Collections.emptyList()
         );
-        String expectedResponseStr = String
-            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), 1);
-
+        String expectedResponseStr = getExpectedResponseString(testMonitor);
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
 
@@ -186,8 +184,11 @@ public class SearchMonitorsToolTests {
 
         XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
         content.startObject();
-        content.field("type", "monitor");
         content.field("name", testMonitor.getName());
+        content.field("type", testMonitor.getType());
+        content.field("enabled", Boolean.toString(testMonitor.getEnabled()));
+        content.field("enabled_time", Long.toString(testMonitor.getEnabledTime().toEpochMilli()));
+        content.field("last_update_time", Long.toString(testMonitor.getLastUpdateTime().toEpochMilli()));
         content.endObject();
         SearchHit[] hits = new SearchHit[1];
         hits[0] = new SearchHit(0, testMonitor.getId(), null, null).sourceRef(BytesReference.bytes(content));
@@ -204,8 +205,7 @@ public class SearchMonitorsToolTests {
             null,
             null
         );
-        String expectedResponseStr = String
-            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), hits.length);
+        String expectedResponseStr = getExpectedResponseString(testMonitor);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
@@ -252,5 +252,20 @@ public class SearchMonitorsToolTests {
         assertTrue(tool.validate(nonEmptyParams));
         assertTrue(tool.validate(monitorIdParams));
         assertTrue(tool.validate(nullParams));
+    }
+
+    private String getExpectedResponseString(Monitor testMonitor) {
+        return String
+            .format(
+                "Monitors=[{id=%s,name=%s,type=%s,enabled=%s,enabledTime=%d,lastUpdateTime=%d}]TotalMonitors=%d",
+                testMonitor.getId(),
+                testMonitor.getName(),
+                testMonitor.getType(),
+                testMonitor.getEnabled(),
+                testMonitor.getEnabledTime().toEpochMilli(),
+                testMonitor.getLastUpdateTime().toEpochMilli(),
+                1
+            );
+
     }
 }
