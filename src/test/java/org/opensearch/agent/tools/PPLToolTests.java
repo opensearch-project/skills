@@ -139,6 +139,17 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_with_WithoutExecution() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude", "execute", false));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            assertEquals("source=demo| head 1", executePPLResult);
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
     public void testTool_with_DefaultPrompt() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude"));
         assertEquals(PPLTool.TYPE, tool.getName());
