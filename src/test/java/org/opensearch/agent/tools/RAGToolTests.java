@@ -91,7 +91,8 @@ public class RAGToolTests {
         client = mock(Client.class);
         listener = mock(ActionListener.class);
         RAGTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
-
+        VectorDBTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
+        NeuralSparseSearchTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
         params = new HashMap<>();
         params.put(RAGTool.INDEX_FIELD, TEST_INDEX);
         params.put(RAGTool.EMBEDDING_FIELD, TEST_EMBEDDING_FIELD);
