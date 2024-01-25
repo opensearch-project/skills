@@ -174,7 +174,7 @@ public class PPLTool implements Tool {
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
-                    if (!this.execute){
+                    if (!this.execute) {
                         listener.onResponse((T) ppl);
                         return;
                     }
@@ -263,7 +263,7 @@ public class PPLTool implements Tool {
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
-                    (boolean) map.getOrDefault("execute", true)
+                (boolean) map.getOrDefault("execute", true)
             );
         }
 
