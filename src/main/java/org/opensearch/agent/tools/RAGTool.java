@@ -193,7 +193,7 @@ public class RAGTool implements Tool {
     /**
      * Factory class to create RAGTool
      */
-    public static class Factory extends AbstractRetrieverTool.Factory<RAGTool> {
+    public static class Factory implements Tool.Factory<RAGTool> {
         private Client client;
         private NamedXContentRegistry xContentRegistry;
 
@@ -227,7 +227,7 @@ public class RAGTool implements Tool {
             String inferenceModelId = enableContentGeneration ? (String) params.get(INFERENCE_MODEL_ID_FIELD) : "";
             switch (queryType) {
                 case "neural_sparse":
-                    NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
+                    params.put(NeuralSparseSearchTool.MODEL_ID_FIELD, embeddingModelId);
                     NeuralSparseSearchTool neuralSparseSearchTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
                     return RAGTool
                         .builder()
@@ -238,7 +238,6 @@ public class RAGTool implements Tool {
                         .queryTool(neuralSparseSearchTool)
                         .build();
                 case "neural":
-                    VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
                     params.put(VectorDBTool.MODEL_ID_FIELD, embeddingModelId);
                     VectorDBTool vectorDBTool = VectorDBTool.Factory.getInstance().create(params);
                     return RAGTool
