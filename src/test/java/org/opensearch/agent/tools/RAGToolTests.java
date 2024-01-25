@@ -55,6 +55,7 @@ public class RAGToolTests {
     public static final String TEST_INFERENCE_MODEL_ID = "1234";
     public static final String TEST_NEURAL_QUERY_TYPE = "neural";
     public static final String TEST_NEURAL_SPARSE_QUERY_TYPE = "neural_sparse";
+
     static public final NamedXContentRegistry TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY = getQueryNamedXContentRegistry();
     private RAGTool ragTool;
     private String mockedSearchResponseString;
@@ -100,6 +101,7 @@ public class RAGToolTests {
         params.put(RAGTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
         params.put(RAGTool.K_FIELD, DEFAULT_K.toString());
         params.put(RAGTool.QUERY_TYPE, TEST_NEURAL_QUERY_TYPE);
+        params.put(RAGTool.CONTENT_GENERATION_FIELD, "true");
         ragTool = RAGTool.Factory.getInstance().create(params);
     }
 
@@ -117,12 +119,6 @@ public class RAGToolTests {
     public void testGetAttributes() {
         assertEquals(ragTool.getVersion(), null);
         assertEquals(ragTool.getType(), RAGTool.TYPE);
-        assertEquals(ragTool.getIndex(), TEST_INDEX);
-        assertEquals(ragTool.getDocSize(), TEST_DOC_SIZE);
-        assertEquals(ragTool.getSourceFields(), TEST_SOURCE_FIELDS);
-        assertEquals(ragTool.getEmbeddingField(), TEST_EMBEDDING_FIELD);
-        assertEquals(ragTool.getEmbeddingModelId(), TEST_EMBEDDING_MODEL_ID);
-        assertEquals(ragTool.getK(), DEFAULT_K);
         assertEquals(ragTool.getInferenceModelId(), TEST_INFERENCE_MODEL_ID);
     }
 
@@ -131,11 +127,6 @@ public class RAGToolTests {
         assertEquals(ragTool.getName(), RAGTool.TYPE);
         ragTool.setName("test-tool");
         assertEquals(ragTool.getName(), "test-tool");
-    }
-
-    @Test
-    public void testGetQueryBodySuccess() {
-        assertEquals(ragTool.getQueryBody(TEST_QUERY_TEXT), TEST_QUERY_TEXT);
     }
 
     @Test
@@ -166,7 +157,7 @@ public class RAGToolTests {
         }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
 
         ragTool.setOutputParser(mockOutputParser);
-        ragTool.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        ragTool.run(Map.of(INPUT_FIELD, TEST_QUERY_TEXT), listener);
 
         verify(client).search(any(), any());
         verify(client).execute(any(), any(), any());
@@ -197,7 +188,7 @@ public class RAGToolTests {
             actionListener.onResponse(MLTaskResponse.builder().output(mlModelTensorOutput).build());
             return null;
         }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
-        ragTool.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        ragTool.run(Map.of(INPUT_FIELD, TEST_QUERY_TEXT), listener);
         verify(client).search(any(), any());
         verify(client).execute(any(), any(), any());
     }
@@ -237,7 +228,7 @@ public class RAGToolTests {
             actionListener.onResponse(MLTaskResponse.builder().output(mlModelTensorOutput).build());
             return null;
         }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
-        rAGtoolWithNeuralSparseQuery.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        rAGtoolWithNeuralSparseQuery.run(Map.of(INPUT_FIELD, TEST_QUERY_TEXT), listener);
         verify(client).search(any(), any());
         verify(client).execute(any(), any(), any());
     }
@@ -287,6 +278,80 @@ public class RAGToolTests {
     }
 
     @Test
+    public void testRunEmptyResponseWithNotEnableContentGeneration() throws IOException {
+        ActionListener<String> mockListener = mock(ActionListener.class);
+        Map<String, Object> paramsWithNotEnableContentGeneration = new HashMap<>(params);
+        paramsWithNotEnableContentGeneration.put(RAGTool.CONTENT_GENERATION_FIELD, "false");
+
+        RAGTool rAGtoolWithNotEnableContentGeneration = RAGTool.Factory.getInstance().create(paramsWithNotEnableContentGeneration);
+
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
+        rAGtoolWithNotEnableContentGeneration.setXContentRegistry(mockNamedXContentRegistry);
+
+        SearchResponse mockedEmptySearchResponse = SearchResponse
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.IGNORE_DEPRECATIONS, mockedEmptySearchResponseString)
+            );
+
+        doAnswer(invocation -> {
+            SearchRequest searchRequest = invocation.getArgument(0);
+            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockedEmptySearchResponse);
+            return null;
+        }).when(client).search(any(), any());
+        rAGtoolWithNotEnableContentGeneration.run(Map.of(INPUT_FIELD, "{question:'what is the population in seattle?'}"), mockListener);
+
+        verify(client).search(any(), any());
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockListener).onResponse(responseCaptor.capture());
+        assertEquals("Can not get any match from search result.", responseCaptor.getValue());
+
+    }
+
+    @Test
+    public void testRunResponseWithNotEnableContentGeneration() throws IOException {
+        ActionListener<String> mockListener = mock(ActionListener.class);
+        Map<String, Object> paramsWithNotEnableContentGeneration = new HashMap<>(params);
+        paramsWithNotEnableContentGeneration.put(RAGTool.CONTENT_GENERATION_FIELD, "false");
+
+        RAGTool rAGtoolWithNotEnableContentGeneration = RAGTool.Factory.getInstance().create(paramsWithNotEnableContentGeneration);
+
+        NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
+        rAGtoolWithNotEnableContentGeneration.setXContentRegistry(mockNamedXContentRegistry);
+
+        SearchResponse mockedNeuralSparseSearchResponse = SearchResponse
+            .fromXContent(
+                JsonXContent.jsonXContent
+                    .createParser(
+                        NamedXContentRegistry.EMPTY,
+                        DeprecationHandler.IGNORE_DEPRECATIONS,
+                        mockedNeuralSparseSearchResponseString
+                    )
+            );
+
+        doAnswer(invocation -> {
+            SearchRequest searchRequest = invocation.getArgument(0);
+            assertEquals((long) TEST_DOC_SIZE, (long) searchRequest.source().size());
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockedNeuralSparseSearchResponse);
+            return null;
+        }).when(client).search(any(), any());
+        rAGtoolWithNotEnableContentGeneration.run(Map.of(INPUT_FIELD, "{question:'what is the population in seattle?'}"), mockListener);
+
+        verify(client).search(any(), any());
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockListener).onResponse(responseCaptor.capture());
+        assertEquals(
+            "{\"_index\":\"my-nlp-index\",\"_source\":{\"passage_text\":\"Hello world\",\"passage_embedding\":{\"!\":0.8708904,\"door\":0.8587369,\"hi\":2.3929274,\"worlds\":2.7839446,\"yes\":0.75845814,\"##world\":2.5432441,\"born\":0.2682308,\"nothing\":0.8625516,\"goodbye\":0.17146169,\"greeting\":0.96817183,\"birth\":1.2788506,\"come\":0.1623208,\"global\":0.4371151,\"it\":0.42951578,\"life\":1.5750692,\"thanks\":0.26481047,\"world\":4.7300377,\"tiny\":0.5462298,\"earth\":2.6555297,\"universe\":2.0308156,\"worldwide\":1.3903781,\"hello\":6.696973,\"so\":0.20279501,\"?\":0.67785245},\"id\":\"s1\"},\"_id\":\"1\",\"_score\":30.0029}\n"
+                + "{\"_index\":\"my-nlp-index\",\"_source\":{\"passage_text\":\"Hi planet\",\"passage_embedding\":{\"hi\":4.338913,\"planets\":2.7755864,\"planet\":5.0969057,\"mars\":1.7405145,\"earth\":2.6087382,\"hello\":3.3210192},\"id\":\"s2\"},\"_id\":\"2\",\"_score\":16.480486}\n",
+            responseCaptor.getValue()
+        );
+
+    }
+
+    @Test
     @SneakyThrows
     public void testRunWithRuntimeExceptionDuringSearch() {
         NamedXContentRegistry mockNamedXContentRegistry = getQueryNamedXContentRegistry();
@@ -298,7 +363,7 @@ public class RAGToolTests {
             actionListener.onFailure(new RuntimeException("Failed to search index"));
             return null;
         }).when(client).search(any(), any());
-        ragTool.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        ragTool.run(Map.of(INPUT_FIELD, TEST_QUERY_TEXT), listener);
         verify(listener).onFailure(any(RuntimeException.class));
         ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(argumentCaptor.capture());
@@ -331,7 +396,7 @@ public class RAGToolTests {
             return null;
         }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
 
-        ragTool.run(Map.of(INPUT_FIELD, "hello?"), listener);
+        ragTool.run(Map.of(INPUT_FIELD, TEST_QUERY_TEXT), listener);
         verify(listener).onFailure(any(RuntimeException.class));
         ArgumentCaptor<Exception> argumentCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(argumentCaptor.capture());
@@ -360,31 +425,16 @@ public class RAGToolTests {
         VectorDBTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
         params.put(VectorDBTool.MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
         VectorDBTool queryTool = VectorDBTool.Factory.getInstance().create(params);
-        RAGTool rAGtool2 = new RAGTool(
-            client,
-            TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY,
-            TEST_INDEX,
-            TEST_EMBEDDING_FIELD,
-            TEST_SOURCE_FIELDS,
-            DEFAULT_K,
-            TEST_DOC_SIZE,
-            TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID,
-            TEST_NEURAL_QUERY_TYPE,
-            queryTool
-        );
+        RAGTool rAGtool2 = new RAGTool(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY, TEST_INFERENCE_MODEL_ID, true, queryTool);
 
         assertEquals(rAGtool1.getClient(), rAGtool2.getClient());
-        assertEquals(rAGtool1.getK(), rAGtool2.getK());
         assertEquals(rAGtool1.getInferenceModelId(), rAGtool2.getInferenceModelId());
         assertEquals(rAGtool1.getName(), rAGtool2.getName());
-        assertEquals(rAGtool1.getDocSize(), rAGtool2.getDocSize());
-        assertEquals(rAGtool1.getIndex(), rAGtool2.getIndex());
-        assertEquals(rAGtool1.getEmbeddingModelId(), rAGtool2.getEmbeddingModelId());
-        assertEquals(rAGtool1.getEmbeddingField(), rAGtool2.getEmbeddingField());
-        assertEquals(rAGtool1.getSourceFields(), rAGtool2.getSourceFields());
+        assertEquals(rAGtool1.getQueryTool().getDocSize(), rAGtool2.getQueryTool().getDocSize());
+        assertEquals(rAGtool1.getQueryTool().getIndex(), rAGtool2.getQueryTool().getIndex());
+        assertEquals(rAGtool1.getQueryTool().getSourceFields(), rAGtool2.getQueryTool().getSourceFields());
         assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
-
+        assertEquals(rAGtool1.getQueryType(), rAGtool2.getQueryType());
     }
 
     @Test
@@ -402,30 +452,16 @@ public class RAGToolTests {
         RAGTool rAGtool1 = factoryMock.create(params);
         NeuralSparseSearchTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
         NeuralSparseSearchTool queryTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
-        RAGTool rAGtool2 = new RAGTool(
-            client,
-            TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY,
-            TEST_INDEX,
-            TEST_EMBEDDING_FIELD,
-            TEST_SOURCE_FIELDS,
-            DEFAULT_K,
-            TEST_DOC_SIZE,
-            TEST_EMBEDDING_MODEL_ID,
-            TEST_INFERENCE_MODEL_ID,
-            TEST_NEURAL_SPARSE_QUERY_TYPE,
-            queryTool
-        );
+        RAGTool rAGtool2 = new RAGTool(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY, TEST_INFERENCE_MODEL_ID, true, queryTool);
 
         assertEquals(rAGtool1.getClient(), rAGtool2.getClient());
-        assertEquals(rAGtool1.getK(), rAGtool2.getK());
         assertEquals(rAGtool1.getInferenceModelId(), rAGtool2.getInferenceModelId());
         assertEquals(rAGtool1.getName(), rAGtool2.getName());
-        assertEquals(rAGtool1.getDocSize(), rAGtool2.getDocSize());
-        assertEquals(rAGtool1.getIndex(), rAGtool2.getIndex());
-        assertEquals(rAGtool1.getEmbeddingModelId(), rAGtool2.getEmbeddingModelId());
-        assertEquals(rAGtool1.getEmbeddingField(), rAGtool2.getEmbeddingField());
-        assertEquals(rAGtool1.getSourceFields(), rAGtool2.getSourceFields());
+        assertEquals(rAGtool1.getQueryTool().getDocSize(), rAGtool2.getQueryTool().getDocSize());
+        assertEquals(rAGtool1.getQueryTool().getIndex(), rAGtool2.getQueryTool().getIndex());
+        assertEquals(rAGtool1.getQueryTool().getSourceFields(), rAGtool2.getQueryTool().getSourceFields());
         assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
+        assertEquals(rAGtool1.getQueryType(), rAGtool2.getQueryType());
 
     }
 
