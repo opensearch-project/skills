@@ -85,7 +85,7 @@ public class SearchAnomalyResultsTool implements Tool {
         final Boolean realTime = parameters.containsKey("realTime") ? Boolean.parseBoolean(parameters.get("realTime")) : null;
         final Double anomalyGradeThreshold = parameters.containsKey("anomalyGradeThreshold")
             ? Double.parseDouble(parameters.get("anomalyGradeThreshold"))
-            : null;
+            : 0;
         final Long dataStartTime = parameters.containsKey("dataStartTime") && StringUtils.isNumeric(parameters.get("dataStartTime"))
             ? Long.parseLong(parameters.get("dataStartTime"))
             : null;
@@ -115,7 +115,7 @@ public class SearchAnomalyResultsTool implements Tool {
             mustList.add(boolQuery);
         }
         if (anomalyGradeThreshold != null) {
-            mustList.add(new RangeQueryBuilder("anomaly_grade").gte(anomalyGradeThreshold));
+            mustList.add(new RangeQueryBuilder("anomaly_grade").gt(anomalyGradeThreshold));
         }
         if (dataStartTime != null || dataEndTime != null) {
             RangeQueryBuilder rangeQuery = new RangeQueryBuilder("anomaly_grade");
