@@ -57,6 +57,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         updateClusterSettings("plugins.ml_commons.only_run_on_ml_node", false);
         // default threshold for native circuit breaker is 90, it may be not enough on test runner machine
         updateClusterSettings("plugins.ml_commons.native_memory_threshold", 100);
+        updateClusterSettings("plugins.ml_commons.jvm_heap_memory_threshold", 100);
         updateClusterSettings("plugins.ml_commons.allow_registering_model_via_url", true);
     }
 
@@ -151,6 +152,17 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         String deployModelTaskId = deployModel(modelId);
         waitTaskComplete(deployModelTaskId);
         return modelId;
+    }
+
+    @SneakyThrows
+    protected void deleteModel(String modelId) {
+        // need to undeploy first as model can be in use
+        makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_undeploy", null, (String) null, null);
+
+        // after model undeploy returns, the max interval to update model status is 3s in ml-commons CronJob.
+        Thread.sleep(3000);
+
+        makeRequest(client(), "DELETE", "/_plugins/_ml/models/" + modelId, null, (String) null, null);
     }
 
     protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
