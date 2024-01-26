@@ -19,8 +19,6 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
-import org.opensearch.commons.alerting.action.GetMonitorRequest;
-import org.opensearch.commons.alerting.action.GetMonitorResponse;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
 import org.opensearch.commons.alerting.model.Monitor;
 import org.opensearch.commons.alerting.model.ScheduledJob;
@@ -35,7 +33,6 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
-import org.opensearch.rest.RestRequest;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
@@ -102,89 +99,73 @@ public class SearchMonitorsTool implements Tool {
             ? Integer.parseInt(parameters.get("startIndex"))
             : 0;
 
-        // If a monitor ID is specified, all other params will be ignored. Simply return the monitor details based on that ID
-        // via the get monitor transport action
+        List<QueryBuilder> mustList = new ArrayList<QueryBuilder>();
         if (monitorId != null) {
-            GetMonitorRequest getMonitorRequest = new GetMonitorRequest(monitorId, 1L, RestRequest.Method.GET, null);
-            ActionListener<GetMonitorResponse> getMonitorListener = ActionListener.<GetMonitorResponse>wrap(response -> {
-                Monitor monitor = response.getMonitor();
-                processGetMonitorHit(monitor, listener);
-            }, e -> {
-                // System index isn't initialized by default, so ignore such errors. Alerting plugin does not return the
-                // standard IndexNotFoundException so we parse the message instead
-                if (e.getMessage().contains("Configured indices are not found")) {
-                    processGetMonitorHit(null, listener);
-                } else {
-                    log.error("Failed to get monitor.", e);
-                    listener.onFailure(e);
-                }
-            });
-            AlertingPluginInterface.INSTANCE.getMonitor((NodeClient) client, getMonitorRequest, getMonitorListener);
-        } else {
-            List<QueryBuilder> mustList = new ArrayList<QueryBuilder>();
-            if (monitorName != null) {
-                mustList.add(new TermQueryBuilder("monitor.name.keyword", monitorName));
-            }
-            if (monitorNamePattern != null) {
-                mustList.add(new WildcardQueryBuilder("monitor.name.keyword", monitorNamePattern));
-            }
-            if (enabled != null) {
-                mustList.add(new TermQueryBuilder("monitor.enabled", enabled));
-            }
-            if (hasTriggers != null) {
-                NestedQueryBuilder nestedTriggerQuery = new NestedQueryBuilder(
-                    "monitor.triggers",
-                    new ExistsQueryBuilder("monitor.triggers"),
-                    ScoreMode.None
-                );
-
-                BoolQueryBuilder triggerQuery = new BoolQueryBuilder();
-                if (hasTriggers) {
-                    triggerQuery.must(nestedTriggerQuery);
-                } else {
-                    triggerQuery.mustNot(nestedTriggerQuery);
-                }
-                mustList.add(triggerQuery);
-            }
-            if (indices != null) {
-                mustList
-                    .add(
-                        new NestedQueryBuilder(
-                            "monitor.inputs",
-                            new WildcardQueryBuilder("monitor.inputs.search.indices", indices),
-                            ScoreMode.None
-                        )
-                    );
-            }
-
-            BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
-            boolQueryBuilder.must().addAll(mustList);
-            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
-                .query(boolQueryBuilder)
-                .size(size)
-                .from(startIndex)
-                .sort(sortString, sortOrder);
-
-            SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(ScheduledJob.SCHEDULED_JOBS_INDEX);
-            SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(searchRequest);
-
-            ActionListener<SearchResponse> searchMonitorListener = ActionListener.<SearchResponse>wrap(response -> {
-                List<SearchHit> hits = Arrays.asList(response.getHits().getHits());
-                Map<String, SearchHit> hitsAsMap = hits.stream().collect(Collectors.toMap(SearchHit::getId, hit -> hit));
-                processHits(hitsAsMap, listener);
-
-            }, e -> {
-                // System index isn't initialized by default, so ignore such errors. Alerting plugin does not return the
-                // standard IndexNotFoundException so we parse the message instead
-                if (e.getMessage().contains("Configured indices are not found")) {
-                    processHits(Collections.emptyMap(), listener);
-                } else {
-                    log.error("Failed to search monitors.", e);
-                    listener.onFailure(e);
-                }
-            });
-            AlertingPluginInterface.INSTANCE.searchMonitors((NodeClient) client, searchMonitorRequest, searchMonitorListener);
+            mustList.add(new TermQueryBuilder("_id", monitorId));
         }
+        if (monitorName != null) {
+            mustList.add(new TermQueryBuilder("monitor.name.keyword", monitorName));
+        }
+        if (monitorNamePattern != null) {
+            mustList.add(new WildcardQueryBuilder("monitor.name.keyword", monitorNamePattern));
+        }
+        if (enabled != null) {
+            mustList.add(new TermQueryBuilder("monitor.enabled", enabled));
+        }
+        if (hasTriggers != null) {
+            NestedQueryBuilder nestedTriggerQuery = new NestedQueryBuilder(
+                "monitor.triggers",
+                new ExistsQueryBuilder("monitor.triggers"),
+                ScoreMode.None
+            );
+
+            BoolQueryBuilder triggerQuery = new BoolQueryBuilder();
+            if (hasTriggers) {
+                triggerQuery.must(nestedTriggerQuery);
+            } else {
+                triggerQuery.mustNot(nestedTriggerQuery);
+            }
+            mustList.add(triggerQuery);
+        }
+        if (indices != null) {
+            mustList
+                .add(
+                    new NestedQueryBuilder(
+                        "monitor.inputs",
+                        new WildcardQueryBuilder("monitor.inputs.search.indices", indices),
+                        ScoreMode.None
+                    )
+                );
+        }
+
+        BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
+        boolQueryBuilder.must().addAll(mustList);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
+            .query(boolQueryBuilder)
+            .size(size)
+            .from(startIndex)
+            .sort(sortString, sortOrder);
+
+        SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(ScheduledJob.SCHEDULED_JOBS_INDEX);
+        SearchMonitorRequest searchMonitorRequest = new SearchMonitorRequest(searchRequest);
+
+        ActionListener<SearchResponse> searchMonitorListener = ActionListener.<SearchResponse>wrap(response -> {
+            List<SearchHit> hits = Arrays.asList(response.getHits().getHits());
+            Map<String, SearchHit> hitsAsMap = hits.stream().collect(Collectors.toMap(SearchHit::getId, hit -> hit));
+            processHits(hitsAsMap, listener);
+
+        }, e -> {
+            // System index isn't initialized by default, so ignore such errors. Alerting plugin does not return the
+            // standard IndexNotFoundException so we parse the message instead
+            if (e.getMessage().contains("Configured indices are not found")) {
+                processHits(Collections.emptyMap(), listener);
+            } else {
+                log.error("Failed to search monitors.", e);
+                listener.onFailure(e);
+            }
+        });
+        AlertingPluginInterface.INSTANCE.searchMonitors((NodeClient) client, searchMonitorRequest, searchMonitorListener);
+
     }
 
     @Override
@@ -201,13 +182,14 @@ public class SearchMonitorsTool implements Tool {
         StringBuilder sb = new StringBuilder();
         sb.append("Monitors=[");
         for (SearchHit hit : hitsAsMap.values()) {
+            Map<String, Object> monitorAsMap = (Map<String, Object>) hit.getSourceAsMap().get("monitor");
             sb.append("{");
             sb.append("id=").append(hit.getId()).append(",");
-            sb.append("name=").append(hit.getSourceAsMap().get("name")).append(",");
-            sb.append("type=").append(hit.getSourceAsMap().get("type")).append(",");
-            sb.append("enabled=").append(hit.getSourceAsMap().get("enabled")).append(",");
-            sb.append("enabledTime=").append(hit.getSourceAsMap().get("enabled_time")).append(",");
-            sb.append("lastUpdateTime=").append(hit.getSourceAsMap().get("last_update_time"));
+            sb.append("name=").append(monitorAsMap.get("name")).append(",");
+            sb.append("type=").append(monitorAsMap.get("type")).append(",");
+            sb.append("enabled=").append(monitorAsMap.get("enabled")).append(",");
+            sb.append("enabledTime=").append(monitorAsMap.get("enabled_time")).append(",");
+            sb.append("lastUpdateTime=").append(monitorAsMap.get("last_update_time"));
             sb.append("}");
         }
         sb.append("]");

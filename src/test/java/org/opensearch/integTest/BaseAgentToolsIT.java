@@ -115,6 +115,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
+    protected String indexMonitor(String monitorAsJsonString) {
+        Response response = makeRequest(client(), "POST", "_plugins/_alerting/monitors", null, monitorAsJsonString, null);
+
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, "_id").toString();
+    }
+
     @SneakyThrows
     protected Map<String, Object> waitTaskComplete(String taskId) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
