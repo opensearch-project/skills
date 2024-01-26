@@ -20,7 +20,6 @@ import org.opensearch.client.Client;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
-import org.opensearch.commons.alerting.model.Monitor;
 import org.opensearch.commons.alerting.model.ScheduledJob;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
@@ -194,25 +193,6 @@ public class SearchMonitorsTool implements Tool {
         }
         sb.append("]");
         sb.append("TotalMonitors=").append(hitsAsMap.size());
-        listener.onResponse((T) sb.toString());
-    }
-
-    private <T> void processGetMonitorHit(Monitor monitor, ActionListener<T> listener) {
-        StringBuilder sb = new StringBuilder();
-        if (monitor != null) {
-            sb.append("Monitors=[");
-            sb.append("{");
-            sb.append("id=").append(monitor.getId()).append(",");
-            sb.append("name=").append(monitor.getName()).append(",");
-            sb.append("type=").append(monitor.getType()).append(",");
-            sb.append("enabled=").append(monitor.getEnabled()).append(",");
-            sb.append("enabledTime=").append(monitor.getEnabledTime().toEpochMilli()).append(",");
-            sb.append("lastUpdateTime=").append(monitor.getLastUpdateTime().toEpochMilli());
-            sb.append("}]");
-            sb.append("TotalMonitors=1");
-        } else {
-            sb.append("Monitors=[]TotalMonitors=0");
-        }
         listener.onResponse((T) sb.toString());
     }
 
