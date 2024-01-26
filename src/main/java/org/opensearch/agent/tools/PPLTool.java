@@ -87,6 +87,8 @@ public class PPLTool implements Tool {
 
     private String contextPrompt;
 
+    private Boolean execute;
+
     private PPLModelType pplModelType;
 
     private static Gson gson = new Gson();
@@ -120,7 +122,7 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType) {
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, boolean execute) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -129,6 +131,7 @@ public class PPLTool implements Tool {
         } else {
             this.contextPrompt = contextPrompt;
         }
+        this.execute = execute;
     }
 
     @Override
@@ -169,6 +172,10 @@ public class PPLTool implements Tool {
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
+                    if (!this.execute) {
+                        listener.onResponse((T) ppl);
+                        return;
+                    }
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
                     PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
@@ -253,7 +260,8 @@ public class PPLTool implements Tool {
                 client,
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
-                (String) map.getOrDefault("model_type", "")
+                (String) map.getOrDefault("model_type", ""),
+                (boolean) map.getOrDefault("execute", true)
             );
         }
 
