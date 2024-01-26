@@ -16,6 +16,7 @@ import java.util.Map;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
@@ -43,6 +44,12 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
             );
     }
 
+    @BeforeEach
+    @SneakyThrows
+    public void prepareTest() {
+        deleteSystemIndices();
+    }
+
     @After
     @SneakyThrows
     public void tearDown() {
@@ -53,7 +60,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_withNoSystemIndex() {
-        deleteSystemIndices();
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \"" + monitorName + "\"}}";
         String result = executeAgent(agentId, agentInput);
@@ -62,7 +68,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_searchById() {
-        deleteSystemIndices();
         String monitorId = indexMonitor(getMonitorJsonString(monitorName, true));
 
         String agentId = createAgent(registerAgentRequestBody);
@@ -75,7 +80,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_singleMonitor_noFilter() {
-        deleteSystemIndices();
         indexMonitor(getMonitorJsonString(monitorName, true));
 
         String agentId = createAgent(registerAgentRequestBody);
@@ -87,8 +91,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_singleMonitor_filter() {
-        deleteSystemIndices();
-
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorId\": \"" + "foo-id" + "\"}}";
         String result = executeAgent(agentId, agentInput);
@@ -97,7 +99,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_noFilter() {
-        deleteSystemIndices();
         indexMonitor(getMonitorJsonString(monitorName, true));
         indexMonitor(getMonitorJsonString(monitorName2, false));
 
@@ -113,7 +114,6 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_filter() {
-        deleteSystemIndices();
         indexMonitor(getMonitorJsonString(monitorName, true));
         indexMonitor(getMonitorJsonString(monitorName2, false));
 
