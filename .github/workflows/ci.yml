@@ -38,7 +38,7 @@ jobs:
         java: 
           - 11
           - 17
-          - 21
+          - 21.0.1
     name: Build and Test skills plugin on Linux
     runs-on: ubuntu-latest
     container:
@@ -98,7 +98,7 @@ jobs:
         java: 
           - 11
           - 17
-          - 21
+          - 21.0.1
     name: Build and Test skills plugin on Windows
     needs: Get-CI-Image-Tag
     runs-on: windows-latest

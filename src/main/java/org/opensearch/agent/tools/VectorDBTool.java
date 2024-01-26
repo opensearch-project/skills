@@ -128,5 +128,10 @@ public class VectorDBTool extends AbstractRetrieverTool {
         public String getDefaultVersion() {
             return null;
         }
+
+        @Override
+        public String getDefaultDescription() {
+            return DEFAULT_DESCRIPTION;
+        }
     }
 }
