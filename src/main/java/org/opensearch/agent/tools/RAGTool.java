@@ -90,7 +90,6 @@ public class RAGTool extends AbstractRetrieverTool {
         this.docSize = docSize == null ? DEFAULT_DOC_SIZE : docSize;
         this.k = k == null ? DEFAULT_K : k;
         this.inferenceModelId = inferenceModelId;
-
         outputParser = new Parser() {
             @Override
             public Object parse(Object o) {
@@ -115,8 +114,7 @@ public class RAGTool extends AbstractRetrieverTool {
         }
 
         try {
-            String question = parameters.get(INPUT_FIELD);
-            input = gson.fromJson(question, String.class);
+            input = parameters.get(INPUT_FIELD);
         } catch (Exception e) {
             log.error("Failed to read question from " + INPUT_FIELD, e);
             listener.onFailure(new IllegalArgumentException("Failed to read question from " + INPUT_FIELD));
