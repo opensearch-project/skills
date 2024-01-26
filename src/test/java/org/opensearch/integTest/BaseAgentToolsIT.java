@@ -159,10 +159,8 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     protected void deleteModel(String modelId) {
         // need to undeploy first as model can be in use
         makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_undeploy", null, (String) null, null);
-
-        // after model undeploy returns, the max interval to update model status is 3s in ml-commons CronJob.
-        Thread.sleep(3000);
-
+        // wait ml-commons CronJob update model status.
+        Thread.sleep(5000);
         makeRequest(client(), "DELETE", "/_plugins/_ml/models/" + modelId, null, (String) null, null);
     }
 
