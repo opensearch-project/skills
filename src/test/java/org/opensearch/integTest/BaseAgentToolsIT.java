@@ -136,6 +136,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             if (state.equals(MLTaskState.FAILED.toString())
                 || state.equals(MLTaskState.CANCELLED.toString())
                 || state.equals(MLTaskState.COMPLETED_WITH_ERROR.toString())) {
+                logger.info("Get task response: " + responseInMap.toString());
                 fail("The task failed with state " + state);
             }
             Thread.sleep(DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND);
