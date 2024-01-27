@@ -245,7 +245,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
             sb.append("{");
             sb.append("id=").append(hit.getId()).append(",");
             sb.append("name=").append(hit.getSourceAsMap().get("name")).append(",");
-            sb.append("type=").append(hit.getSourceAsMap().get("type")).append(",");
+            sb.append("type=").append(hit.getSourceAsMap().get("detector_type")).append(",");
             sb.append("description=").append(hit.getSourceAsMap().get("description")).append(",");
             sb.append("index=").append(hit.getSourceAsMap().get("indices")).append(",");
             sb.append("lastUpdateTime=").append(hit.getSourceAsMap().get("last_update_time"));

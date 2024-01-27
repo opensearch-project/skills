@@ -117,7 +117,7 @@ public class SearchAnomalyDetectorsToolTests {
         XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
         content.startObject();
         content.field("name", testDetector.getName());
-        content.field("type", testDetector.getDetectorType());
+        content.field("detector_type", testDetector.getDetectorType());
         content.field("description", testDetector.getDescription());
         content.field("indices", testDetector.getIndices().get(0));
         content.field("last_update_time", testDetector.getLastUpdateTime().toEpochMilli());
