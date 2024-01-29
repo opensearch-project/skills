@@ -45,7 +45,7 @@ import lombok.extern.log4j.Log4j2;
 public class SearchMonitorsTool implements Tool {
     public static final String TYPE = "SearchMonitorsTool";
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool that searches alerting monitors. It takes 10 optional arguments named monitorId which defines the monitor ID to filter for (default is null), and monitorName which defines explicit name of the monitor (default is null), and monitorNamePattern which is a wildcard query to match detector name (default is null), and enabled which defines whether the monitor is enabled (default is null, indicating both), and hasTriggers which defines whether the monitor has triggers enabled (default is null, indicating both), and indices which defines the index being monitored (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the index to start from (default is 0).  The tool returns 2 values: a list of alerting monitors (each containining ID, name, type, enabled, enabled time, last update time), and the total number of monitors.";
+        "This is a tool that searches alerting monitors. It takes 10 optional arguments named monitorId which defines the monitor ID to filter for (default is null), and monitorName which defines explicit name of the monitor (default is null), and monitorNamePattern which is a wildcard query to match monitor name (default is null), and enabled which defines whether the monitor is enabled (default is null, indicating both enabled and disabled), and hasTriggers which defines whether the monitor has triggers enabled (default is null, indicating both), and indices which defines the index being monitored (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the paginated index to start from (default is 0).  The tool returns 2 values: a list of alerting monitors (each containining monitor ID, monitor name, monitor type (indicating query-level, document-level, or bucket-level monitor types), enabled, enabled time in epoch milliseconds, last update time in epoch milliseconds), and the total number of alerting monitors.";
     @Setter
     @Getter
     private String name = TYPE;
@@ -185,7 +185,7 @@ public class SearchMonitorsTool implements Tool {
             sb.append("{");
             sb.append("id=").append(hit.getId()).append(",");
             sb.append("name=").append(monitorAsMap.get("name")).append(",");
-            sb.append("type=").append(monitorAsMap.get("type")).append(",");
+            sb.append("type=").append(monitorAsMap.get("monitor_type")).append(",");
             sb.append("enabled=").append(monitorAsMap.get("enabled")).append(",");
             sb.append("enabledTime=").append(monitorAsMap.get("enabled_time")).append(",");
             sb.append("lastUpdateTime=").append(monitorAsMap.get("last_update_time"));
