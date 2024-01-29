@@ -217,7 +217,7 @@ public class SearchMonitorsToolTests {
             .startObject()
             .startObject("monitor")
             .field("name", monitor.getName())
-            .field("type", monitor.getType())
+            .field("monitor_type", monitor.getType())
             .field("enabled", Boolean.toString(monitor.getEnabled()))
             .field("enabled_time", Long.toString(monitor.getEnabledTime().toEpochMilli()))
             .field("last_update_time", Long.toString(monitor.getLastUpdateTime().toEpochMilli()))
