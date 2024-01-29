@@ -144,14 +144,9 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             return;
         }
 
-        String lockId = lockId();
-        Runnable releaseLock = () -> lockService
-            .deleteLock(
-                lockId,
-                ActionListener.wrap(d -> log.debug("{} release lock", jobName), ex -> log.error("{} release lock failed", jobName, ex))
-            );
+        String jobId = jobId();
 
-        lockService.acquireLockWithId(jobName, JOB_LOCK_INTERVAL.seconds(), lockId, ActionListener.wrap(lockModel -> {
+        lockService.acquireLockWithId(jobName, JOB_LOCK_INTERVAL.seconds(), jobId, ActionListener.wrap(lockModel -> {
 
             threadPool.executor(INDEX_SUMMARY_JOB_THREAD_POOL).submit(() -> {
                 if (lockModel == null) {
@@ -159,10 +154,18 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                     return;
                 }
 
-                log.info("{} starts", jobName);
+                log.info("{} starts with id {}", jobName, jobId);
+
+                String lockId = lockModel.getLockId();
+
+                Runnable releaseLock = () -> lockService
+                        .deleteLock(
+                                lockId,
+                                ActionListener.wrap(d -> log.debug("{} release lock {}", jobName, lockId), ex -> log.error("{} release lock {} failed", jobName, lockId, ex))
+                        );
 
                 // search agent with IndexRoutingTool
-                mlClients.getModelIdsForIndexRoutingTool(adhocAgentId, ActionListener.wrap(embeddingModelIds -> {
+                mlClients.getModelIdsForIndexRoutingTool(adhocAgentId, ActionListener.runAfter(ActionListener.wrap(embeddingModelIds -> {
                     // no embedding model
                     if (embeddingModelIds.isEmpty()) {
                         return;
@@ -205,24 +208,21 @@ public class IndexSummaryEmbeddingJob implements Runnable {
                         }
                     }
 
-                    log.debug("{} finished", jobName);
-                    releaseLock.run();
-                }, e -> log.error("Search agent error happened", e)));
+                    log.debug("{} with id {} finished", jobName, jobId);
+                }, e -> log.error("Search agent error happened", e)), releaseLock));
             });
-        }, ex -> log.debug("can't acquired lock for {}", jobName, ex)));
-
+        }, ex -> log.debug("Can't acquired lock for {} with id {}", jobName, jobId, ex)));
     }
 
-    private String lockId() {
+    private String jobId() {
         if (adhocIndexName != null && !adhocIndexName.isEmpty()) {
-            return String.format(Locale.ROOT, "%s-%s", jobName, String.join("_", adhocIndexName));
+            return adhocIndexName.get(0);
         } else if (adhocAgentId != null) {
-            return String.format(Locale.ROOT, "%s-%s", jobName, adhocAgentId);
+            return adhocAgentId;
         } else if (incremental) {
-            return String.format(Locale.ROOT, "%s-incremental", jobName);
-        } else {
-            return jobName;
+            return "incremental";
         }
+        return "full";
     }
 
     /**
@@ -237,19 +237,7 @@ public class IndexSummaryEmbeddingJob implements Runnable {
 
         if (incremental) {
             try {
-                SearchRequest searchRequest = Requests.searchRequest(INDEX_SUMMARY_EMBEDDING_INDEX);
-                TermQueryBuilder termQueryBuilder = QueryBuilders.termQuery(SAMPLE_DATA_INCLUDED_FIELD, false);
-                searchRequest.source(new SearchSourceBuilder().query(termQueryBuilder).fetchField(INDEX_NAME_FIELD).size(1000));
-
-                ActionFuture<SearchResponse> searchFuture = client.search(searchRequest);
-                List<String> indexWithoutSampleData = new ArrayList<>();
-                SearchResponse response = searchFuture.actionGet(DEFAULT_TIMEOUT_SECOND, TimeUnit.SECONDS);
-
-                for (SearchHit hit : response.getHits()) {
-                    String indexName = (String) hit.getSourceAsMap().get(INDEX_NAME_FIELD);
-                    indexWithoutSampleData.add(indexName);
-                }
-
+                List<String> indexWithoutSampleData = SearchIndexesWithoutSampleData();
                 indices = filterByIndexNames(indices, indexWithoutSampleData);
             } catch (Exception e) {
                 return Map.of();
@@ -346,7 +334,12 @@ public class IndexSummaryEmbeddingJob implements Runnable {
             List<String> sampleDataList = Optional.ofNullable((List<String>) summaryMap.remove(SAMPLE_DATA)).orElse(List.of());
             String mapping = (String) summaryMap.remove(MAPPING);
             String indexSummaryStr = String
-                .format(Locale.ROOT, "Index Mappings:%s\\nSample data:\\n%s", mapping, sampleDataList.subList(0, nSample));
+                .format(
+                    Locale.ROOT,
+                    "Index Mappings:%s\\nSample data:\\n%s",
+                    mapping,
+                    sampleDataList.subList(0, Math.min(nSample, sampleDataList.size()))
+                );
             summaryMap.put(INDEX_SUMMARY_FIELD, indexSummaryStr);
             summaryMap.put(SAMPLE_DATA_INCLUDED_FIELD, !sampleDataList.isEmpty());
             summaryMap.put(INDEX_SUMMARY_SIGN_FIELD, mappingSignature(mapping));
@@ -401,6 +394,29 @@ public class IndexSummaryEmbeddingJob implements Runnable {
         }
 
         return indexMetaAndSamplesMap;
+    }
+
+    /**
+     * Search all indexes without sample data included in index summary embedding index
+     * @return index names list
+     */
+    private List<String> SearchIndexesWithoutSampleData() {
+        List<String> indexWithoutSampleData = new ArrayList<>();
+
+        SearchRequest searchRequest = Requests.searchRequest(INDEX_SUMMARY_EMBEDDING_INDEX);
+        TermQueryBuilder termQueryBuilder = QueryBuilders.termQuery(SAMPLE_DATA_INCLUDED_FIELD, false);
+        searchRequest.source(new SearchSourceBuilder().query(termQueryBuilder).fetchField(INDEX_NAME_FIELD).size(1000));
+
+        ActionFuture<SearchResponse> searchFuture = client.search(searchRequest);
+        SearchResponse response = searchFuture.actionGet(DEFAULT_TIMEOUT_SECOND, TimeUnit.SECONDS);
+
+        log.debug("Total have {} indexes found without sample data included", response.getHits().getTotalHits().toString());
+
+        for (SearchHit hit : response.getHits()) {
+            String indexName = (String) hit.getSourceAsMap().get(INDEX_NAME_FIELD);
+            indexWithoutSampleData.add(indexName);
+        }
+        return indexWithoutSampleData;
     }
 
     private static String mappingSignature(String mapping) {

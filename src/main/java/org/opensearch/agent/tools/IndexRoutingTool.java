@@ -34,6 +34,7 @@ import org.opensearch.agent.tools.utils.LLMProvider;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.output.model.ModelTensor;
@@ -156,46 +157,48 @@ public class IndexRoutingTool extends VectorDBTool {
             return;
         }
 
-        // get index of knn-index
-        super.run(parameters, ActionListener.wrap(res -> {
-            List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;
+        try (ThreadContext.StoredContext ignored = client.threadPool().getThreadContext().stashContext()) {
+            // get index of knn-index
+            super.run(parameters, ActionListener.wrap(res -> {
+                List<Map<String, Object>> summaries = (List<Map<String, Object>>) res;
 
-            if (summaries.isEmpty()) {
-                listener.onResponse((T) NOT_SURE);
-                return;
-            }
+                if (summaries.isEmpty()) {
+                    listener.onResponse((T) NOT_SURE);
+                    return;
+                }
 
-            // build prompt
-            String summaryStr = summaries
-                .stream()
-                .map(
-                    summaryMap -> String
-                        .format(
-                            Locale.ROOT,
-                            "%s:%s",
-                            summaryMap.get(IndexSummaryEmbeddingJob.INDEX_NAME_FIELD),
-                            summaryMap.get(IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD)
-                        )
-                )
-                .collect(Collectors.joining("\\n---\\n"));
+                // build prompt
+                String summaryStr = summaries
+                    .stream()
+                    .map(
+                        summaryMap -> String
+                            .format(
+                                Locale.ROOT,
+                                "%s:%s",
+                                summaryMap.get(IndexSummaryEmbeddingJob.INDEX_NAME_FIELD),
+                                summaryMap.get(IndexSummaryEmbeddingJob.INDEX_SUMMARY_FIELD)
+                            )
+                    )
+                    .collect(Collectors.joining("\\n---\\n"));
 
-            // call LLM, MLModelTool
-            String question = parameters.get(INPUT_FIELD);
-            String prompt = buildFinalPrompt(summaryStr, question);
-            log.debug("prompt send to inference is {}", prompt);
-            // TODO use MLModelTool
-            mlClients.inference(inferenceModelId, prompt, ActionListener.wrap(r -> {
-                ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
-                ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
-                String response = (String) modelTensor.getDataAsMap().get("response");
-                log.debug("response back from inference mode is {}", response);
-                Set<String> validIndexes = findMatchedIndex(response, summaries);
-                listener.onResponse((T) (validIndexes.isEmpty() ? NOT_SURE : validIndexes.iterator().next()));
-            }, exception -> { listener.onResponse((T) NOT_SURE); }));
-        }, exception -> {
-            log.error("Failed to query index");
-            listener.onFailure(exception);
-        }));
+                // call LLM, MLModelTool
+                String question = parameters.get(INPUT_FIELD);
+                String prompt = buildFinalPrompt(summaryStr, question);
+                log.debug("prompt send to inference is {}", prompt);
+                // TODO use MLModelTool
+                mlClients.inference(inferenceModelId, prompt, ActionListener.wrap(r -> {
+                    ModelTensorOutput output = (ModelTensorOutput) r.getOutput();
+                    ModelTensor modelTensor = output.getMlModelOutputs().get(0).getMlModelTensors().get(0);
+                    String response = (String) modelTensor.getDataAsMap().get("response");
+                    log.debug("response back from inference mode is {}", response);
+                    Set<String> validIndexes = findMatchedIndex(response, summaries);
+                    listener.onResponse((T) (validIndexes.isEmpty() ? NOT_SURE : validIndexes.iterator().next()));
+                }, exception -> { listener.onResponse((T) NOT_SURE); }));
+            }, exception -> {
+                log.error("Failed to query index");
+                listener.onFailure(exception);
+            }));
+        }
     }
 
     private Set<String> findMatchedIndex(String result, List<Map<String, Object>> candidates) {

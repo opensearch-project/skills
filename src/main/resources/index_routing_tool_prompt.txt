@@ -27,6 +27,7 @@ Format the output as a comma-separated sequence, e.g. index-1, index-2, index-3.
 appear relevant to the question, return the empty string ''.
 
 Just return the index names, nothing else.
+If the question already contains the relevant index, just return that index.
 If you are not sure, just return 'Not sure', nothing else.
 
 Question: ${question}

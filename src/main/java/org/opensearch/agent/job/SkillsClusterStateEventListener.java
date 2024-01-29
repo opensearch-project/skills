@@ -108,23 +108,32 @@ public class SkillsClusterStateEventListener implements ClusterStateListener {
         if (event.nodesChanged() || event.isNewCluster()) {
             cancel();
             startJob(true);
+            return;
         }
 
         // additional check for index deleted and created
-        IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(
-            client,
-            clusterService,
-            indicesHelper,
-            mlClients,
-            lockService,
-            threadPool
-        );
         if (!event.indicesCreated().isEmpty()) {
+            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(
+                client,
+                clusterService,
+                indicesHelper,
+                mlClients,
+                lockService,
+                threadPool
+            );
             job.setAdhocIndexName(event.indicesCreated());
             threadPool.schedule(job, TimeValue.timeValueMinutes(1), INDEX_SUMMARY_JOB_THREAD_POOL);
         }
 
         if (!event.indicesDeleted().isEmpty() && clusterService.state().metadata().hasIndex(SKILLS_INDEX_SUMMARY.getIndexName())) {
+            IndexSummaryEmbeddingJob job = new IndexSummaryEmbeddingJob(
+                client,
+                clusterService,
+                indicesHelper,
+                mlClients,
+                lockService,
+                threadPool
+            );
             threadPool.executor(INDEX_SUMMARY_JOB_THREAD_POOL).execute(() -> {
                 List<String> indexNames = event.indicesDeleted().stream().map(Index::getName).collect(Collectors.toList());
                 job.bulkDelete(SKILLS_INDEX_SUMMARY.getIndexName(), indexNames);
