@@ -244,6 +244,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
+    @SneakyThrows
+    protected void addDocToIndex(String indexName, String docId, String contents) {
+        Response response = makeRequest(client(), "POST", "/" + indexName + "/_doc/" + docId + "?refresh=true", null, contents, null);
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
     public String createAgent(String requestBody) {
         Response response = makeRequest(client(), "POST", "/_plugins/_ml/agents/_register", null, requestBody, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
