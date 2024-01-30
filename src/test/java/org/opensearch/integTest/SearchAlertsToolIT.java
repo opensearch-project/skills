@@ -128,26 +128,26 @@ public class SearchAlertsToolIT extends BaseAgentToolsIT {
     }
 
     @SneakyThrows
-    public void testSearchAlertsToolInFlowAgent_multipleAlerts_complex() {
+    public void testSearchAlertsToolInFlowAgent_multipleAlerts_complexParams() {
         setupAlertingSystemIndices();
+        String monitorId2 = monitorId + "2";
+        String monitorId3 = monitorId + "3";
         ingestSampleAlert(monitorId, "1");
-        ingestSampleAlert(monitorId + "foo", "2");
-        ingestSampleAlert(monitorId + "bar", "3");
+        ingestSampleAlert(monitorId2, "2");
+        ingestSampleAlert(monitorId3, "3");
         String agentId = createAgent(registerAgentRequestBody);
-        // TODO: make more complex and add more params to check here
+        String agentInput = "{\"parameters\":{\"monitorIds\": "
+            + "[ \""
+            + monitorId
+            + "\", \""
+            + monitorId2
+            + "\", \""
+            + monitorId3
+            + "\" ], "
+            + "\"sortOrder\": \"asc\", \"sortString\": \"monitor_name.keyword\", \"size\": 3, \"startIndex\": 0, \"severityLevel\": \"ALL\", \"alertState\": \"ALL\" } }";
 
-
-
-
-
-
-
-
-
-        
-        String agentInput = "{\"parameters\":{\"monitorId\": \"" + monitorId + "\"}}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains("TotalAlerts=1"));
+        assertTrue(result.contains("TotalAlerts=3"));
     }
 
     @SneakyThrows

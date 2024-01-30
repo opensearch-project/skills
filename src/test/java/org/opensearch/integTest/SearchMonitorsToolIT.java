@@ -114,4 +114,17 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         assertTrue(result.contains("enabled=true"));
         assertTrue(result.contains("TotalMonitors=1"));
     }
+
+    @SneakyThrows
+    public void testSearchMonitorsToolInFlowAgent_multipleMonitors_complexParams() {
+        indexMonitor(TestHelpers.getMonitorJsonString(monitorName, true));
+        indexMonitor(TestHelpers.getMonitorJsonString(monitorName2, false));
+
+        String agentId = createAgent(registerAgentRequestBody);
+        String agentInput = "{\"parameters\":{\"monitorName\": \""
+            + monitorName
+            + "\", \"enabled\": true, \"hasTriggers\": false, \"sortOrder\": \"asc\", \"sortString\": \"monitor.name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
+        String result = executeAgent(agentId, agentInput);
+        assertTrue(result.contains("TotalMonitors=1"));
+    }
 }
