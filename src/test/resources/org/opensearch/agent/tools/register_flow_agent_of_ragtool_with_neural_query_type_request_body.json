@@ -1,0 +1,24 @@
+{
+  "name": "Test_Agent_For_RagTool",
+  "type": "flow",
+  "description": "this is a test flow agent in flow",
+  "tools": [
+    {
+      "type": "RAGTool",
+      "description": "A description of the tool",
+      "parameters": {
+        "embedding_model_id": "<MODEL_ID>",
+        "inference_model_id": "c8NwFo0BY4jgIz2mgLNH",
+        "index": "<INDEX_NAME>",
+        "embedding_field": "embedding",
+        "query_type": "neural",
+        "enable_Content_Generation":"false",
+        "source_field": [
+          "text"
+        ],
+        "input": "${parameters.question}",
+        "prompt": "\n\nHuman:You are a professional data analysist. You will always answer question based on the given context first. If the answer is not directly shown in the context, you will analyze the data and find the answer. If you don't know the answer, just say don't know. \n\n Context:\n${parameters.output_field}\n\nHuman:${parameters.question}\n\nAssistant:"
+      }
+    }
+  ]
+}
