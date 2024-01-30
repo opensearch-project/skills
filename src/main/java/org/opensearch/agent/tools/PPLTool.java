@@ -263,7 +263,7 @@ public class PPLTool implements Tool {
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
-                Boolean.valueOf((String) map.getOrDefault("execute", true))
+                Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
 
