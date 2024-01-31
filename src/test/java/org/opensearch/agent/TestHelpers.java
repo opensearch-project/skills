@@ -10,12 +10,8 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
-import org.json.JSONObject;
 import org.mockito.Mockito;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
@@ -64,21 +60,5 @@ public class TestHelpers {
         content.field("name", detectorName);
         content.endObject();
         return new SearchHit(0, detectorId, null, null).sourceRef(BytesReference.bytes(content));
-    }
-
-    public static String getMonitorJsonString(String monitorName, boolean enabled) {
-        JSONObject jsonObj = new JSONObject();
-        jsonObj.put("type", "monitor");
-        jsonObj.put("name", monitorName);
-        jsonObj.put("enabled", String.valueOf(enabled));
-        jsonObj.put("inputs", Collections.emptyList());
-        jsonObj.put("triggers", Collections.emptyList());
-        Map scheduleMap = new HashMap<String, Object>();
-        Map periodMap = new HashMap<String, Object>();
-        periodMap.put("interval", 5);
-        periodMap.put("unit", "MINUTES");
-        scheduleMap.put("period", periodMap);
-        jsonObj.put("schedule", scheduleMap);
-        return jsonObj.toString();
     }
 }
