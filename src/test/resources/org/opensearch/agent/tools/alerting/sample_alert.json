@@ -1,0 +1,23 @@
+{
+    "monitor_id": "foo-monitor-id",
+    "workflow_id": "",
+    "workflow_name": "",
+    "associated_alert_ids": [],
+    "schema_version": 5,
+    "monitor_version": 1,
+    "monitor_name": "foo-monitor",
+    "execution_id": "foo-execution-id",
+    "trigger_id": "foo-trigger-id",
+    "trigger_name": "foo-trigger-name",
+    "finding_ids": [],
+    "related_doc_ids": [],
+    "state": "COMPLETED",
+    "error_message": null,
+    "alert_history": [],
+    "severity": "2",
+    "action_execution_results": [],
+    "start_time": 1234,
+    "last_notification_time": 1234,
+    "end_time": 1234,
+    "acknowledged_time": null
+}

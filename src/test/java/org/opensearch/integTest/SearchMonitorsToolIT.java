@@ -9,14 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
-import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.jupiter.api.BeforeEach;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
@@ -24,24 +23,19 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class SearchMonitorsToolIT extends BaseAgentToolsIT {
     private String registerAgentRequestBody;
+    private String sampleMonitor;
     private static final String monitorName = "foo-name";
     private static final String monitorName2 = "bar-name";
+    private static final String registerAgentFilepath =
+        "org/opensearch/agent/tools/alerting/register_flow_agent_of_search_monitors_tool_request_body.json";
+    private static final String sampleMonitorFilepath = "org/opensearch/agent/tools/alerting/sample_monitor.json";
 
     @Before
     @SneakyThrows
     public void setUp() {
         super.setUp();
-        registerAgentRequestBody = Files
-            .readString(
-                Path
-                    .of(
-                        this
-                            .getClass()
-                            .getClassLoader()
-                            .getResource("org/opensearch/agent/tools/register_flow_agent_of_search_monitors_tool_request_body.json")
-                            .toURI()
-                    )
-            );
+        registerAgentRequestBody = Files.readString(Path.of(this.getClass().getClassLoader().getResource(registerAgentFilepath).toURI()));
+        sampleMonitor = Files.readString(Path.of(this.getClass().getClassLoader().getResource(sampleMonitorFilepath).toURI()));
     }
 
     @BeforeEach
@@ -68,7 +62,7 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_searchById() {
-        String monitorId = indexMonitor(getMonitorJsonString(monitorName, true));
+        String monitorId = ingestSampleMonitor(monitorName, true);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorId\": \"" + monitorId + "\"}}";
@@ -80,7 +74,7 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_singleMonitor_noFilter() {
-        indexMonitor(getMonitorJsonString(monitorName, true));
+        ingestSampleMonitor(monitorName, true);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
@@ -99,8 +93,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_noFilter() {
-        indexMonitor(getMonitorJsonString(monitorName, true));
-        indexMonitor(getMonitorJsonString(monitorName2, false));
+        ingestSampleMonitor(monitorName, true);
+        ingestSampleMonitor(monitorName2, false);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
@@ -114,8 +108,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_filter() {
-        indexMonitor(getMonitorJsonString(monitorName, true));
-        indexMonitor(getMonitorJsonString(monitorName2, false));
+        ingestSampleMonitor(monitorName, true);
+        ingestSampleMonitor(monitorName2, false);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \"" + monitorName + "\"}}";
@@ -126,20 +120,23 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         assertTrue(result.contains("TotalMonitors=1"));
     }
 
-    // Helper fn to create the JSON string to use in a REST request body when indexing a monitor
-    private String getMonitorJsonString(String monitorName, boolean enabled) {
-        JSONObject jsonObj = new JSONObject();
-        jsonObj.put("type", "monitor");
-        jsonObj.put("name", monitorName);
-        jsonObj.put("enabled", String.valueOf(enabled));
-        jsonObj.put("inputs", Collections.emptyList());
-        jsonObj.put("triggers", Collections.emptyList());
-        Map scheduleMap = new HashMap<String, Object>();
-        Map periodMap = new HashMap<String, Object>();
-        periodMap.put("interval", 5);
-        periodMap.put("unit", "MINUTES");
-        scheduleMap.put("period", periodMap);
-        jsonObj.put("schedule", scheduleMap);
-        return jsonObj.toString();
+    @SneakyThrows
+    public void testSearchMonitorsToolInFlowAgent_multipleMonitors_complexParams() {
+        ingestSampleMonitor(monitorName, true);
+        ingestSampleMonitor(monitorName2, false);
+
+        String agentId = createAgent(registerAgentRequestBody);
+        String agentInput = "{\"parameters\":{\"monitorName\": \""
+            + monitorName
+            + "\", \"enabled\": true, \"hasTriggers\": false, \"sortOrder\": \"asc\", \"sortString\": \"monitor.name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
+        String result = executeAgent(agentId, agentInput);
+        assertTrue(result.contains("TotalMonitors=1"));
+    }
+
+    private String ingestSampleMonitor(String monitorName, boolean enabled) {
+        JsonObject sampleMonitorJson = new Gson().fromJson(sampleMonitor, JsonObject.class);
+        sampleMonitorJson.addProperty("name", monitorName);
+        sampleMonitorJson.addProperty("enabled", String.valueOf(enabled));
+        return indexMonitor(sampleMonitorJson.toString());
     }
 }
