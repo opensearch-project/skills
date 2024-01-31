@@ -1,0 +1,161 @@
+{
+    "mappings": {
+        "dynamic": "false",
+        "_meta": {
+            "schema_version": 5
+        },
+        "properties": {
+            "anomaly_grade": {
+                "type": "double"
+            },
+            "anomaly_score": {
+                "type": "double"
+            },
+            "approx_anomaly_start_time": {
+                "type": "date",
+                "format": "strict_date_time||epoch_millis"
+            },
+            "confidence": {
+                "type": "double"
+            },
+            "data_end_time": {
+                "type": "date",
+                "format": "strict_date_time||epoch_millis"
+            },
+            "data_start_time": {
+                "type": "date",
+                "format": "strict_date_time||epoch_millis"
+            },
+            "detector_id": {
+                "type": "keyword"
+            },
+            "entity": {
+                "type": "nested",
+                "properties": {
+                    "name": {
+                        "type": "keyword"
+                    },
+                    "value": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "error": {
+                "type": "text"
+            },
+            "execution_end_time": {
+                "type": "date",
+                "format": "strict_date_time||epoch_millis"
+            },
+            "execution_start_time": {
+                "type": "date",
+                "format": "strict_date_time||epoch_millis"
+            },
+            "expected_values": {
+                "type": "nested",
+                "properties": {
+                    "likelihood": {
+                        "type": "double"
+                    },
+                    "value_list": {
+                        "type": "nested",
+                        "properties": {
+                            "data": {
+                                "type": "double"
+                            },
+                            "feature_id": {
+                                "type": "keyword"
+                            }
+                        }
+                    }
+                }
+            },
+            "feature_data": {
+                "type": "nested",
+                "properties": {
+                    "data": {
+                        "type": "double"
+                    },
+                    "feature_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "is_anomaly": {
+                "type": "boolean"
+            },
+            "model_id": {
+                "type": "keyword"
+            },
+            "past_values": {
+                "type": "nested",
+                "properties": {
+                    "data": {
+                        "type": "double"
+                    },
+                    "feature_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "relevant_attribution": {
+                "type": "nested",
+                "properties": {
+                    "data": {
+                        "type": "double"
+                    },
+                    "feature_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "schema_version": {
+                "type": "integer"
+            },
+            "task_id": {
+                "type": "keyword"
+            },
+            "threshold": {
+                "type": "double"
+            },
+            "user": {
+                "type": "nested",
+                "properties": {
+                    "backend_roles": {
+                        "type": "text",
+                        "fields": {
+                            "keyword": {
+                                "type": "keyword"
+                            }
+                        }
+                    },
+                    "custom_attribute_names": {
+                        "type": "text",
+                        "fields": {
+                            "keyword": {
+                                "type": "keyword"
+                            }
+                        }
+                    },
+                    "name": {
+                        "type": "text",
+                        "fields": {
+                            "keyword": {
+                                "type": "keyword",
+                                "ignore_above": 256
+                            }
+                        }
+                    },
+                    "roles": {
+                        "type": "text",
+                        "fields": {
+                            "keyword": {
+                                "type": "keyword"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
