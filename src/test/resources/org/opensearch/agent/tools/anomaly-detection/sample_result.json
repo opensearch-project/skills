@@ -1,0 +1,19 @@
+{
+    "detector_id": "foo-id",
+    "schema_version": 5,
+    "data_start_time": 1234,
+    "data_end_time": 1234,
+    "feature_data": [
+        {
+            "feature_id": "foo-feature-id",
+            "feature_name": "foo-feature-name",
+            "data": 1
+        }
+    ],
+    "execution_start_time": 1234,
+    "execution_end_time": 1234,
+    "anomaly_score": 0.5,
+    "anomaly_grade": 0.5,
+    "confidence": 0.5,
+    "threshold": 0.8
+}

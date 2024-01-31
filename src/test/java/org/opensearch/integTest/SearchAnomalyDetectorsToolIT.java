@@ -27,7 +27,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
     private String sampleIndexMappings;
     private static final String detectorName = "foo-name";
     private static final String registerAgentFilepath =
-        "org/opensearch/agent/tools/register_flow_agent_of_search_detectors_tool_request_body.json";
+        "org/opensearch/agent/tools/anomaly-detection/register_flow_agent_of_search_anomaly_detectors_tool_request_body.json";
     private static final String detectorsIndexMappingsFilepath =
         "org/opensearch/agent/tools/anomaly-detection/detectors_index_mappings.json";
     private static final String sampleDetectorFilepath = "org/opensearch/agent/tools/anomaly-detection/sample_detector.json";

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.jupiter.api.BeforeEach;
+import org.opensearch.agent.tools.utils.ToolConstants;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -152,14 +153,14 @@ public class SearchAlertsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     private void setupAlertingSystemIndices() {
-        createIndexWithConfiguration(".opendistro-alerting-alerts", alertsIndexMappings);
-        createIndexWithConfiguration(".opendistro-alerting-config", alertingConfigIndexMappings);
+        createIndexWithConfiguration(ToolConstants.ALERTING_ALERTS_INDEX, alertsIndexMappings);
+        createIndexWithConfiguration(ToolConstants.ALERTING_CONFIG_INDEX, alertingConfigIndexMappings);
     }
 
     private void ingestSampleAlert(String monitorId, String docId) {
         JsonObject sampleAlertJson = new Gson().fromJson(sampleAlert, JsonObject.class);
         sampleAlertJson.addProperty("monitor_id", monitorId);
-        addDocToIndex(".opendistro-alerting-alerts", docId, sampleAlertJson.toString());
+        addDocToIndex(ToolConstants.ALERTING_ALERTS_INDEX, docId, sampleAlertJson.toString());
     }
 
 }
