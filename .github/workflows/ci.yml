@@ -35,10 +35,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: 
-          - 11
-          - 17
-          - 21.0.1
+        java: [11, 17, 21]
     name: Build and Test skills plugin on Linux
     runs-on: ubuntu-latest
     container:
@@ -71,7 +68,7 @@ jobs:
   build-MacOS:
     strategy:
       matrix:
-        java: [ 11, 17 ]
+        java: [11, 17, 21]
 
     name: Build and Test skills Plugin on MacOS
     needs: Get-CI-Image-Tag
@@ -95,10 +92,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        java: 
-          - 11
-          - 17
-          - 21.0.1
+        java: [11, 17, 21]
     name: Build and Test skills plugin on Windows
     needs: Get-CI-Image-Tag
     runs-on: windows-latest

@@ -68,6 +68,11 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         server.stop(1);
     }
 
+    @After
+    public void deleteModel() {
+        deleteModel(modelId);
+    }
+
     private String setUpConnector() {
         String url = String.format(Locale.ROOT, "http://127.0.0.1:%d/invoke", server.getAddress().getPort());
         return createConnector(
