@@ -17,9 +17,9 @@ buildscript {
 
     repositories {
         mavenLocal()
-        mavenCentral()
-        maven { url "https://plugins.gradle.org/m2/" }
         maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+        maven { url "https://plugins.gradle.org/m2/" }
+        mavenCentral()
     }
 
     dependencies {
@@ -45,7 +45,7 @@ repositories {
 }
 
 allprojects {
-    group 'org.opensearch.plugin'
+    group 'org.opensearch'
     version = opensearch_version.tokenize('-')[0] + '.0'
     if (buildVersionQualifier) {
         version += "-${buildVersionQualifier}"
@@ -176,6 +176,7 @@ dependencyLicenses.enabled = false
 loggerUsageCheck.enabled = false
 testingConventions.enabled = false
 thirdPartyAudit.enabled = false
+publishNebulaPublicationToMavenLocal.enabled = false
 
 test {
     testLogging {
