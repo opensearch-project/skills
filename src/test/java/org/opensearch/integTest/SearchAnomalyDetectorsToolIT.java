@@ -99,9 +99,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"detectorName\": \""
             + detectorName
-            + "\", \"highCardinality\": false, \"sortOrder\": \"asc\", \"sortString\": \"name.keyword\", \"size\": 10, \"startIndex\": 0, \"disabled\": true }}";
-            //String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
-
+            + "\", \"highCardinality\": false, \"sortOrder\": \"asc\", \"sortString\": \"name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
         String result = executeAgent(agentId, agentInput);
         assertTrue(result.contains(String.format("id=%s", detectorId)));
         assertTrue(result.contains(String.format("name=%s", detectorName)));

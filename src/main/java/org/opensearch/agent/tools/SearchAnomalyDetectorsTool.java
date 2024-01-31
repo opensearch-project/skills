@@ -160,7 +160,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
                     GetAnomalyDetectorRequest profileRequest = new GetAnomalyDetectorRequest(
                         hit.getId(),
                         Versions.MATCH_ANY,
-                        true,
+                        false,
                         true,
                         "",
                         "",
