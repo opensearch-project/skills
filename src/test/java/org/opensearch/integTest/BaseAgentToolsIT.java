@@ -125,6 +125,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return parseFieldFromResponse(response, "_id").toString();
     }
 
+    protected String indexDetector(String detectorAsJsonString) {
+        Response response = makeRequest(client(), "POST", "_plugins/_anomaly_detection/detectors", null, detectorAsJsonString, null);
+
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, "_id").toString();
+    }
+
     @SneakyThrows
     protected Map<String, Object> waitResponseMeetingCondition(
         String method,
@@ -239,6 +246,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             builder.toString(),
             null
         );
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
+    @SneakyThrows
+    protected void addDocToIndex(String indexName, String docId, String contents) {
+        Response response = makeRequest(client(), "POST", "/" + indexName + "/_doc/" + docId + "?refresh=true", null, contents, null);
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
