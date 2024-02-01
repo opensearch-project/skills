@@ -47,7 +47,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
             connectorId = setUpConnector();
         } catch (Exception e) {
             // Wait for ML encryption master key has been initialized
-            TimeUnit.SECONDS.sleep(10);
+            TimeUnit.SECONDS.sleep(15);
             connectorId = setUpConnector();
         }
         modelGroupId = setupModelGroup();
