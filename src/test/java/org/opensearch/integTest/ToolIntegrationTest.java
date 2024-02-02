@@ -43,13 +43,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         server = MockHttpServer.setupMockLLM(promptHandlers());
         server.start();
         clusterSettings(false);
-        try {
-            connectorId = setUpConnector();
-        } catch (Exception e) {
-            // Wait for ML encryption master key has been initialized
-            TimeUnit.SECONDS.sleep(15);
-            connectorId = setUpConnector();
-        }
+        connectorId = setUpConnectorWithRetry(5);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
         // wait for model to get deployed
@@ -71,6 +65,23 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
     @After
     public void deleteModel() {
         deleteModel(modelId);
+    }
+
+    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException {
+        int retryTimes = 0;
+        String connectorId = null;
+        while (retryTimes < maxRetryTimes) {
+            try {
+                connectorId = setUpConnector();
+                break;
+            } catch (Exception e) {
+                // Wait for ML encryption master key has been initialized
+                log.info("Failed to setup connector, retry times: {}", retryTimes);
+                retryTimes++;
+                TimeUnit.SECONDS.sleep(10);
+            }
+        }
+        return connectorId;
     }
 
     private String setUpConnector() {
