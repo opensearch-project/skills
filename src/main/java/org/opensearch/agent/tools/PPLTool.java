@@ -173,7 +173,8 @@ public class PPLTool implements Tool {
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
                     if (!this.execute) {
-                        listener.onResponse((T) ppl);
+                        Map<String, String> ret = ImmutableMap.of("ppl", ppl);
+                        listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
                         return;
                     }
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
