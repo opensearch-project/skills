@@ -16,6 +16,8 @@ import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 import org.opensearch.core.rest.RestStatus;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
 import lombok.extern.log4j.Log4j2;
@@ -86,7 +88,7 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
     }
 
     private String extractAdditionalInfo(String responseStr) {
-        return JsonParser
+        JsonArray output = JsonParser
             .parseString(responseStr)
             .getAsJsonObject()
             .get("inference_results")
@@ -94,14 +96,19 @@ public class VisualizationsToolIT extends ToolIntegrationTest {
             .get(0)
             .getAsJsonObject()
             .get("output")
-            .getAsJsonArray()
-            .get(0)
-            .getAsJsonObject()
-            .get("dataAsMap")
-            .getAsJsonObject()
-            .get("additional_info")
-            .getAsJsonObject()
-            .get(String.format(Locale.ROOT, "%s.output", toolType()))
-            .getAsString();
+            .getAsJsonArray();
+        for (JsonElement element : output) {
+            if ("response".equals(element.getAsJsonObject().get("name").getAsString())) {
+                return element
+                    .getAsJsonObject()
+                    .get("dataAsMap")
+                    .getAsJsonObject()
+                    .get("additional_info")
+                    .getAsJsonObject()
+                    .get(String.format(Locale.ROOT, "%s.output", toolType()))
+                    .getAsString();
+            }
+        }
+        return null;
     }
 }
