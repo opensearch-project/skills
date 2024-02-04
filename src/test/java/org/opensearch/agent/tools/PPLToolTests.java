@@ -224,7 +224,10 @@ public class PPLToolTests {
                 assertEquals(pplResult, "ppl result");
             }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
         );
-        assertEquals("Parameter index and question can not be null or empty.", exception.getMessage());
+        assertEquals(
+            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name",
+            exception.getMessage()
+        );
     }
 
     @Test
