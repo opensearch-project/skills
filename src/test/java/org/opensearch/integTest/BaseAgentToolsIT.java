@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +36,7 @@ import org.opensearch.ml.common.MLModel;
 import org.opensearch.ml.common.MLTask;
 import org.opensearch.ml.common.MLTaskState;
 import org.opensearch.ml.common.input.execute.agent.AgentMLInput;
+import org.opensearch.ml.common.model.MLModelState;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
@@ -57,7 +59,9 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         updateClusterSettings("plugins.ml_commons.only_run_on_ml_node", false);
         // default threshold for native circuit breaker is 90, it may be not enough on test runner machine
         updateClusterSettings("plugins.ml_commons.native_memory_threshold", 100);
+        updateClusterSettings("plugins.ml_commons.jvm_heap_memory_threshold", 100);
         updateClusterSettings("plugins.ml_commons.allow_registering_model_via_url", true);
+        updateClusterSettings("plugins.ml_commons.agent_framework_enabled", true);
     }
 
     @SneakyThrows
@@ -115,25 +119,48 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
+    protected String indexMonitor(String monitorAsJsonString) {
+        Response response = makeRequest(client(), "POST", "_plugins/_alerting/monitors", null, monitorAsJsonString, null);
+
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, "_id").toString();
+    }
+
+    protected String indexDetector(String detectorAsJsonString) {
+        Response response = makeRequest(client(), "POST", "_plugins/_anomaly_detection/detectors", null, detectorAsJsonString, null);
+
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return parseFieldFromResponse(response, "_id").toString();
+    }
+
     @SneakyThrows
-    protected Map<String, Object> waitTaskComplete(String taskId) {
+    protected Map<String, Object> waitResponseMeetingCondition(
+        String method,
+        String endpoint,
+        String jsonEntity,
+        Predicate<Map<String, Object>> condition
+    ) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
-            Response response = makeRequest(client(), "GET", "/_plugins/_ml/tasks/" + taskId, null, (String) null, null);
+            Response response = makeRequest(client(), method, endpoint, null, jsonEntity, null);
             assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
             Map<String, Object> responseInMap = parseResponseToMap(response);
-            String state = responseInMap.get(MLTask.STATE_FIELD).toString();
-            if (state.equals(MLTaskState.COMPLETED.toString())) {
+            if (condition.test(responseInMap)) {
                 return responseInMap;
             }
-            if (state.equals(MLTaskState.FAILED.toString())
-                || state.equals(MLTaskState.CANCELLED.toString())
-                || state.equals(MLTaskState.COMPLETED_WITH_ERROR.toString())) {
-                fail("The task failed with state " + state);
-            }
+            logger.info("The " + i + "-th response: " + responseInMap.toString());
             Thread.sleep(DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND);
         }
-        fail("The task failed to complete after " + MAX_TASK_RESULT_QUERY_TIME_IN_SECOND + " seconds.");
+        fail("The response failed to meet condition after " + MAX_TASK_RESULT_QUERY_TIME_IN_SECOND + " seconds.");
         return null;
+    }
+
+    @SneakyThrows
+    protected Map<String, Object> waitTaskComplete(String taskId) {
+        Predicate<Map<String, Object>> condition = responseInMap -> {
+            String state = responseInMap.get(MLTask.STATE_FIELD).toString();
+            return state.equals(MLTaskState.COMPLETED.toString());
+        };
+        return waitResponseMeetingCondition("GET", "/_plugins/_ml/tasks/" + taskId, (String) null, condition);
     }
 
     // Register the model then deploy it. Returns the model_id until the model is deployed
@@ -144,6 +171,26 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         String deployModelTaskId = deployModel(modelId);
         waitTaskComplete(deployModelTaskId);
         return modelId;
+    }
+
+    @SneakyThrows
+    private void waitModelUndeployed(String modelId) {
+        Predicate<Map<String, Object>> condition = responseInMap -> {
+            String state = responseInMap.get(MLModel.MODEL_STATE_FIELD).toString();
+            return !state.equals(MLModelState.DEPLOYED.toString())
+                && !state.equals(MLModelState.DEPLOYING.toString())
+                && !state.equals(MLModelState.PARTIALLY_DEPLOYED.toString());
+        };
+        waitResponseMeetingCondition("GET", "/_plugins/_ml/models/" + modelId, (String) null, condition);
+        return;
+    }
+
+    @SneakyThrows
+    protected void deleteModel(String modelId) {
+        // need to undeploy first as model can be in use
+        makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_undeploy", null, (String) null, null);
+        waitModelUndeployed(modelId);
+        makeRequest(client(), "DELETE", "/_plugins/_ml/models/" + modelId, null, (String) null, null);
     }
 
     protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
@@ -202,6 +249,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             builder.toString(),
             null
         );
+        assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
+    @SneakyThrows
+    protected void addDocToIndex(String indexName, String docId, String contents) {
+        Response response = makeRequest(client(), "POST", "/" + indexName + "/_doc/" + docId + "?refresh=true", null, contents, null);
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 

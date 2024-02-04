@@ -35,7 +35,6 @@ import org.opensearch.client.ClusterAdminClient;
 import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.commons.alerting.action.GetMonitorResponse;
 import org.opensearch.commons.alerting.model.CronSchedule;
 import org.opensearch.commons.alerting.model.DataSources;
 import org.opensearch.commons.alerting.model.Monitor;
@@ -96,29 +95,15 @@ public class SearchMonitorsToolTests {
     @Test
     public void testRunWithNoMonitors() throws Exception {
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
-
-        SearchHit[] hits = new SearchHit[0];
-
-        TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
-
-        SearchResponse getMonitorsResponse = new SearchResponse(
-            new SearchResponseSections(new SearchHits(hits, totalHits, 0), new Aggregations(new ArrayList<>()), null, false, null, null, 0),
-            null,
-            0,
-            0,
-            0,
-            0,
-            null,
-            null
-        );
-        String expectedResponseStr = String.format("Monitors=[]TotalMonitors=%d", hits.length);
+        SearchResponse searchMonitorsResponse = getEmptySearchMonitorsResponse();
+        String expectedResponseStr = "Monitors=[]TotalMonitors=0";
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
 
         doAnswer((invocation) -> {
             ActionListener<SearchResponse> responseListener = invocation.getArgument(2);
-            responseListener.onResponse(getMonitorsResponse);
+            responseListener.onResponse(searchMonitorsResponse);
             return null;
         }).when(nodeClient).execute(any(ActionType.class), any(), any());
 
@@ -132,23 +117,15 @@ public class SearchMonitorsToolTests {
     public void testRunWithMonitorId() throws Exception {
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
 
-        GetMonitorResponse getMonitorResponse = new GetMonitorResponse(
-            testMonitor.getId(),
-            1L,
-            2L,
-            0L,
-            testMonitor,
-            Collections.emptyList()
-        );
-        String expectedResponseStr = String
-            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), 1);
+        SearchResponse searchMonitorsResponse = getSearchMonitorsResponse(testMonitor);
+        String expectedResponseStr = getExpectedResponseString(testMonitor);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
 
         doAnswer((invocation) -> {
-            ActionListener<GetMonitorResponse> responseListener = invocation.getArgument(2);
-            responseListener.onResponse(getMonitorResponse);
+            ActionListener<SearchResponse> responseListener = invocation.getArgument(2);
+            responseListener.onResponse(searchMonitorsResponse);
             return null;
         }).when(nodeClient).execute(any(ActionType.class), any(), any());
 
@@ -162,15 +139,15 @@ public class SearchMonitorsToolTests {
     public void testRunWithMonitorIdNotFound() throws Exception {
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
 
-        GetMonitorResponse responseWithNullMonitor = new GetMonitorResponse(testMonitor.getId(), 1L, 2L, 0L, null, Collections.emptyList());
-        String expectedResponseStr = String.format("Monitors=[]TotalMonitors=0");
+        SearchResponse searchMonitorsResponse = getEmptySearchMonitorsResponse();
+        String expectedResponseStr = "Monitors=[]TotalMonitors=0";
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
 
         doAnswer((invocation) -> {
-            ActionListener<GetMonitorResponse> responseListener = invocation.getArgument(2);
-            responseListener.onResponse(responseWithNullMonitor);
+            ActionListener<SearchResponse> responseListener = invocation.getArgument(2);
+            responseListener.onResponse(searchMonitorsResponse);
             return null;
         }).when(nodeClient).execute(any(ActionType.class), any(), any());
 
@@ -184,35 +161,15 @@ public class SearchMonitorsToolTests {
     public void testRunWithSingleMonitor() throws Exception {
         Tool tool = SearchMonitorsTool.Factory.getInstance().create(Collections.emptyMap());
 
-        XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
-        content.startObject();
-        content.field("type", "monitor");
-        content.field("name", testMonitor.getName());
-        content.endObject();
-        SearchHit[] hits = new SearchHit[1];
-        hits[0] = new SearchHit(0, testMonitor.getId(), null, null).sourceRef(BytesReference.bytes(content));
-
-        TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
-
-        SearchResponse getMonitorsResponse = new SearchResponse(
-            new SearchResponseSections(new SearchHits(hits, totalHits, 0), new Aggregations(new ArrayList<>()), null, false, null, null, 0),
-            null,
-            0,
-            0,
-            0,
-            0,
-            null,
-            null
-        );
-        String expectedResponseStr = String
-            .format("Monitors=[{id=%s,name=%s}]TotalMonitors=%d", testMonitor.getId(), testMonitor.getName(), hits.length);
+        SearchResponse searchMonitorsResponse = getSearchMonitorsResponse(testMonitor);
+        String expectedResponseStr = getExpectedResponseString(testMonitor);
 
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
 
         doAnswer((invocation) -> {
             ActionListener<SearchResponse> responseListener = invocation.getArgument(2);
-            responseListener.onResponse(getMonitorsResponse);
+            responseListener.onResponse(searchMonitorsResponse);
             return null;
         }).when(nodeClient).execute(any(ActionType.class), any(), any());
 
@@ -252,5 +209,64 @@ public class SearchMonitorsToolTests {
         assertTrue(tool.validate(nonEmptyParams));
         assertTrue(tool.validate(monitorIdParams));
         assertTrue(tool.validate(nullParams));
+    }
+
+    private SearchResponse getSearchMonitorsResponse(Monitor monitor) throws Exception {
+        XContentBuilder content = XContentBuilder.builder(XContentType.JSON.xContent());
+        content
+            .startObject()
+            .startObject("monitor")
+            .field("name", monitor.getName())
+            .field("monitor_type", monitor.getType())
+            .field("enabled", Boolean.toString(monitor.getEnabled()))
+            .field("enabled_time", Long.toString(monitor.getEnabledTime().toEpochMilli()))
+            .field("last_update_time", Long.toString(monitor.getLastUpdateTime().toEpochMilli()))
+            .endObject()
+            .endObject();
+        SearchHit[] hits = new SearchHit[1];
+        hits[0] = new SearchHit(0, monitor.getId(), null, null).sourceRef(BytesReference.bytes(content));
+
+        TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
+
+        return new SearchResponse(
+            new SearchResponseSections(new SearchHits(hits, totalHits, 0), new Aggregations(new ArrayList<>()), null, false, null, null, 0),
+            null,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null
+        );
+    }
+
+    private SearchResponse getEmptySearchMonitorsResponse() throws Exception {
+        SearchHit[] hits = new SearchHit[0];
+        TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
+        return new SearchResponse(
+            new SearchResponseSections(new SearchHits(hits, totalHits, 0), new Aggregations(new ArrayList<>()), null, false, null, null, 0),
+            null,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null
+        );
+    }
+
+    private String getExpectedResponseString(Monitor testMonitor) {
+        return String
+            .format(
+                "Monitors=[{id=%s,name=%s,type=%s,enabled=%s,enabledTime=%d,lastUpdateTime=%d}]TotalMonitors=%d",
+                testMonitor.getId(),
+                testMonitor.getName(),
+                testMonitor.getType(),
+                testMonitor.getEnabled(),
+                testMonitor.getEnabledTime().toEpochMilli(),
+                testMonitor.getLastUpdateTime().toEpochMilli(),
+                1
+            );
+
     }
 }

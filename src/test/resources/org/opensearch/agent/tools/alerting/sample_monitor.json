@@ -1,0 +1,15 @@
+{
+    "type": "monitor",
+    "schema_version": 0,
+    "name": "foo-monitor",
+    "monitor_type": "query_level_monitor",
+    "enabled": true,
+    "schedule": {
+        "period": {
+            "interval": 1,
+            "unit": "MINUTES"
+        }
+    },
+    "inputs": [],
+    "triggers": []
+}

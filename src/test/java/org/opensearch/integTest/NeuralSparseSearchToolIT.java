@@ -88,6 +88,7 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
     public void tearDown() {
         super.tearDown();
         deleteExternalIndices();
+        deleteModel(modelId);
     }
 
     public void testNeuralSparseSearchToolInFlowAgent() {

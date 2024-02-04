@@ -40,7 +40,7 @@ import lombok.extern.log4j.Log4j2;
 public class SearchAnomalyResultsTool implements Tool {
     public static final String TYPE = "SearchAnomalyResultsTool";
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool that searches anomaly results. It takes 9 arguments named detectorId which defines the detector ID to filter for (default is null), and realtime which defines whether the anomaly is real time, and anomalyGradeThreshold which defines the threshold for anomaly grade (a number between 0 and 1 that indicates how anomalous a data point is) (default is 0), and dataStartTime which defines the start time of the anomaly query (default is null), and dataEndTime which defines the end time of the anomaly query (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is desc), and sortString which which defines how to sort the results (default is data_start_time), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the index to start from (default is 0). The tool returns a list of anomaly results, and the total number of anomaly result.";
+        "This is a tool that searches anomaly results. It takes 9 arguments named detectorId which defines the detector ID to filter for (default is null), and realtime which defines whether the anomaly results are from a realtime detector (set to false to only get results from historical analyses) (default is null), and anomalyGradeThreshold which defines the threshold for anomaly grade (a number between 0 and 1 that indicates how anomalous a data point is) (default is greater than 0), and dataStartTime which defines the start time of the anomaly data in epoch milliseconds (default is null), and dataEndTime which defines the end time of the anomaly data in epoch milliseconds (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is desc), and sortString which defines how to sort the results (default is data_start_time), and size which defines the number of anomalies to be returned (default is 20), and startIndex which defines the paginated index to start from (default is 0). The tool returns 2 values: a list of anomaly results (where each result contains the detector ID, the anomaly grade, and the confidence), and the total number of anomaly results.";
 
     @Setter
     @Getter
@@ -85,7 +85,7 @@ public class SearchAnomalyResultsTool implements Tool {
         final Boolean realTime = parameters.containsKey("realTime") ? Boolean.parseBoolean(parameters.get("realTime")) : null;
         final Double anomalyGradeThreshold = parameters.containsKey("anomalyGradeThreshold")
             ? Double.parseDouble(parameters.get("anomalyGradeThreshold"))
-            : null;
+            : 0;
         final Long dataStartTime = parameters.containsKey("dataStartTime") && StringUtils.isNumeric(parameters.get("dataStartTime"))
             ? Long.parseLong(parameters.get("dataStartTime"))
             : null;
@@ -115,7 +115,7 @@ public class SearchAnomalyResultsTool implements Tool {
             mustList.add(boolQuery);
         }
         if (anomalyGradeThreshold != null) {
-            mustList.add(new RangeQueryBuilder("anomaly_grade").gte(anomalyGradeThreshold));
+            mustList.add(new RangeQueryBuilder("anomaly_grade").gt(anomalyGradeThreshold));
         }
         if (dataStartTime != null || dataEndTime != null) {
             RangeQueryBuilder rangeQuery = new RangeQueryBuilder("anomaly_grade");

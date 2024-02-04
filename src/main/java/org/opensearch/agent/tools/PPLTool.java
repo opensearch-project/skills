@@ -88,6 +88,8 @@ public class PPLTool implements Tool {
 
     private String contextPrompt;
 
+    private Boolean execute;
+
     private PPLModelType pplModelType;
 
     private String previousToolKey;
@@ -123,7 +125,7 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey) {
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey, boolean execute) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -133,6 +135,7 @@ public class PPLTool implements Tool {
             this.contextPrompt = contextPrompt;
         }
         this.previousToolKey = previousToolKey;
+        this.execute = execute;
     }
 
     @Override
@@ -158,9 +161,12 @@ public class PPLTool implements Tool {
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
+            if (mappings.size() == 0) {
+                throw new IllegalArgumentException("No matching mapping with index name: " + indexName);
+            }
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
-                String tableInfo = constructTableInfo(searchHits, mappings, indexName);
+                String tableInfo = constructTableInfo(searchHits, mappings);
                 String prompt = constructPrompt(tableInfo, question, indexName);
                 RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                     .builder()
@@ -177,6 +183,11 @@ public class PPLTool implements Tool {
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
+                    if (!this.execute) {
+                        Map<String, String> ret = ImmutableMap.of("ppl", ppl);
+                        listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
+                        return;
+                    }
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
                     PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
@@ -273,6 +284,7 @@ public class PPLTool implements Tool {
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", "")
+                Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
 
@@ -308,9 +320,9 @@ public class PPLTool implements Tool {
         return getMappingsRequest;
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings, String indexName)
-        throws PrivilegedActionException {
-        MappingMetadata mappingMetadata = mappings.get(indexName);
+    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
+        String firstIndexName = (String) mappings.keySet().toArray()[0];
+        MappingMetadata mappingMetadata = mappings.get(firstIndexName);
         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
         Map<String, String> fieldsToType = new HashMap<>();
         extractNamesTypes(mappingSource, fieldsToType, "");
