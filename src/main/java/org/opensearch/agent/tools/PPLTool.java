@@ -5,8 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import static org.opensearch.ml.common.CommonValue.*;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -95,35 +93,35 @@ public class PPLTool implements Tool {
 
     private static Gson gson = new Gson();
 
-    private static Map<String, String> defaultPromptDict;
+    private static Map<String, String> DEFAULT_PROMPT_DICT;
 
-    private static Set<String> allowedFieldsType;
+    private static Set<String> ALLOWED_FIELDS_TYPE;
 
     static {
-        allowedFieldsType = new HashSet<>(); // from https://github.com/opensearch-project/sql/blob/2.x/docs/user/ppl/general/datatypes.rst#data-types-mapping
-        allowedFieldsType.add("boolean");
-        allowedFieldsType.add("byte");
-        allowedFieldsType.add("short");
-        allowedFieldsType.add("integer");
-        allowedFieldsType.add("long");
-        allowedFieldsType.add("float");
-        allowedFieldsType.add("half_float");
-        allowedFieldsType.add("scaled_float");
-        allowedFieldsType.add("double");
-        allowedFieldsType.add("keyword");
-        allowedFieldsType.add("text");
-        allowedFieldsType.add("date");
-        allowedFieldsType.add("ip");
-        allowedFieldsType.add("binary");
-        allowedFieldsType.add("object");
-        allowedFieldsType.add("nested");
-
+        ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
+                                               // https://github.com/opensearch-project/sql/blob/2.x/docs/user/ppl/general/datatypes.rst#data-types-mapping
+        ALLOWED_FIELDS_TYPE.add("boolean");
+        ALLOWED_FIELDS_TYPE.add("byte");
+        ALLOWED_FIELDS_TYPE.add("short");
+        ALLOWED_FIELDS_TYPE.add("integer");
+        ALLOWED_FIELDS_TYPE.add("long");
+        ALLOWED_FIELDS_TYPE.add("float");
+        ALLOWED_FIELDS_TYPE.add("half_float");
+        ALLOWED_FIELDS_TYPE.add("scaled_float");
+        ALLOWED_FIELDS_TYPE.add("double");
+        ALLOWED_FIELDS_TYPE.add("keyword");
+        ALLOWED_FIELDS_TYPE.add("text");
+        ALLOWED_FIELDS_TYPE.add("date");
+        ALLOWED_FIELDS_TYPE.add("ip");
+        ALLOWED_FIELDS_TYPE.add("binary");
+        ALLOWED_FIELDS_TYPE.add("object");
+        ALLOWED_FIELDS_TYPE.add("nested");
 
         try {
-            defaultPromptDict = loadDefaultPromptDict();
+            DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
         } catch (IOException e) {
             log.error("fail to load default prompt dict" + e.getMessage());
-            defaultPromptDict = new HashMap<>();
+            DEFAULT_PROMPT_DICT = new HashMap<>();
         }
     }
 
@@ -150,7 +148,7 @@ public class PPLTool implements Tool {
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
         if (contextPrompt.isEmpty()) {
-            this.contextPrompt = this.defaultPromptDict.getOrDefault(this.pplModelType.toString(), "");
+            this.contextPrompt = this.DEFAULT_PROMPT_DICT.getOrDefault(this.pplModelType.toString(), "");
         } else {
             this.contextPrompt = contextPrompt;
         }
@@ -345,14 +343,14 @@ public class PPLTool implements Tool {
             extractSamples(sampleSource, fieldsToSample, "");
 
             for (String key : sortedKeys) {
-                if (allowedFieldsType.contains(fieldsToType.get(key))) {
+                if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
                     String line = "- " + key + ": " + fieldsToType.get(key) + " (" + fieldsToSample.get(key) + ")";
                     tableInfoJoiner.add(line);
                 }
             }
         } else {
             for (String key : sortedKeys) {
-                if (allowedFieldsType.contains(fieldsToType.get(key))) {
+                if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
                     String line = "- " + key + ": " + fieldsToType.get(key);
                     tableInfoJoiner.add(line);
                 }
