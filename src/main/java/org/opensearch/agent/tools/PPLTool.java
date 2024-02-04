@@ -137,13 +137,12 @@ public class PPLTool implements Tool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         parameters = extractFromChatParameters(parameters);
-        String indexName;
+        String indexName = "";
         if (parameters.containsKey("index")) {
-            indexName = parameters.get("index");
-        } else if (!StringUtils.isBlank(this.previousToolKey) && parameters.containsKey(this.previousToolKey + ".output")) {
-            indexName = parameters.get(this.previousToolKey + ".output"); // read index name from previous key
-        } else {
-            indexName = "";
+            indexName = parameters.getOrDefault("index", "");
+        }
+        if (!StringUtils.isBlank(this.previousToolKey) && parameters.containsKey(this.previousToolKey + ".output") && StringUtils.isBlank(indexName)) {
+            indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
