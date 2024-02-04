@@ -72,7 +72,8 @@ public class PPLTool implements Tool {
     @Setter
     private Client client;
 
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to generate PPL and execute.";
+    private static final String DEFAULT_DESCRIPTION =
+        "\"Use this tool when user ask question based on the data in the cluster or parse user statement about which index to use in a conversion.\nAlso use this tool when question only contains index information.\n1. If uesr question contain both question and index name, the input parameters are {'question': UserQuestion, 'index': IndexName}.\n2. If user question contain only question, the input parameter is {'question': UserQuestion}.\n3. If uesr question contain only index name, find the original human input from the conversation histroy and formulate parameter as {'question': UserQuestion, 'index': IndexName}\nThe index name should be exactly as stated in user's input.";
 
     @Setter
     @Getter
@@ -137,12 +138,11 @@ public class PPLTool implements Tool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         parameters = extractFromChatParameters(parameters);
-        String indexName = "";
-        if (parameters.containsKey("index")) {
-            indexName = parameters.getOrDefault("index", "");
-        }
-        if (!StringUtils.isBlank(this.previousToolKey) && parameters.containsKey(this.previousToolKey + ".output") && StringUtils.isBlank(indexName)) {
-            indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
+        String indexName = getIndexNameFromParameters(parameters);
+        if (StringUtils.isBlank(indexName)) {
+            throw new IllegalArgumentException(
+                "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+            );
         }
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
@@ -211,7 +211,17 @@ public class PPLTool implements Tool {
             ));
         }, e -> {
             log.info("fail to get mapping: " + e);
-            listener.onFailure(e);
+            String error_message = e.getMessage();
+            if (error_message.contains("no such index")) {
+                listener
+                    .onFailure(
+                        new IllegalArgumentException(
+                            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                        )
+                    );
+            } else {
+                listener.onFailure(e);
+            }
         }));
     }
 
@@ -427,6 +437,20 @@ public class PPLTool implements Tool {
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         return ppl;
+    }
+
+    private String getIndexNameFromParameters(Map<String, String> parameters) {
+        String indexName = "";
+        if (parameters.containsKey("index")) {
+            indexName = parameters.getOrDefault("index", "");
+        }
+        if (!StringUtils.isBlank(this.previousToolKey)
+            && parameters.containsKey(this.previousToolKey + ".output")
+            && StringUtils.isBlank(indexName)) {
+            indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
+        }
+        return indexName;
+
     }
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {
