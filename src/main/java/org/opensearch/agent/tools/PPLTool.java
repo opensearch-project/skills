@@ -72,7 +72,8 @@ public class PPLTool implements Tool {
     @Setter
     private Client client;
 
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to generate PPL and execute.";
+    private static final String DEFAULT_DESCRIPTION =
+        "\"Use this tool when user ask question based on the data in the cluster or parse user statement about which index to use in a conversion.\nAlso use this tool when question only contains index information.\n1. If uesr question contain both question and index name, the input parameters are {'question': UserQuestion, 'index': IndexName}.\n2. If user question contain only question, the input parameter is {'question': UserQuestion}.\n3. If uesr question contain only index name, find the original human input from the conversation histroy and formulate parameter as {'question': UserQuestion, 'index': IndexName}\nThe index name should be exactly as stated in user's input.";
 
     @Setter
     @Getter
@@ -90,6 +91,8 @@ public class PPLTool implements Tool {
     private Boolean execute;
 
     private PPLModelType pplModelType;
+
+    private String previousToolKey;
 
     private static Gson gson = new Gson();
 
@@ -143,7 +146,7 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, boolean execute) {
+    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey, boolean execute) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -152,12 +155,19 @@ public class PPLTool implements Tool {
         } else {
             this.contextPrompt = contextPrompt;
         }
+        this.previousToolKey = previousToolKey;
         this.execute = execute;
     }
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        String indexName = parameters.get("index");
+        parameters = extractFromChatParameters(parameters);
+        String indexName = getIndexNameFromParameters(parameters);
+        if (StringUtils.isBlank(indexName)) {
+            throw new IllegalArgumentException(
+                "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+            );
+        }
         String question = parameters.get("question");
         if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
@@ -180,7 +190,7 @@ public class PPLTool implements Tool {
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
                 String tableInfo = constructTableInfo(searchHits, mappings);
-                String prompt = constructPrompt(tableInfo, question, indexName);
+                String prompt = constructPrompt(tableInfo, question.strip(), indexName);
                 RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                     .builder()
                     .parameters(Collections.singletonMap("prompt", prompt))
@@ -234,7 +244,17 @@ public class PPLTool implements Tool {
             ));
         }, e -> {
             log.info("fail to get mapping: " + e);
-            listener.onFailure(e);
+            String errorMessage = e.getMessage();
+            if (errorMessage.contains("no such index")) {
+                listener
+                    .onFailure(
+                        new IllegalArgumentException(
+                            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                        )
+                    );
+            } else {
+                listener.onFailure(e);
+            }
         }));
     }
 
@@ -285,6 +305,7 @@ public class PPLTool implements Tool {
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
+                (String) map.getOrDefault("previous_tool_name", ""),
                 Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
@@ -434,6 +455,7 @@ public class PPLTool implements Tool {
             ppl = matcher.group(1).replaceAll("[\\r\\n]", "").replaceAll("ISNOTNULL", "isnotnull").trim();
         } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
+            int describeIndex = llmOutput.indexOf("describe ");
             if (sourceIndex != -1) {
                 llmOutput = llmOutput.substring(sourceIndex);
 
@@ -447,6 +469,17 @@ public class PPLTool implements Tool {
 
                 // Joining the string back together
                 ppl = String.join("|", lists);
+            } else if (describeIndex != -1) {
+                llmOutput = llmOutput.substring(describeIndex);
+                String[] lists = llmOutput.split("\\|");
+
+                // Modifying the first element
+                if (lists.length > 0) {
+                    lists[0] = "describe " + indexName;
+                }
+
+                // Joining the string back together
+                ppl = String.join("|", lists);
             } else {
                 throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
             }
@@ -454,6 +487,15 @@ public class PPLTool implements Tool {
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         return ppl;
+    }
+
+    private String getIndexNameFromParameters(Map<String, String> parameters) {
+        String indexName = parameters.getOrDefault("index", "");
+        if (!StringUtils.isBlank(this.previousToolKey) && StringUtils.isBlank(indexName)) {
+            indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
+        }
+        return indexName;
+
     }
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {

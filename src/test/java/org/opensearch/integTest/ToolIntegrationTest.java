@@ -73,6 +73,26 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         deleteModel(modelId);
     }
 
+<<<<<<< HEAD
+=======
+    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException {
+        int retryTimes = 0;
+        String connectorId = null;
+        while (retryTimes < maxRetryTimes) {
+            try {
+                connectorId = setUpConnector();
+                break;
+            } catch (Exception e) {
+                // Wait for ML encryption master key has been initialized
+                log.info("Failed to setup connector, retry times: {}", retryTimes);
+                retryTimes++;
+                TimeUnit.SECONDS.sleep(20);
+            }
+        }
+        return connectorId;
+    }
+
+>>>>>>> c2a1fed (add previous key for PPL tool (#131))
     private String setUpConnector() {
         String url = String.format(Locale.ROOT, "http://127.0.0.1:%d/invoke", server.getAddress().getPort());
         return createConnector(
