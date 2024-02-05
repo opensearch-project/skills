@@ -198,6 +198,23 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_withDescribeStartPPL() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        pplReturns = Collections.singletonMap("response", "describe demo");
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
+        initMLTensors();
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("describe demo", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
     public void testTool_querySystemIndex() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());

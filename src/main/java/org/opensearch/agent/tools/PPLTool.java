@@ -167,7 +167,7 @@ public class PPLTool implements Tool {
             client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
                 String tableInfo = constructTableInfo(searchHits, mappings);
-                String prompt = constructPrompt(tableInfo, question, indexName);
+                String prompt = constructPrompt(tableInfo, question.strip(), indexName);
                 RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                     .builder()
                     .parameters(Collections.singletonMap("prompt", prompt))
@@ -429,6 +429,7 @@ public class PPLTool implements Tool {
             ppl = matcher.group(1).replaceAll("[\\r\\n]", "").replaceAll("ISNOTNULL", "isnotnull").trim();
         } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
+            int describeIndex = llmOutput.indexOf("describe ");
             if (sourceIndex != -1) {
                 llmOutput = llmOutput.substring(sourceIndex);
 
@@ -438,6 +439,17 @@ public class PPLTool implements Tool {
                 // Modifying the first element
                 if (lists.length > 0) {
                     lists[0] = "source=" + indexName;
+                }
+
+                // Joining the string back together
+                ppl = String.join("|", lists);
+            } else if (describeIndex != -1) {
+                llmOutput = llmOutput.substring(describeIndex);
+                String[] lists = llmOutput.split("\\|");
+
+                // Modifying the first element
+                if (lists.length > 0) {
+                    lists[0] = "describe " + indexName;
                 }
 
                 // Joining the string back together
@@ -452,8 +464,7 @@ public class PPLTool implements Tool {
     }
 
     private String getIndexNameFromParameters(Map<String, String> parameters) {
-        String indexName = "";
-        indexName = parameters.getOrDefault("index", "");
+        String indexName = parameters.getOrDefault("index", "");
         if (!StringUtils.isBlank(this.previousToolKey) && StringUtils.isBlank(indexName)) {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
