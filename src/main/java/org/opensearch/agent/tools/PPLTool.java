@@ -222,8 +222,8 @@ public class PPLTool implements Tool {
             ));
         }, e -> {
             log.info("fail to get mapping: " + e);
-            String error_message = e.getMessage();
-            if (error_message.contains("no such index")) {
+            String errorMessage = e.getMessage();
+            if (errorMessage.contains("no such index")) {
                 listener
                     .onFailure(
                         new IllegalArgumentException(
@@ -453,12 +453,8 @@ public class PPLTool implements Tool {
 
     private String getIndexNameFromParameters(Map<String, String> parameters) {
         String indexName = "";
-        if (parameters.containsKey("index")) {
-            indexName = parameters.getOrDefault("index", "");
-        }
-        if (!StringUtils.isBlank(this.previousToolKey)
-            && parameters.containsKey(this.previousToolKey + ".output")
-            && StringUtils.isBlank(indexName)) {
+        indexName = parameters.getOrDefault("index", "");
+        if (!StringUtils.isBlank(this.previousToolKey) && StringUtils.isBlank(indexName)) {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
         return indexName;
