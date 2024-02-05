@@ -130,7 +130,8 @@ public class PPLTool implements Tool {
 
     public enum PPLModelType {
         CLAUDE,
-        FINETUNE;
+        FINETUNE,
+        OPENAI;
 
         public static PPLModelType from(String value) {
             if (value.isEmpty()) {
@@ -139,7 +140,7 @@ public class PPLTool implements Tool {
             try {
                 return PPLModelType.valueOf(value.toUpperCase(Locale.ROOT));
             } catch (Exception e) {
-                log.error("Wrong PPL Model type, should be CLAUDE or FINETUNE");
+                log.error("Wrong PPL Model type, should be CLAUDE, FINETUNE, or OPENAI");
                 return PPLModelType.CLAUDE;
             }
         }
