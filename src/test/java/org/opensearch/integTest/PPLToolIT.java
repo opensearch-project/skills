@@ -108,14 +108,30 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee2\"}}")
         );
-        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("no such index [employee2]")));
+        MatcherAssert
+            .assertThat(
+                exception.getMessage(),
+                allOf(
+                    containsString(
+                        "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                    )
+                )
+            );
     }
 
     public void testPPLTool_withBlankInput_thenThrowException() {
         prepareIndex();
         String agentId = registerAgent();
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
-        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("Parameter index and question can not be null or empty.")));
+        MatcherAssert
+            .assertThat(
+                exception.getMessage(),
+                allOf(
+                    containsString(
+                        "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                    )
+                )
+            );
     }
 
     @SneakyThrows

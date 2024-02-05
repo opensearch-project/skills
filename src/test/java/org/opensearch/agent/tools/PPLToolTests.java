@@ -139,6 +139,21 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_withPreviousInput() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("previousTool.output", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
     public void testTool_with_WithoutExecution() {
         PPLTool tool = PPLTool.Factory
             .getInstance()
@@ -183,6 +198,23 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_withDescribeStartPPL() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        pplReturns = Collections.singletonMap("response", "describe demo");
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
+        initMLTensors();
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("describe demo", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
     public void testTool_querySystemIndex() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
@@ -195,6 +227,22 @@ public class PPLToolTests {
         assertEquals(
             "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
                 + ML_CONNECTOR_INDEX,
+            exception.getMessage()
+        );
+    }
+
+    @Test
+    public void testTool_queryEmptyIndex() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tool.run(ImmutableMap.of("question", "demo"), ActionListener.<String>wrap(ppl -> {
+                assertEquals(pplResult, "ppl result");
+            }, e -> { assertEquals("We cannot search system indices " + ML_CONNECTOR_INDEX, e.getMessage()); }))
+        );
+        assertEquals(
+            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name",
             exception.getMessage()
         );
     }
