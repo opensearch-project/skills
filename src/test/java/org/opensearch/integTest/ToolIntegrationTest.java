@@ -78,7 +78,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
                 // Wait for ML encryption master key has been initialized
                 log.info("Failed to setup connector, retry times: {}", retryTimes);
                 retryTimes++;
-                TimeUnit.SECONDS.sleep(10);
+                TimeUnit.SECONDS.sleep(20);
             }
         }
         return connectorId;
