@@ -495,8 +495,7 @@ public class PPLTool implements Tool {
         if (!StringUtils.isBlank(this.previousToolKey) && StringUtils.isBlank(indexName)) {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
-        return indexName;
-
+        return indexName.trim();
     }
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {
