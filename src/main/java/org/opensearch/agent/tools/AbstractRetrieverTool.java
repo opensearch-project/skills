@@ -50,6 +50,11 @@ public abstract class AbstractRetrieverTool implements Tool {
     protected Integer docSize;
     protected String version;
 
+    @Override
+    public boolean useOriginalInput() {
+        return true;
+    }
+
     protected AbstractRetrieverTool(
         Client client,
         NamedXContentRegistry xContentRegistry,

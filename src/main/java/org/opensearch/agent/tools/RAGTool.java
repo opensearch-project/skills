@@ -71,6 +71,11 @@ public class RAGTool implements Tool {
     @Setter
     private Parser outputParser;
 
+    @Override
+    public boolean useOriginalInput() {
+        return true;
+    }
+
     @Builder
     public RAGTool(
         Client client,
