@@ -41,6 +41,11 @@ public class VectorDBTool extends AbstractRetrieverTool {
     private String embeddingField;
     private Integer k;
 
+    @Override
+    public boolean useOriginalInput() {
+        return true;
+    }
+
     @Builder
     public VectorDBTool(
         Client client,
