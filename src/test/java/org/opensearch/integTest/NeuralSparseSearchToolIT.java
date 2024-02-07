@@ -7,6 +7,7 @@ package org.opensearch.integTest;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,6 +115,16 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
                 exception.getMessage(),
                 allOf(containsString("[input] is null or empty, can not process it."), containsString("IllegalArgumentException"))
             );
+
+        // use json string input
+        String jsonInput = gson.toJson(Map.of("parameters", Map.of("question", gson.toJson(Map.of("hi", "a")))));
+        String result3 = executeAgent(agentId, jsonInput);
+        assertEquals(
+            "The agent execute response not equal with expected.",
+            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 3\"},\"_id\":\"2\",\"_score\":2.4136734}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 2\"},\"_id\":\"1\",\"_score\":1.2068367}\n",
+            result3
+        );
     }
 
     public void testNeuralSparseSearchToolInFlowAgent_withIllegalSourceField_thenGetEmptySource() {
