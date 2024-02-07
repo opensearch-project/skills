@@ -20,5 +20,5 @@
     "last_notification_time": 1234,
     "end_time": 1234,
     "acknowledged_time": null,
-    "clusters": ""
+    "clusters": []
 }
