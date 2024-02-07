@@ -5,8 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import static org.apache.commons.lang3.math.NumberUtils.min;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -226,14 +224,18 @@ public class PPLTool implements Tool {
                         return;
                     }
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
-                    PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
+                    String executePPL = ppl;
+                    if (this.truncate > 0) {
+                        executePPL = executePPL + " | head " + this.truncate;
+                    }
+                    PPLQueryRequest pplQueryRequest = new PPLQueryRequest(executePPL, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
                     client
                         .execute(
                             PPLQueryAction.INSTANCE,
                             transportPPLQueryRequest,
                             getPPLTransportActionListener(ActionListener.<TransportPPLQueryResponse>wrap(transportPPLQueryResponse -> {
-                                String results = getPPLResult(transportPPLQueryResponse);
+                                String result = transportPPLQueryResponse.getResult();
                                 Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
                                 listener
                                     .onResponse(
@@ -511,18 +513,6 @@ public class PPLTool implements Tool {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
         return indexName.trim();
-    }
-
-    private String getPPLResult(TransportPPLQueryResponse transportPPLQueryResponse) throws PrivilegedActionException {
-        String result = transportPPLQueryResponse.getResult();
-        if (this.truncate > 0) {
-            Map<String, Object> returnMap = gson.fromJson(result, Map.class);
-            List<Object> executionResult = (List<Object>) returnMap.get("datarows");
-            List<Object> truncatedResult = executionResult.subList(0, min(executionResult.size(), this.truncate));
-            returnMap.put("datarows", truncatedResult);
-            result = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(returnMap));
-        }
-        return result;
     }
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {
