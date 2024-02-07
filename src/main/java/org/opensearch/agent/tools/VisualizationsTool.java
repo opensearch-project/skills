@@ -77,7 +77,7 @@ public class VisualizationsTool implements Tool {
         boolQueryBuilder.must().add(QueryBuilders.matchQuery(SAVED_OBJECT_TYPE + ".title", parameters.get("input")));
 
         SearchSourceBuilder searchSourceBuilder = SearchSourceBuilder.searchSource().query(boolQueryBuilder);
-        searchSourceBuilder.from(0).size(3);
+        searchSourceBuilder.from(0).size(size);
         SearchRequest searchRequest = Requests.searchRequest(index).source(searchSourceBuilder);
 
         client.search(searchRequest, new ActionListener<>() {
