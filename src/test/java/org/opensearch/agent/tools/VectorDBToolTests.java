@@ -55,11 +55,21 @@ public class VectorDBToolTests {
     @SneakyThrows
     public void testGetQueryBody() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
-        assertEquals(
-            "{\"query\":{\"neural\":{\"test embedding\":{\""
-                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\",\"k\":123}}} }",
-            tool.getQueryBody(TEST_QUERY_TEXT)
-        );
+        Map<String, Map<String, Map<String, Map<String, String>>>> queryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
+        assertEquals("123fsd23134sdfouh", queryBody.get("query").get("neural").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("query").get("neural").get("test embedding").get("model_id"));
+        assertEquals(123.0, queryBody.get("query").get("neural").get("test embedding").get("k"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetQueryBodyWithJsonObjectString() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        String jsonInput = gson.toJson(Map.of("hi", "a"));
+        Map<String, Map<String, Map<String, Map<String, String>>>> queryBody = gson.fromJson(tool.getQueryBody(jsonInput), Map.class);
+        assertEquals("{\"hi\":\"a\"}", queryBody.get("query").get("neural").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("query").get("neural").get("test embedding").get("model_id"));
+        assertEquals(123.0, queryBody.get("query").get("neural").get("test embedding").get("k"));
     }
 
     @Test

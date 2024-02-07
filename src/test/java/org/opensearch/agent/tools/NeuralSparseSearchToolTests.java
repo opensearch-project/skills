@@ -55,11 +55,19 @@ public class NeuralSparseSearchToolTests {
     @SneakyThrows
     public void testGetQueryBody() {
         NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
-        assertEquals(
-            "{\"query\":{\"neural_sparse\":{\"test embedding\":{\""
-                + "query_text\":\"123fsd23134sdfouh\",\"model_id\":\"123fsd23134\"}}} }",
-            tool.getQueryBody(TEST_QUERY_TEXT)
-        );
+        Map<String, Map<String, Map<String, Map<String, String>>>> queryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
+        assertEquals("123fsd23134sdfouh", queryBody.get("query").get("neural_sparse").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("query").get("neural_sparse").get("test embedding").get("model_id"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetQueryBodyWithJsonObjectString() {
+        NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
+        String jsonInput = gson.toJson(Map.of("hi", "a"));
+        Map<String, Map<String, Map<String, Map<String, String>>>> queryBody = gson.fromJson(tool.getQueryBody(jsonInput), Map.class);
+        assertEquals("{\"hi\":\"a\"}", queryBody.get("query").get("neural_sparse").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("query").get("neural_sparse").get("test embedding").get("model_id"));
     }
 
     @Test
