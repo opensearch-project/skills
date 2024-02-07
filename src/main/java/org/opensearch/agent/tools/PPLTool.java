@@ -94,7 +94,7 @@ public class PPLTool implements Tool {
 
     private String previousToolKey;
 
-    private int truncate;
+    private int head;
 
     private static Gson gson = new Gson();
 
@@ -155,7 +155,7 @@ public class PPLTool implements Tool {
         String contextPrompt,
         String pplModelType,
         String previousToolKey,
-        int truncate,
+        int head,
         boolean execute
     ) {
         this.client = client;
@@ -167,7 +167,7 @@ public class PPLTool implements Tool {
             this.contextPrompt = contextPrompt;
         }
         this.previousToolKey = previousToolKey;
-        this.truncate = truncate;
+        this.head = head;
         this.execute = execute;
     }
 
@@ -224,11 +224,7 @@ public class PPLTool implements Tool {
                         return;
                     }
                     JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
-                    String executePPL = ppl;
-                    if (this.truncate > 0) {
-                        executePPL = executePPL + " | head " + this.truncate;
-                    }
-                    PPLQueryRequest pplQueryRequest = new PPLQueryRequest(executePPL, jsonContent, null, "jdbc");
+                    PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
                     TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
                     client
                         .execute(
@@ -323,7 +319,7 @@ public class PPLTool implements Tool {
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
-                Integer.valueOf((String) map.getOrDefault("truncate", "-1")),
+                Integer.valueOf((String) map.getOrDefault("head", "-1")),
                 Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
@@ -504,6 +500,14 @@ public class PPLTool implements Tool {
         }
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
+        if (this.head > 0) {
+            String[] lists = llmOutput.split("\\|");
+            String lastCommand = lists[lists.length - 1].strip();
+            if (!lastCommand.toLowerCase(Locale.ROOT).startsWith("head")) // not handle cases source=...| ... | head 5 | head <head>
+            {
+                ppl = ppl + " | head " + this.head;
+            }
+        }
         return ppl;
     }
 
