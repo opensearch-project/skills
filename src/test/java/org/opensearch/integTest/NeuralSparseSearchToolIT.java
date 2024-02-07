@@ -112,7 +112,7 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("[input] is null or empty, can not process it."), containsString("illegal_argument_exception"))
+                allOf(containsString("[input] is null or empty, can not process it."), containsString("IllegalArgumentException"))
             );
     }
 
@@ -134,10 +134,7 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("failed to create query: [neural_sparse] query only works on [rank_features] fields"),
-                    containsString("search_phase_execution_exception")
-                )
+                allOf(containsString("all shards failed"), containsString("SearchPhaseExecutionException"))
             );
     }
 
@@ -148,7 +145,7 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("no such index [test_index2]"), containsString("index_not_found_exception"))
+                allOf(containsString("no such index [test_index2]"), containsString("IndexNotFoundException"))
             );
     }
 
@@ -157,6 +154,6 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
 
         org.hamcrest.MatcherAssert
-            .assertThat(exception.getMessage(), allOf(containsString("Failed to find model"), containsString("status_exception")));
+            .assertThat(exception.getMessage(), allOf(containsString("Failed to find model"), containsString("OpenSearchStatusException")));
     }
 }

@@ -5,6 +5,7 @@
 
 import org.opensearch.gradle.test.RestIntegTestTask
 import java.util.concurrent.Callable
+import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 
 buildscript {
     ext {
@@ -125,7 +126,7 @@ dependencies {
     // ZipArchive dependencies used for integration tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
-    zipArchive "org.opensearch.plugin:opensearch-anomaly-detection:${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-anomaly-detection', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
@@ -135,16 +136,16 @@ dependencies {
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation group: 'junit', name: 'junit', version: '4.13.2'
     testImplementation group: 'org.json', name: 'json', version: '20231013'
-    testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.8.0'
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.10.0'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
     testImplementation("net.bytebuddy:byte-buddy:1.14.7")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.14.7")
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.10.0'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
     testImplementation "com.cronutils:cron-utils:9.2.1"
     testImplementation "commons-validator:commons-validator:1.8.0"
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
 }
 
 task extractSqlJar(type: Copy) {
@@ -234,21 +235,44 @@ opensearchplugin {
     noticeFile rootProject.file("NOTICE")
 }
 
-publishing {
-    repositories {
-        maven {
-            name = 'staging'
-            url = "${rootProject.buildDir}/local-staging-repo"
-        }
-        maven {
-            name = "Snapshots"
-            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
-            credentials {
-                username "$System.env.SONATYPE_USERNAME"
-                password "$System.env.SONATYPE_PASSWORD"
+allprojects {
+    // Default to the apache license
+    project.ext.licenseName = 'The Apache Software License, Version 2.0'
+    project.ext.licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+    plugins.withType(ShadowPlugin).whenPluginAdded {
+        publishing {
+            repositories {
+                maven {
+                    name = 'staging'
+                    url = "${rootProject.buildDir}/local-staging-repo"
+                }
+            }
+            publications {
+                // add license information to generated poms
+                all {
+                    pom {
+                        name = "skills"
+                        description = "Tools for Agent Framework"
+                    }
+                    pom.withXml { XmlProvider xml ->
+                        Node node = xml.asNode()
+                        node.appendNode('inceptionYear', '2021')
+
+                        Node license = node.appendNode('licenses').appendNode('license')
+                        license.appendNode('name', project.licenseName)
+                        license.appendNode('url', project.licenseUrl)
+
+                        Node developer = node.appendNode('developers').appendNode('developer')
+                        developer.appendNode('name', 'OpenSearch')
+                        developer.appendNode('url', 'https://github.com/opensearch-project/')skills
+                    }
+                }
             }
         }
     }
+}
+
+publishing {
     publications {
         pluginZip(MavenPublication) { publication ->
             pom {
@@ -267,6 +291,16 @@ publishing {
                         url = "https://github.com/opensearch-project/skills"
                     }
                 }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "Snapshots"
+            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            credentials {
+                username "$System.env.SONATYPE_USERNAME"
+                password "$System.env.SONATYPE_PASSWORD"
             }
         }
     }
