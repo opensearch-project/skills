@@ -134,10 +134,7 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("all shards failed"),
-                    containsString("SearchPhaseExecutionException")
-                )
+                allOf(containsString("all shards failed"), containsString("SearchPhaseExecutionException"))
             );
     }
 
