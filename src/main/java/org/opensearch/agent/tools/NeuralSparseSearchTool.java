@@ -7,6 +7,9 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -57,14 +60,15 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
                 "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
-        return "{\"query\":{\"neural_sparse\":{\""
-            + embeddingField
-            + "\":{\"query_text\":\""
-            + queryText
-            + "\",\"model_id\":\""
-            + modelId
-            + "\"}}}"
-            + " }";
+
+        Map<String, Object> queryBody = Map
+            .of("query", Map.of("neural_sparse", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId))));
+
+        try {
+            return AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(queryBody));
+        } catch (PrivilegedActionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
