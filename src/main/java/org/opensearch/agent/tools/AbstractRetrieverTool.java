@@ -8,6 +8,8 @@ package org.opensearch.agent.tools;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.io.IOException;
+import java.security.AccessController;
+import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -109,7 +111,9 @@ public abstract class AbstractRetrieverTool implements Tool {
                 StringBuilder contextBuilder = new StringBuilder();
                 for (SearchHit hit : hits) {
                     Map<String, Object> docContent = processResponse(hit);
-                    contextBuilder.append(gson.toJson(docContent)).append("\n");
+                    String docContentInString = AccessController
+                        .doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(docContent));
+                    contextBuilder.append(docContentInString).append("\n");
                 }
                 listener.onResponse((T) contextBuilder.toString());
             } else {
