@@ -235,7 +235,7 @@ public class PPLTool implements Tool {
                             PPLQueryAction.INSTANCE,
                             transportPPLQueryRequest,
                             getPPLTransportActionListener(ActionListener.<TransportPPLQueryResponse>wrap(transportPPLQueryResponse -> {
-                                String result = transportPPLQueryResponse.getResult();
+                                String results = transportPPLQueryResponse.getResult();
                                 Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
                                 listener
                                     .onResponse(
