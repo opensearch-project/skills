@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import static org.apache.commons.lang3.math.NumberUtils.min;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -94,6 +96,8 @@ public class PPLTool implements Tool {
 
     private String previousToolKey;
 
+    private int truncate;
+
     private static Gson gson = new Gson();
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
@@ -147,7 +151,15 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey, boolean execute) {
+    public PPLTool(
+        Client client,
+        String modelId,
+        String contextPrompt,
+        String pplModelType,
+        String previousToolKey,
+        int truncate,
+        boolean execute
+    ) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -157,6 +169,7 @@ public class PPLTool implements Tool {
             this.contextPrompt = contextPrompt;
         }
         this.previousToolKey = previousToolKey;
+        this.truncate = truncate;
         this.execute = execute;
     }
 
@@ -220,7 +233,7 @@ public class PPLTool implements Tool {
                             PPLQueryAction.INSTANCE,
                             transportPPLQueryRequest,
                             getPPLTransportActionListener(ActionListener.<TransportPPLQueryResponse>wrap(transportPPLQueryResponse -> {
-                                String results = transportPPLQueryResponse.getResult();
+                                String results = getPPLResult(transportPPLQueryResponse);
                                 Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
                                 listener
                                     .onResponse(
@@ -308,6 +321,7 @@ public class PPLTool implements Tool {
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
+                Integer.valueOf((String) map.getOrDefault("truncate", "-1")),
                 Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
@@ -497,6 +511,18 @@ public class PPLTool implements Tool {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
         return indexName.trim();
+    }
+
+    private String getPPLResult(TransportPPLQueryResponse transportPPLQueryResponse) throws PrivilegedActionException {
+        String result = transportPPLQueryResponse.getResult();
+        if (this.truncate > 0) {
+            Map<String, Object> returnMap = gson.fromJson(result, Map.class);
+            List<Object> executionResult = (List<Object>) returnMap.get("datarows");
+            List<Object> truncatedResult = executionResult.subList(0, min(executionResult.size(), this.truncate));
+            returnMap.put("datarows", truncatedResult);
+            result = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(returnMap));
+        }
+        return result;
     }
 
     private static Map<String, String> loadDefaultPromptDict() throws IOException {

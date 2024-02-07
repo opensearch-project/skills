@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -133,6 +134,30 @@ public class PPLToolTests {
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
             Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
             assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testTool_withTruncation() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(
+                ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool", "truncate", "2")
+            );
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        List<String> demoExecuteRet = List.of("demo1", "demo2", "demo3");
+        Map<String, String> executeMap = ImmutableMap.of("datarows", gson.toJson(demoExecuteRet));
+        String retResult = gson.toJson(executeMap);
+        when(transportPPLQueryResponse.getResult()).thenReturn(retResult);
+
+        tool.run(ImmutableMap.of("previousTool.output", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            Map<String, Object> executionResult = gson.fromJson(returnResults.get("executionResult"), Map.class);
+            List<Object> datarows = (List<Object>) executionResult.get("datarows");
+            assertEquals(datarows.size(), 2);
             assertEquals("source=demo| head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
 
