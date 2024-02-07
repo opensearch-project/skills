@@ -131,6 +131,6 @@ public class SearchIndexToolIT extends BaseAgentToolsIT {
             + "  }\n"
             + "}\n";
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, agentInput));
-        MatcherAssert.assertThat(exception.getMessage(), containsString("parsing_exception"));
+        MatcherAssert.assertThat(exception.getMessage(), containsString("ParsingException"));
     }
 }
