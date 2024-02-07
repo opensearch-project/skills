@@ -108,7 +108,8 @@ public class SearchAlertsToolTests {
             Collections.emptyList(),
             null,
             null,
-            Collections.emptyList()
+            Collections.emptyList(),
+            null
         );
         Alert alert2 = new Alert(
             "alert-id-2",
@@ -135,7 +136,8 @@ public class SearchAlertsToolTests {
             Collections.emptyList(),
             null,
             null,
-            Collections.emptyList()
+            Collections.emptyList(),
+            null
         );
         List<Alert> mockAlerts = List.of(alert1, alert2);
 
