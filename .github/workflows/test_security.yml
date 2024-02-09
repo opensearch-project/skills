@@ -1,4 +1,4 @@
-name: Security test workflow for Skills
+name: Run Security tests
 on:
   push:
     branches-ignore:
