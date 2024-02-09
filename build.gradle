@@ -11,8 +11,20 @@ buildscript {
     ext {
         opensearch_group = "org.opensearch"
         opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
+         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
-        buildVersionQualifier = System.getProperty("build.version_qualifier", "")
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        plugin_no_snapshot = opensearch_build
+         if (buildVersionQualifier) {
+            opensearch_build += "-${buildVersionQualifier}"
+            plugin_no_snapshot += "-${buildVersionQualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
+        opensearch_no_snapshot = opensearch_build.replace("-SNAPSHOT","")
+    
         kotlin_version = System.getProperty("kotlin.version", "1.8.21")
     }
 
@@ -46,14 +58,8 @@ repositories {
 }
 
 allprojects {
-    group 'org.opensearch'
-    version = opensearch_version.tokenize('-')[0] + '.0'
-    if (buildVersionQualifier) {
-        version += "-${buildVersionQualifier}"
-    }
-    if (isSnapshot) {
-        version += "-SNAPSHOT"
-    }
+    group = opensearch_group
+    version = "${opensearch_build}"
 }
 
 targetCompatibility = JavaVersion.VERSION_11
@@ -76,6 +82,7 @@ def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
     zipArchive
+    pluginZipArchive
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
@@ -114,23 +121,23 @@ dependencies {
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.10.0'
 
     // Plugin dependencies
-    compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${version}"
-    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${version}.jar"])
-    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${version}.jar"])
-    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${version}.jar", "protocol-${version}.jar"])
+    compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
+    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${opensearch_build}.jar"])
+    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
     compileOnly "org.opensearch:common-utils:${version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${version}"
 
 
     // ZipArchive dependencies used for integration tests
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-anomaly-detection', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${version}"
-    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-anomaly-detection', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${opensearch_build}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
