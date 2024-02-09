@@ -5,6 +5,8 @@
 
 import org.opensearch.gradle.test.RestIntegTestTask
 import java.util.concurrent.Callable
+import org.opensearch.gradle.testclusters.OpenSearchCluster
+import java.nio.file.Paths
 import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 
 buildscript {
@@ -43,6 +45,7 @@ plugins {
     id 'java-library'
     id 'com.diffplug.spotless' version '6.23.0'
     id "io.freefair.lombok" version "8.4"
+    id "de.undercouch.download" version "5.3.0"
 }
 
 lombok {
@@ -81,6 +84,7 @@ def adJarDirectory = "$buildDir/dependencies/opensearch-anomaly-detection"
 
 configurations {
     zipArchive
+    secureIntegTestPluginArchive
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
@@ -136,6 +140,7 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${opensearch_build}"
+    secureIntegTestPluginArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
@@ -240,6 +245,87 @@ opensearchplugin {
     noticeFile rootProject.file("NOTICE")
 }
 
+
+def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
+opensearch_tmp_dir.mkdirs()
+
+ext {
+    projectSubstitutions = [:]
+
+    // Config below including files are copied from security demo configuration
+    ['esnode.pem', 'esnode-key.pem', 'root-ca.pem','kirk.pem','kirk-key.pem'].forEach { file ->
+        File local = Paths.get(opensearch_tmp_dir.absolutePath, file).toFile()
+        download.run {
+            src "https://raw.githubusercontent.com/opensearch-project/security/main/bwc-test/src/test/resources/security/" + file
+            dest local
+            overwrite false
+        }
+    }
+
+    isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+    projectSubstitutions = [:]
+
+    configureSecurityPlugin = { OpenSearchCluster cluster ->
+        configurations.secureIntegTestPluginArchive.asFileTree.each {
+            if(it.name.contains("opensearch-security")){
+                cluster.plugin(provider(new Callable<RegularFile>() {
+                    @Override
+                    RegularFile call() throws Exception {
+                        return new RegularFile() {
+                            @Override
+                            File getAsFile() {
+                                return it
+                            }
+                        }
+                    }
+                }))
+            }
+        }
+
+        cluster.getNodes().forEach { node ->
+            var creds = node.getCredentials()
+            if (creds.isEmpty()) {
+                creds.add(Map.of('username', 'admin', 'password', 'admin'))
+            } else {
+                creds.get(0).putAll(Map.of('username', 'admin', 'password', 'admin'))
+            }
+        }
+
+        // // Config below including files are copied from security demo configuration
+        cluster.extraConfigFile("esnode.pem", file("$opensearch_tmp_dir/esnode.pem"))
+        cluster.extraConfigFile("esnode-key.pem", file("$opensearch_tmp_dir/esnode-key.pem"))
+        cluster.extraConfigFile("root-ca.pem", file("$opensearch_tmp_dir/root-ca.pem"))
+
+        // This configuration is copied from the security plugins demo install:
+        // https://github.com/opensearch-project/security/blob/2.11.1.0/tools/install_demo_configuration.sh#L365-L388
+        cluster.setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+        cluster.setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+        cluster.setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+        cluster.setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+        cluster.setting("plugins.security.ssl.http.enabled", "true")
+        cluster.setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+        cluster.setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+        cluster.setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+        cluster.setting("plugins.security.allow_unsafe_democertificates", "true")
+        cluster.setting("plugins.security.allow_default_init_securityindex", "true")
+        cluster.setting("plugins.security.unsupported.inject_user.enabled", "true")
+
+        cluster.setting("plugins.security.authcz.admin_dn", "\n- CN=kirk,OU=client,O=client,L=test, C=de")
+        cluster.setting('plugins.security.restapi.roles_enabled', '["all_access", "security_rest_api_access"]')
+        cluster.setting('plugins.security.system_indices.enabled', "true")
+        cluster.setting('plugins.security.system_indices.indices', '[' +
+                '".plugins-ml-config", ' +
+                '".plugins-ml-connector", ' +
+                '".plugins-ml-model-group", ' +
+                '".plugins-ml-model", ".plugins-ml-task", ' +
+                '".plugins-ml-conversation-meta", ' +
+                '".plugins-ml-conversation-interactions", ' +
+                ']'
+        )
+        cluster.setSecure(true)
+    }
+}
+
 allprojects {
     // Default to the apache license
     project.ext.licenseName = 'The Apache Software License, Version 2.0'
@@ -313,8 +399,6 @@ publishing {
     gradle.startParameter.setLogLevel(LogLevel.DEBUG)
 }
 
-def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
-opensearch_tmp_dir.mkdirs()
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
 // Set up integration tests
@@ -334,6 +418,22 @@ integTest {
     systemProperty "https", System.getProperty("https")
     systemProperty "user", System.getProperty("user")
     systemProperty "password", System.getProperty("password")
+
+    systemProperty 'security.enabled', System.getProperty('security.enabled')
+    var is_https = System.getProperty("https")
+    var user = System.getProperty("user")
+    var password = System.getProperty("password")
+
+    if (System.getProperty("security.enabled") != null) {
+        // If security is enabled, set is_https/user/password defaults
+        is_https = is_https == null ? "true" : is_https
+        user = user == null ? "admin" : user
+        password = password == null ? "admin" : password
+    }
+
+    systemProperty("https", is_https)
+    systemProperty("user", user)
+    systemProperty("password", password)
 
 
     // doFirst delays this block until execution time
@@ -360,6 +460,11 @@ integTest {
 // Set up integration test clusters, installs all zipArchive dependencies and this plugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
+    
+    // Optionally install security
+    if (System.getProperty("security.enabled") != null) {
+        configureSecurityPlugin(testClusters.integTest)
+    }
 
     // Installs all registered zipArchive dependencies on integTest cluster nodes
     configurations.zipArchive.asFileTree.each {
