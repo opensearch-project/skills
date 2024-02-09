@@ -320,6 +320,24 @@ ext {
                 '".plugins-ml-model", ".plugins-ml-task", ' +
                 '".plugins-ml-conversation-meta", ' +
                 '".plugins-ml-conversation-interactions", ' +
+                '".opendistro-alerting-config", ' +
+                '".opendistro-alerting-alert*", ' +
+                '".opendistro-anomaly-results*", ' +
+                '".opendistro-anomaly-detector*", ' +
+                '".opendistro-anomaly-checkpoints", ' +
+                '".opendistro-anomaly-detection-state", ' +
+                '".opendistro-reports-*", ' +
+                '".opensearch-notifications-*", ' +
+                '".opensearch-notebooks", ' +
+                '".opensearch-observability", ' +
+                '".ql-datasources", ' +
+                '".opendistro-asynchronous-search-response*", ' +
+                '".replication-metadata-store", ' +
+                '".opensearch-knn-models", ' +
+                '".geospatial-ip2geo-data*", ' +
+                '".plugins-flow-framework-config", ' +
+                '".plugins-flow-framework-templates", ' +
+                '".plugins-flow-framework-state"' +
                 ']'
         )
         cluster.setSecure(true)
@@ -429,11 +447,23 @@ integTest {
         is_https = is_https == null ? "true" : is_https
         user = user == null ? "admin" : user
         password = password == null ? "admin" : password
+        System.setProperty("https", is_https)
+        System.setProperty("user", user)
+        System.setProperty("password", password)
     }
 
     systemProperty("https", is_https)
     systemProperty("user", user)
     systemProperty("password", password)
+
+    if (System.getProperty("https") != null && System.getProperty("https") == "true") {
+        filter {
+            excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
+        }
+    }
 
 
     // doFirst delays this block until execution time
@@ -515,6 +545,15 @@ task integTestRemote(type: RestIntegTestTask) {
     if (System.getProperty("tests.rest.cluster") != null) {
         filter {
             includeTestsMatching "org.opensearch.integTest.*IT"
+        }
+    }
+
+    if (System.getProperty("https") != null && System.getProperty("https") == "true") {
+        filter {
+            excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
         }
     }
 }
