@@ -355,6 +355,7 @@ integTest {
 
     if (System.getProperty("security.enabled") != null) {
         // If security is enabled, set is_https/user/password defaults
+        // admin password is permissable here since the security plugin is manually configured using the default internal_users.yml configuration
         is_https = is_https == null ? "true" : is_https
         user = user == null ? "admin" : user
         password = password == null ? "admin" : password
@@ -422,6 +423,7 @@ testClusters.integTest {
 
         getNodes().forEach { node ->
             var creds = node.getCredentials()
+            // admin password is permissable here since the security plugin is manually configured using the default internal_users.yml configuration
             if (creds.isEmpty()) {
                 creds.add(Map.of('username', 'admin', 'password', 'admin'))
             } else {
