@@ -5,6 +5,8 @@
 
 import org.opensearch.gradle.test.RestIntegTestTask
 import java.util.concurrent.Callable
+import org.opensearch.gradle.testclusters.OpenSearchCluster
+import java.nio.file.Paths
 import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 
 buildscript {
@@ -44,6 +46,7 @@ plugins {
     id 'java-library'
     id 'com.diffplug.spotless' version '6.23.0'
     id "io.freefair.lombok" version "8.4"
+    id "de.undercouch.download" version "5.3.0"
 }
 
 lombok {
@@ -82,6 +85,7 @@ def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
     zipArchive
+    secureIntegTestPluginArchive
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
@@ -137,6 +141,7 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${opensearch_build}"
+    secureIntegTestPluginArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
 
     // Test dependencies
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
@@ -241,6 +246,14 @@ opensearchplugin {
     noticeFile rootProject.file("NOTICE")
 }
 
+def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
+opensearch_tmp_dir.mkdirs()
+
+ext {
+    projectSubstitutions = [:]
+    isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+}
+
 allprojects {
     // Default to the apache license
     project.ext.licenseName = 'The Apache Software License, Version 2.0'
@@ -314,8 +327,6 @@ publishing {
     gradle.startParameter.setLogLevel(LogLevel.DEBUG)
 }
 
-def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
-opensearch_tmp_dir.mkdirs()
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
 // Set up integration tests
@@ -335,6 +346,34 @@ integTest {
     systemProperty "https", System.getProperty("https")
     systemProperty "user", System.getProperty("user")
     systemProperty "password", System.getProperty("password")
+
+    systemProperty 'security.enabled', System.getProperty('security.enabled')
+    var is_https = System.getProperty("https")
+    var user = System.getProperty("user")
+    var password = System.getProperty("password")
+
+    if (System.getProperty("security.enabled") != null) {
+        // If security is enabled, set is_https/user/password defaults
+        is_https = is_https == null ? "true" : is_https
+        user = user == null ? "admin" : user
+        password = password == null ? "admin" : password
+        System.setProperty("https", is_https)
+        System.setProperty("user", user)
+        System.setProperty("password", password)
+    }
+
+    systemProperty("https", is_https)
+    systemProperty("user", user)
+    systemProperty("password", password)
+
+    if (System.getProperty("https") != null && System.getProperty("https") == "true") {
+        filter {
+            excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
+        }
+    }
 
 
     // doFirst delays this block until execution time
@@ -361,6 +400,95 @@ integTest {
 // Set up integration test clusters, installs all zipArchive dependencies and this plugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
+
+    // Optionally install security
+    if (System.getProperty("security.enabled") != null) {
+         configurations.secureIntegTestPluginArchive.asFileTree.each {
+            if(it.name.contains("opensearch-security")){
+                plugin(provider(new Callable<RegularFile>() {
+                    @Override
+                    RegularFile call() throws Exception {
+                        return new RegularFile() {
+                            @Override
+                            File getAsFile() {
+                                return it
+                            }
+                        }
+                    }
+                }))
+            }
+        }
+
+        getNodes().forEach { node ->
+            var creds = node.getCredentials()
+            if (creds.isEmpty()) {
+                creds.add(Map.of('username', 'admin', 'password', 'admin'))
+            } else {
+                creds.get(0).putAll(Map.of('username', 'admin', 'password', 'admin'))
+            }
+        }
+
+        // Config below including files are copied from security demo configuration
+        ['esnode.pem', 'esnode-key.pem', 'root-ca.pem','kirk.pem','kirk-key.pem'].forEach { file ->
+            File local = Paths.get(opensearch_tmp_dir.absolutePath, file).toFile()
+            download.run {
+                src "https://raw.githubusercontent.com/opensearch-project/security/main/bwc-test/src/test/resources/security/" + file
+                dest local
+                overwrite false
+            }
+        }
+
+        // // Config below including files are copied from security demo configuration
+        extraConfigFile("esnode.pem", file("$opensearch_tmp_dir/esnode.pem"))
+        extraConfigFile("esnode-key.pem", file("$opensearch_tmp_dir/esnode-key.pem"))
+        extraConfigFile("root-ca.pem", file("$opensearch_tmp_dir/root-ca.pem"))
+
+        // This configuration is copied from the security plugins demo install:
+        // https://github.com/opensearch-project/security/blob/2.11.1.0/tools/install_demo_configuration.sh#L365-L388
+        setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+        setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+        setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+        setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+        setting("plugins.security.ssl.http.enabled", "true")
+        setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+        setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+        setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+        setting("plugins.security.allow_unsafe_democertificates", "true")
+        setting("plugins.security.allow_default_init_securityindex", "true")
+        setting("plugins.security.unsupported.inject_user.enabled", "true")
+
+        setting("plugins.security.authcz.admin_dn", "\n- CN=kirk,OU=client,O=client,L=test, C=de")
+        setting('plugins.security.restapi.roles_enabled', '["all_access", "security_rest_api_access"]')
+        setting('plugins.security.system_indices.enabled', "true")
+        setting('plugins.security.system_indices.indices', '[' +
+                '".plugins-ml-config", ' +
+                '".plugins-ml-connector", ' +
+                '".plugins-ml-model-group", ' +
+                '".plugins-ml-model", ".plugins-ml-task", ' +
+                '".plugins-ml-conversation-meta", ' +
+                '".plugins-ml-conversation-interactions", ' +
+                '".opendistro-alerting-config", ' +
+                '".opendistro-alerting-alert*", ' +
+                '".opendistro-anomaly-results*", ' +
+                '".opendistro-anomaly-detector*", ' +
+                '".opendistro-anomaly-checkpoints", ' +
+                '".opendistro-anomaly-detection-state", ' +
+                '".opendistro-reports-*", ' +
+                '".opensearch-notifications-*", ' +
+                '".opensearch-notebooks", ' +
+                '".opensearch-observability", ' +
+                '".ql-datasources", ' +
+                '".opendistro-asynchronous-search-response*", ' +
+                '".replication-metadata-store", ' +
+                '".opensearch-knn-models", ' +
+                '".geospatial-ip2geo-data*", ' +
+                '".plugins-flow-framework-config", ' +
+                '".plugins-flow-framework-templates", ' +
+                '".plugins-flow-framework-state"' +
+                ']'
+        )
+        setSecure(true)
+    }
 
     // Installs all registered zipArchive dependencies on integTest cluster nodes
     configurations.zipArchive.asFileTree.each {
@@ -411,6 +539,15 @@ task integTestRemote(type: RestIntegTestTask) {
     if (System.getProperty("tests.rest.cluster") != null) {
         filter {
             includeTestsMatching "org.opensearch.integTest.*IT"
+        }
+    }
+
+    if (System.getProperty("https") != null && System.getProperty("https") == "true") {
+        filter {
+            excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
+            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
         }
     }
 }
