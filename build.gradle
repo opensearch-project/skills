@@ -82,7 +82,6 @@ def adJarDirectory = "$buildDir/dependencies/opensearch-time-series-analytics"
 
 configurations {
     zipArchive
-    pluginZipArchive
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
@@ -94,19 +93,19 @@ configurations {
 
 task addJarsToClasspath(type: Copy) {
     from(fileTree(dir: sqlJarDirectory)) {
-        include "opensearch-sql-${version}.jar"
-        include "ppl-${version}.jar"
-        include "protocol-${version}.jar"
+        include "opensearch-sql-${opensearch_build}.jar"
+        include "ppl-${opensearch_build}.jar"
+        include "protocol-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
 
     from(fileTree(dir: jsJarDirectory)) {
-        include "opensearch-job-scheduler-${version}.jar"
+        include "opensearch-job-scheduler-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
 
     from(fileTree(dir: adJarDirectory)) {
-        include "opensearch-time-series-analytics-${version}.jar"
+        include "opensearch-time-series-analytics-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
 }
@@ -124,10 +123,10 @@ dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${opensearch_build}.jar"])
-    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${version}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
-    compileOnly "org.opensearch:common-utils:${version}"
+    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
+    compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
-    compileOnly "org.opensearch:opensearch-job-scheduler-spi:${version}"
+    compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
 
 
     // ZipArchive dependencies used for integration tests
