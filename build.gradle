@@ -367,12 +367,12 @@ integTest {
     systemProperty("user", user)
     systemProperty("password", password)
 
+    // Certain integ tests require system index manipulation to properly test. We exclude those
+    // in the security-enabled scenario since this action is prohibited by security plugin.
     if (System.getProperty("https") != null && System.getProperty("https") == "true") {
         filter {
             excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
-            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
             excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
-            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
         }
     }
 
@@ -544,12 +544,12 @@ task integTestRemote(type: RestIntegTestTask) {
         }
     }
 
+    // Certain integ tests require system index manipulation to properly test. We exclude those
+    // in the security-enabled scenario since this action is prohibited by security plugin.
     if (System.getProperty("https") != null && System.getProperty("https") == "true") {
         filter {
             excludeTestsMatching "org.opensearch.integTest.SearchAlertsToolIT"
-            excludeTestsMatching "org.opensearch.integTest.SearchAnomalyDetectorsToolIT"
             excludeTestsMatching "org.opensearch.integTest.SearchAnomalyResultsToolIT"
-            excludeTestsMatching "org.opensearch.integTest.SearchMonitorsToolIT"
         }
     }
 }
