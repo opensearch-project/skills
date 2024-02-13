@@ -126,11 +126,28 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         return parseFieldFromResponse(response, "_id").toString();
     }
 
+    protected void deleteMonitor(String monitorId) {
+        Response response = makeRequest(client(), "DELETE", "_plugins/_alerting/monitors/" + monitorId, null, (String) null, null);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
     protected String indexDetector(String detectorAsJsonString) {
         Response response = makeRequest(client(), "POST", "_plugins/_anomaly_detection/detectors", null, detectorAsJsonString, null);
 
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, "_id").toString();
+    }
+
+    protected void deleteDetector(String detectorId) {
+        Response response = makeRequest(
+            client(),
+            "DELETE",
+            "_plugins/_anomaly_detection/detectors/" + detectorId,
+            null,
+            (String) null,
+            null
+        );
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
     @SneakyThrows

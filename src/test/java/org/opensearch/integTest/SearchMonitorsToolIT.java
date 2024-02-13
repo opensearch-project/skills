@@ -12,7 +12,9 @@ import java.nio.file.Path;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.TestMethodOrder;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -21,6 +23,7 @@ import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
+@TestMethodOrder(OrderAnnotation.class)
 public class SearchMonitorsToolIT extends BaseAgentToolsIT {
     private String registerAgentRequestBody;
     private String sampleMonitor;
@@ -38,21 +41,15 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         sampleMonitor = Files.readString(Path.of(this.getClass().getClassLoader().getResource(sampleMonitorFilepath).toURI()));
     }
 
-    @BeforeEach
-    @SneakyThrows
-    public void prepareTest() {
-        deleteSystemIndices();
-    }
-
     @After
     @SneakyThrows
     public void tearDown() {
         super.tearDown();
         deleteExternalIndices();
-        deleteSystemIndices();
     }
 
     @SneakyThrows
+    @Order(1)
     public void testSearchMonitorsToolInFlowAgent_withNoSystemIndex() {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \"" + monitorName + "\"}}";
@@ -61,29 +58,33 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
     }
 
     @SneakyThrows
+    @Order(2)
     public void testSearchMonitorsToolInFlowAgent_searchById() {
         String monitorId = ingestSampleMonitor(monitorName, true);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorId\": \"" + monitorId + "\"}}";
-
         String result = executeAgent(agentId, agentInput);
         assertTrue(result.contains(String.format("name=%s", monitorName)));
         assertTrue(result.contains("TotalMonitors=1"));
+        deleteMonitor(monitorId);
     }
 
     @SneakyThrows
+    @Order(3)
     public void testSearchMonitorsToolInFlowAgent_singleMonitor_noFilter() {
-        ingestSampleMonitor(monitorName, true);
+        String monitorId = ingestSampleMonitor(monitorName, true);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
         String result = executeAgent(agentId, agentInput);
         assertTrue(result.contains(String.format("name=%s", monitorName)));
         assertTrue(result.contains("TotalMonitors=1"));
+        deleteMonitor(monitorId);
     }
 
     @SneakyThrows
+    @Order(4)
     public void testSearchMonitorsToolInFlowAgent_singleMonitor_filter() {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorId\": \"" + "foo-id" + "\"}}";
@@ -92,9 +93,10 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
     }
 
     @SneakyThrows
+    @Order(5)
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_noFilter() {
-        ingestSampleMonitor(monitorName, true);
-        ingestSampleMonitor(monitorName2, false);
+        String monitorId1 = ingestSampleMonitor(monitorName, true);
+        String monitorId2 = ingestSampleMonitor(monitorName2, false);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
@@ -104,12 +106,15 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         assertTrue(result.contains("enabled=true"));
         assertTrue(result.contains("enabled=false"));
         assertTrue(result.contains("TotalMonitors=2"));
+        deleteMonitor(monitorId1);
+        deleteMonitor(monitorId2);
     }
 
     @SneakyThrows
+    @Order(6)
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_filter() {
-        ingestSampleMonitor(monitorName, true);
-        ingestSampleMonitor(monitorName2, false);
+        String monitorId1 = ingestSampleMonitor(monitorName, true);
+        String monitorId2 = ingestSampleMonitor(monitorName2, false);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \"" + monitorName + "\"}}";
@@ -118,12 +123,15 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         assertFalse(result.contains(String.format("name=%s", monitorName2)));
         assertTrue(result.contains("enabled=true"));
         assertTrue(result.contains("TotalMonitors=1"));
+        deleteMonitor(monitorId1);
+        deleteMonitor(monitorId2);
     }
 
     @SneakyThrows
+    @Order(7)
     public void testSearchMonitorsToolInFlowAgent_multipleMonitors_complexParams() {
-        ingestSampleMonitor(monitorName, true);
-        ingestSampleMonitor(monitorName2, false);
+        String monitorId1 = ingestSampleMonitor(monitorName, true);
+        String monitorId2 = ingestSampleMonitor(monitorName2, false);
 
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \""
@@ -131,6 +139,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
             + "\", \"enabled\": true, \"hasTriggers\": false, \"sortOrder\": \"asc\", \"sortString\": \"monitor.name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
         String result = executeAgent(agentId, agentInput);
         assertTrue(result.contains("TotalMonitors=1"));
+        deleteMonitor(monitorId1);
+        deleteMonitor(monitorId2);
     }
 
     private String ingestSampleMonitor(String monitorName, boolean enabled) {
