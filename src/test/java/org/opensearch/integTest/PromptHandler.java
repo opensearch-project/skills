@@ -23,7 +23,7 @@ public class PromptHandler {
     }
 
     String response(String prompt) {
-        if (prompt.contains("TOOL RESPONSE: ")) {
+        if (prompt.contains("Human: TOOL RESPONSE ")) {
             return "```json{\n"
                 + "    \"thought\": \"Thought: Now I know the final answer\",\n"
                 + "    \"final_answer\": \"final answer\"\n"
