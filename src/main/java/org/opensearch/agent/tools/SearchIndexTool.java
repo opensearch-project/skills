@@ -50,7 +50,7 @@ public class SearchIndexTool implements Tool {
 
     public static final String TYPE = "SearchIndexTool";
     private static final String DEFAULT_DESCRIPTION =
-        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query. Only use this tool when a DSL query is available.";
+        "Use this tool to search an index by providing two parameters: 'index' for the index name, and 'query' for the OpenSearch DSL formatted query. Only use this tool when both index name and DSL query is available.";
 
     private String name = TYPE;
 
