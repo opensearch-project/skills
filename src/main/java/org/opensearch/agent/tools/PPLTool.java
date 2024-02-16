@@ -94,6 +94,8 @@ public class PPLTool implements Tool {
 
     private String previousToolKey;
 
+    private int head;
+
     private static Gson gson = new Gson();
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
@@ -147,7 +149,15 @@ public class PPLTool implements Tool {
 
     }
 
-    public PPLTool(Client client, String modelId, String contextPrompt, String pplModelType, String previousToolKey, boolean execute) {
+    public PPLTool(
+        Client client,
+        String modelId,
+        String contextPrompt,
+        String pplModelType,
+        String previousToolKey,
+        int head,
+        boolean execute
+    ) {
         this.client = client;
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
@@ -157,6 +167,7 @@ public class PPLTool implements Tool {
             this.contextPrompt = contextPrompt;
         }
         this.previousToolKey = previousToolKey;
+        this.head = head;
         this.execute = execute;
     }
 
@@ -307,6 +318,7 @@ public class PPLTool implements Tool {
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
+                Integer.valueOf((String) map.getOrDefault("head", "-1")),
                 Boolean.valueOf((String) map.getOrDefault("execute", "true"))
             );
         }
@@ -487,6 +499,14 @@ public class PPLTool implements Tool {
         }
         ppl = ppl.replace("`", "");
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
+        if (this.head > 0) {
+            String[] lists = llmOutput.split("\\|");
+            String lastCommand = lists[lists.length - 1].strip();
+            if (!lastCommand.toLowerCase(Locale.ROOT).startsWith("head")) // not handle cases source=...| ... | head 5 | head <head>
+            {
+                ppl = ppl + " | head " + this.head;
+            }
+        }
         return ppl;
     }
 
