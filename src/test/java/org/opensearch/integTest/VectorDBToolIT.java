@@ -71,7 +71,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
             + "      },\n"
             + "      \"embedding\": {\n"
             + "        \"type\": \"knn_vector\",\n"
-            + "        \"dimension\": 384,\n"
+            + "        \"dimension\": 768,\n"
             + "        \"method\": {\n"
             + "          \"name\": \"hnsw\",\n"
             + "          \"space_type\": \"l2\",\n"
@@ -126,6 +126,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
     public void tearDown() {
         super.tearDown();
         deleteExternalIndices();
+        deleteModel(modelId);
     }
 
     public void testVectorDBToolInFlowAgent() {
@@ -135,8 +136,8 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"c\"}}");
         assertEquals(
             "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.60735726}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.3785958}\n",
+            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.7046764}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.2649903}\n",
             result
         );
 
@@ -145,8 +146,8 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
 
         assertEquals(
             "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.70875686}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.39044854}\n",
+            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.56714886}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.24236833}\n",
             result1
         );
 
@@ -156,7 +157,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("[input] is null or empty, can not process it."), containsString("illegal_argument_exception"))
+                allOf(containsString("[input] is null or empty, can not process it."), containsString("IllegalArgumentException"))
             );
     }
 
@@ -165,8 +166,8 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
         assertEquals(
             "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":0.7572355}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"0\",\"_score\":0.38389856}\n",
+            "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"0\",\"_score\":0.70493275}\n"
+                + "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":0.2650575}\n",
             result
         );
     }
@@ -178,10 +179,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("failed to create query: Field 'embedding2' is not knn_vector type."),
-                    containsString("query_shard_exception")
-                )
+                allOf(containsString("all shards failed"), containsString("SearchPhaseExecutionException"))
             );
     }
 
@@ -192,7 +190,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("no such index [test_index2]"), containsString("index_not_found_exception"))
+                allOf(containsString("no such index [test_index2]"), containsString("IndexNotFoundException"))
             );
     }
 
@@ -201,6 +199,6 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
 
         org.hamcrest.MatcherAssert
-            .assertThat(exception.getMessage(), allOf(containsString("Failed to find model"), containsString("status_exception")));
+            .assertThat(exception.getMessage(), allOf(containsString("Failed to find model"), containsString("OpenSearchStatusException")));
     }
 }
