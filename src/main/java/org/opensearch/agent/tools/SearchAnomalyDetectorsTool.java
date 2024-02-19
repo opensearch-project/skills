@@ -29,7 +29,6 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.MatchQueryBuilder;
-import org.opensearch.index.query.Operator;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
@@ -118,7 +117,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
             mustList.add(new WildcardQueryBuilder("name.keyword", detectorNamePattern));
         }
         if (indices != null) {
-            mustList.add(new MatchQueryBuilder("indices", indices).operator(Operator.AND));
+            mustList.add(new MatchQueryBuilder("indices", indices).analyzer("keyword"));
         }
         if (highCardinality != null) {
             mustList.add(new TermQueryBuilder("detector_type", highCardinality ? "MULTI_ENTITY" : "SINGLE_ENTITY"));
