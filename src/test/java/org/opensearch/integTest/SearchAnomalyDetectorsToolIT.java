@@ -59,46 +59,126 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     @Order(2)
-    public void testSearchAnomalyDetectorsToolInFlowAgent_noMatching() {
-        setupTestDetectionIndex("test-index");
-        String detectorId = ingestSampleDetector(detectorName, "test-index");
-        String agentId = createAgent(registerAgentRequestBody);
-        String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "foo" + "\"}}";
-        String result = executeAgent(agentId, agentInput);
-        assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
-        deleteDetector(detectorId);
+    public void testSearchAnomalyDetectorsToolInFlowAgent_detectorNameParam() {
+        String detectorId = "";
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "foo" + "\"}}";
+            String result = executeAgent(agentId, agentInput);
+            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+
+            String agentInput2 = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
+            String result2 = executeAgent(agentId, agentInput2);
+            assertTrue(result2.contains(String.format("id=%s", detectorId)));
+            assertTrue(result2.contains(String.format("name=%s", detectorName)));
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+        }
     }
 
     @SneakyThrows
     @Order(3)
-    public void testSearchAnomalyDetectorsToolInFlowAgent_matching() {
-        setupTestDetectionIndex("test-index");
-        String detectorId = ingestSampleDetector(detectorName, "test-index");
-        String agentId = createAgent(registerAgentRequestBody);
-        String agentInput = "{\"parameters\":{\"detectorName\": \"" + detectorName + "\"}}";
-        String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("id=%s", detectorId)));
-        assertTrue(result.contains(String.format("name=%s", detectorName)));
-        assertTrue(result.contains(String.format("TotalAnomalyDetectors=%d", 1)));
-        deleteDetector(detectorId);
+    public void testSearchAnomalyDetectorsToolInFlowAgent_detectorNamePatternParam() {
+        String detectorId = "";
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"detectorNamePattern\": \"" + detectorName + "foo" + "\"}}";
+            String result = executeAgent(agentId, agentInput);
+            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+
+            String agentInput2 = "{\"parameters\":{\"detectorNamePattern\": \"" + detectorName + "*" + "\"}}";
+            String result2 = executeAgent(agentId, agentInput2);
+            assertTrue(result2.contains(String.format("id=%s", detectorId)));
+            assertTrue(result2.contains(String.format("name=%s", detectorName)));
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+        }
+
     }
 
     @SneakyThrows
     @Order(4)
+    public void testSearchAnomalyDetectorsToolInFlowAgent_indicesParam() {
+        String detectorId = "";
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"indices\": \"test-index-foo\"}}";
+            String result = executeAgent(agentId, agentInput);
+            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+
+            String agentInput2 = "{\"parameters\":{\"indices\": \"test-index\"}}";
+            String result2 = executeAgent(agentId, agentInput2);
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+        }
+
+    }
+
+    @SneakyThrows
+    @Order(5)
+    public void testSearchAnomalyDetectorsToolInFlowAgent_highCardinalityParam() {
+        String detectorId = "";
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"highCardinality\": \"true\"}}";
+            String result = executeAgent(agentId, agentInput);
+            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+
+            String agentInput2 = "{\"parameters\":{\"highCardinality\": \"false\"}}";
+            String result2 = executeAgent(agentId, agentInput2);
+            assertTrue(result2.contains(String.format("id=%s", detectorId)));
+            assertTrue(result2.contains(String.format("name=%s", detectorName)));
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+        }
+
+    }
+
+    @SneakyThrows
+    @Order(6)
     public void testSearchAnomalyDetectorsToolInFlowAgent_complexParams() {
-        setupTestDetectionIndex("test-index");
-        String detectorId = ingestSampleDetector(detectorName, "test-index");
-        String detectorIdFoo = ingestSampleDetector(detectorName + "foo", "test-index");
-        String agentId = createAgent(registerAgentRequestBody);
-        String agentInput = "{\"parameters\":{\"detectorName\": \""
-            + detectorName
-            + "\", \"highCardinality\": false, \"sortOrder\": \"asc\", \"sortString\": \"name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
-        String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("id=%s", detectorId)));
-        assertTrue(result.contains(String.format("name=%s", detectorName)));
-        assertTrue(result.contains(String.format("TotalAnomalyDetectors=%d", 1)));
-        deleteDetector(detectorId);
-        deleteDetector(detectorIdFoo);
+        String detectorId = null;
+        String detectorIdFoo = null;
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            detectorIdFoo = ingestSampleDetector(detectorName + "foo", "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"detectorName\": \""
+                + detectorName
+                + "\", \"highCardinality\": false, \"sortOrder\": \"asc\", \"sortString\": \"name.keyword\", \"size\": 10, \"startIndex\": 0 }}";
+            String result = executeAgent(agentId, agentInput);
+            assertTrue(result.contains(String.format("id=%s", detectorId)));
+            assertTrue(result.contains(String.format("name=%s", detectorName)));
+            assertTrue(result.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+            if (detectorIdFoo != null) {
+                deleteDetector(detectorIdFoo);
+            }
+        }
     }
 
     @SneakyThrows
