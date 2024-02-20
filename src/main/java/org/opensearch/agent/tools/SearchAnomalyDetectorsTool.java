@@ -116,7 +116,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
             mustList.add(new WildcardQueryBuilder("name.keyword", detectorNamePattern));
         }
         if (indices != null) {
-            mustList.add(new TermQueryBuilder("indices", indices));
+            mustList.add(new TermQueryBuilder("indices.keyword", indices));
         }
         if (highCardinality != null) {
             mustList.add(new TermQueryBuilder("detector_type", highCardinality ? "MULTI_ENTITY" : "SINGLE_ENTITY"));

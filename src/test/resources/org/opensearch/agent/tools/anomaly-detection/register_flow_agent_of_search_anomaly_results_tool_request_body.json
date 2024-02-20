@@ -3,8 +3,7 @@
   "type": "flow",
   "tools": [
     {
-      "type": "SearchAnomalyResultsTool",
-      "description": "Use this tool to search anomaly results."
+      "type": "SearchAnomalyResultsTool"
     }
   ]
 }
