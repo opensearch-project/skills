@@ -3,8 +3,7 @@
   "type": "flow",
   "tools": [
     {
-      "type": "SearchMonitorsTool",
-      "description": "Use this tool to search alerting monitors."
+      "type": "SearchMonitorsTool"
     }
   ]
 }
