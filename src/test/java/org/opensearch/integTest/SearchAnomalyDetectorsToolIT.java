@@ -156,6 +156,31 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     @Order(6)
+    public void testSearchAnomalyDetectorsToolInFlowAgent_runningParam() {
+        String detectorId = "";
+        try {
+            setupTestDetectionIndex("test-index");
+            detectorId = ingestSampleDetector(detectorName, "test-index");
+            String agentId = createAgent(registerAgentRequestBody);
+            String agentInput = "{\"parameters\":{\"running\": \"true\"}}";
+            String result = executeAgent(agentId, agentInput);
+            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+
+            String agentInput2 = "{\"parameters\":{\"running\": \"false\"}}";
+            String result2 = executeAgent(agentId, agentInput2);
+            assertTrue(result2.contains(String.format("id=%s", detectorId)));
+            assertTrue(result2.contains(String.format("name=%s", detectorName)));
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        } finally {
+            if (detectorId != null) {
+                deleteDetector(detectorId);
+            }
+        }
+
+    }
+
+    @SneakyThrows
+    @Order(7)
     public void testSearchAnomalyDetectorsToolInFlowAgent_complexParams() {
         String detectorId = null;
         String detectorIdFoo = null;

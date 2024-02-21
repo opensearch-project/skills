@@ -26,6 +26,7 @@ import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
 import org.opensearch.client.Client;
 import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
@@ -49,7 +50,7 @@ import lombok.extern.log4j.Log4j2;
 public class SearchAnomalyDetectorsTool implements Tool {
     public static final String TYPE = "SearchAnomalyDetectorsTool";
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool that searches anomaly detectors. It takes 12 optional arguments named detectorName which is the explicit name of the monitor (default is null), and detectorNamePattern which is a wildcard query to match detector name (default is null), and indices which defines the index or index pattern the detector is detecting over (default is null), and highCardinality which defines whether the anomaly detector is high cardinality (synonymous with multi-entity) of non-high-cardinality (synonymous with single-entity) (default is null, indicating both), and lastUpdateTime which defines the latest update time of the anomaly detector in epoch milliseconds (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the paginated index to start from (default is 0), and running which defines whether the anomaly detector is running (default is null, indicating both), and disabled which defines whether the anomaly detector is disabled (default is null, indicating both), and failed which defines whether the anomaly detector has failed (default is null, indicating both). The tool returns 2 values: a list of anomaly detectors (each containing the detector id, detector name, detector type indicating multi-entity or single-entity (where multi-entity also means high-cardinality), detector description, name of the configured index, last update time in epoch milliseconds), and the total number of anomaly detectors.";
+        "This is a tool that searches anomaly detectors. It takes 12 optional arguments named detectorName which is the explicit name of the detector (default is null), and detectorNamePattern which is a wildcard query to match detector name (default is null), and indices which defines the index or index pattern the detector is detecting over (default is null), and highCardinality which defines whether the anomaly detector is high cardinality (synonymous with multi-entity) of non-high-cardinality (synonymous with single-entity) (default is null, indicating both), and lastUpdateTime which defines the latest update time of the anomaly detector in epoch milliseconds (default is null), and sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the paginated index to start from (default is 0), and running which defines whether the anomaly detector is running (default is null, indicating both), and disabled which defines whether the anomaly detector is disabled (default is null, indicating both), and failed which defines whether the anomaly detector has failed (default is null, indicating both). The tool returns 2 values: a list of anomaly detectors (each containing the detector id, detector name, detector type indicating multi-entity or single-entity (where multi-entity also means high-cardinality), detector description, name of the configured index, last update time in epoch milliseconds), and the total number of anomaly detectors.";
 
     @Setter
     @Getter
@@ -70,9 +71,9 @@ public class SearchAnomalyDetectorsTool implements Tool {
     @Setter
     private Parser<?, ?> outputParser;
 
-    public SearchAnomalyDetectorsTool(Client client) {
+    public SearchAnomalyDetectorsTool(Client client, NamedWriteableRegistry namedWriteableRegistry) {
         this.client = client;
-        this.adClient = new AnomalyDetectionNodeClient(client);
+        this.adClient = new AnomalyDetectionNodeClient(client, namedWriteableRegistry);
 
         // probably keep this overridden output parser. need to ensure the output matches what's expected
         outputParser = new Parser<>() {
@@ -262,6 +263,8 @@ public class SearchAnomalyDetectorsTool implements Tool {
     public static class Factory implements Tool.Factory<SearchAnomalyDetectorsTool> {
         private Client client;
 
+        private NamedWriteableRegistry namedWriteableRegistry;
+
         private AnomalyDetectionNodeClient adClient;
 
         private static Factory INSTANCE;
@@ -286,14 +289,15 @@ public class SearchAnomalyDetectorsTool implements Tool {
          * Initialize this factory
          * @param client The OpenSearch client
          */
-        public void init(Client client) {
+        public void init(Client client, NamedWriteableRegistry namedWriteableRegistry) {
             this.client = client;
-            this.adClient = new AnomalyDetectionNodeClient(client);
+            this.namedWriteableRegistry = namedWriteableRegistry;
+            this.adClient = new AnomalyDetectionNodeClient(client, namedWriteableRegistry);
         }
 
         @Override
         public SearchAnomalyDetectorsTool create(Map<String, Object> map) {
-            return new SearchAnomalyDetectorsTool(client);
+            return new SearchAnomalyDetectorsTool(client, namedWriteableRegistry);
         }
 
         @Override

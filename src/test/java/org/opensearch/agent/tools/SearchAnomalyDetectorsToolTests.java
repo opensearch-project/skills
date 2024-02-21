@@ -41,12 +41,15 @@ import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
 import org.opensearch.timeseries.model.IntervalTimeConfiguration;
 
 public class SearchAnomalyDetectorsToolTests {
+    @Mock
+    private NamedWriteableRegistry namedWriteableRegistry;
     @Mock
     private NodeClient nodeClient;
 
@@ -59,7 +62,7 @@ public class SearchAnomalyDetectorsToolTests {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
-        SearchAnomalyDetectorsTool.Factory.getInstance().init(nodeClient);
+        SearchAnomalyDetectorsTool.Factory.getInstance().init(nodeClient, namedWriteableRegistry);
 
         nullParams = null;
         emptyParams = Collections.emptyMap();
