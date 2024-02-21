@@ -69,8 +69,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         SearchIndexTool.Factory.getInstance().init(client, xContentRegistry);
         RAGTool.Factory.getInstance().init(client, xContentRegistry);
         SearchAlertsTool.Factory.getInstance().init(client);
-        SearchAnomalyDetectorsTool.Factory.getInstance().init(client);
-        SearchAnomalyResultsTool.Factory.getInstance().init(client);
+        SearchAnomalyDetectorsTool.Factory.getInstance().init(client, namedWriteableRegistry);
+        SearchAnomalyResultsTool.Factory.getInstance().init(client, namedWriteableRegistry);
         SearchMonitorsTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
