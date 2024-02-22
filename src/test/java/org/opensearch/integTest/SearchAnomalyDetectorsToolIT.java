@@ -60,7 +60,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     @Order(2)
     public void testSearchAnomalyDetectorsToolInFlowAgent_detectorNameParam() {
-        String detectorId = "";
+        String detectorId = null;
         try {
             setupTestDetectionIndex("test-index");
             detectorId = ingestSampleDetector(detectorName, "test-index");
@@ -84,7 +84,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     @Order(3)
     public void testSearchAnomalyDetectorsToolInFlowAgent_detectorNamePatternParam() {
-        String detectorId = "";
+        String detectorId = null;
         try {
             setupTestDetectionIndex("test-index");
             detectorId = ingestSampleDetector(detectorName, "test-index");
@@ -109,7 +109,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     @Order(4)
     public void testSearchAnomalyDetectorsToolInFlowAgent_indicesParam() {
-        String detectorId = "";
+        String detectorId = null;
         try {
             setupTestDetectionIndex("test-index");
             detectorId = ingestSampleDetector(detectorName, "test-index");
@@ -132,7 +132,7 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     @Order(5)
     public void testSearchAnomalyDetectorsToolInFlowAgent_highCardinalityParam() {
-        String detectorId = "";
+        String detectorId = null;
         try {
             setupTestDetectionIndex("test-index");
             detectorId = ingestSampleDetector(detectorName, "test-index");
@@ -156,24 +156,52 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     @Order(6)
-    public void testSearchAnomalyDetectorsToolInFlowAgent_runningParam() {
-        String detectorId = "";
+    public void testSearchAnomalyDetectorsToolInFlowAgent_detectorStateParams() {
+        String detectorIdRunning = null;
+        String detectorIdDisabled1 = null;
+        String detectorIdDisabled2 = null;
         try {
+            // TODO: update test scenarios
             setupTestDetectionIndex("test-index");
-            detectorId = ingestSampleDetector(detectorName, "test-index");
+            detectorIdRunning = ingestSampleDetector(detectorName + "-running", "test-index");
+            detectorIdDisabled1 = ingestSampleDetector(detectorName + "-disabled-1", "test-index");
+            detectorIdDisabled2 = ingestSampleDetector(detectorName + "-disabled-2", "test-index");
+            startDetector(detectorIdRunning);
+            Thread.sleep(5000);
+
             String agentId = createAgent(registerAgentRequestBody);
             String agentInput = "{\"parameters\":{\"running\": \"true\"}}";
             String result = executeAgent(agentId, agentInput);
-            assertEquals("AnomalyDetectors=[]TotalAnomalyDetectors=0", result);
+            assertTrue(result.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+            assertTrue(result.contains(detectorIdRunning));
 
             String agentInput2 = "{\"parameters\":{\"running\": \"false\"}}";
             String result2 = executeAgent(agentId, agentInput2);
-            assertTrue(result2.contains(String.format("id=%s", detectorId)));
-            assertTrue(result2.contains(String.format("name=%s", detectorName)));
-            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+            assertTrue(result2.contains(String.format("TotalAnomalyDetectors=%d", 2)));
+            assertTrue(result2.contains(detectorIdDisabled1));
+            assertTrue(result2.contains(detectorIdDisabled2));
+
+            String agentInput3 = "{\"parameters\":{\"failed\": \"true\"}}";
+            String result3 = executeAgent(agentId, agentInput3);
+            assertTrue(result3.contains(String.format("TotalAnomalyDetectors=%d", 0)));
+
+            String agentInput4 = "{\"parameters\":{\"failed\": \"false\"}}";
+            String result4 = executeAgent(agentId, agentInput4);
+            assertTrue(result4.contains(String.format("TotalAnomalyDetectors=%d", 3)));
+            assertTrue(result4.contains(detectorIdRunning));
+            assertTrue(result4.contains(detectorIdDisabled1));
+            assertTrue(result4.contains(detectorIdDisabled2));
         } finally {
-            if (detectorId != null) {
-                deleteDetector(detectorId);
+            if (detectorIdRunning != null) {
+                stopDetector(detectorIdRunning);
+                Thread.sleep(5000);
+                deleteDetector(detectorIdRunning);
+            }
+            if (detectorIdDisabled1 != null) {
+                deleteDetector(detectorIdDisabled1);
+            }
+            if (detectorIdDisabled2 != null) {
+                deleteDetector(detectorIdDisabled2);
             }
         }
 
