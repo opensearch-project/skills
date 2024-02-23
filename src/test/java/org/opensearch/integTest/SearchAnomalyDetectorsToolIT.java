@@ -191,6 +191,28 @@ public class SearchAnomalyDetectorsToolIT extends BaseAgentToolsIT {
             assertTrue(result4.contains(detectorIdRunning));
             assertTrue(result4.contains(detectorIdDisabled1));
             assertTrue(result4.contains(detectorIdDisabled2));
+
+            String agentInput5 = "{\"parameters\":{\"running\": \"true\", \"failed\": \"true\"}}";
+            String result5 = executeAgent(agentId, agentInput5);
+            assertTrue(result5.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+            assertTrue(result5.contains(detectorIdRunning));
+
+            String agentInput6 = "{\"parameters\":{\"running\": \"true\", \"failed\": \"false\"}}";
+            String result6 = executeAgent(agentId, agentInput6);
+            assertTrue(result6.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+            assertTrue(result6.contains(detectorIdRunning));
+
+            String agentInput7 = "{\"parameters\":{\"running\": \"false\", \"failed\": \"true\"}}";
+            String result7 = executeAgent(agentId, agentInput7);
+            assertTrue(result7.contains(String.format("TotalAnomalyDetectors=%d", 2)));
+            assertTrue(result7.contains(detectorIdDisabled1));
+            assertTrue(result7.contains(detectorIdDisabled2));
+
+            String agentInput8 = "{\"parameters\":{\"running\": \"false\", \"failed\": \"false\"}}";
+            String result8 = executeAgent(agentId, agentInput8);
+            assertTrue(result8.contains(String.format("TotalAnomalyDetectors=%d", 2)));
+            assertTrue(result8.contains(detectorIdDisabled1));
+            assertTrue(result8.contains(detectorIdDisabled2));
         } finally {
             if (detectorIdRunning != null) {
                 stopDetector(detectorIdRunning);

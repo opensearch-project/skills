@@ -208,18 +208,19 @@ public class SearchAnomalyDetectorsTool implements Tool {
                             }
                         }
 
-                        // if the detector state matches something set as "true", then don't remove
-                        boolean matchesTrueStates = (Boolean.TRUE.equals(running)
-                            && detectorState.equals(DetectorStateString.Running.name()))
-                            || (Boolean.TRUE.equals(failed) && detectorState.equals(DetectorStateString.Failed.name()));
+                        boolean includeRunning = running != null && running == true;
+                        boolean includeFailed = failed != null && failed == true;
+                        boolean isValid = true;
 
-                        // if the detector state matches something set as "false", then don't remove
-                        boolean matchesFalseStates = (Boolean.FALSE.equals(running)
-                            && !detectorState.equals(DetectorStateString.Running.name()))
-                            || (Boolean.FALSE.equals(failed) && !detectorState.equals(DetectorStateString.Failed.name()));
+                        if (detectorState.equals(DetectorStateString.Running.name())) {
+                            isValid = (running == null || running == true) && !(includeFailed && running == null);
+                        } else if (detectorState.equals(DetectorStateString.Failed.name())) {
+                            isValid = (failed == null || failed == true) && !(includeRunning && failed == null);
+                        } else if (detectorState.equals(DetectorStateString.Disabled.name())) {
+                            isValid = (running == null || running == false) && !(includeFailed && running == null);
+                        }
 
-                        // if the detector state doesn't match either of these, then remove it
-                        if (!matchesTrueStates && !matchesFalseStates) {
+                        if (!isValid) {
                             hitsAsMap.remove(responseDetectorName);
                         }
                     }
