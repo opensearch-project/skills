@@ -16,6 +16,7 @@ import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.ExistsQueryBuilder;
@@ -61,9 +62,9 @@ public class SearchAnomalyResultsTool implements Tool {
     @Setter
     private Parser<?, ?> outputParser;
 
-    public SearchAnomalyResultsTool(Client client) {
+    public SearchAnomalyResultsTool(Client client, NamedWriteableRegistry namedWriteableRegistry) {
         this.client = client;
-        this.adClient = new AnomalyDetectionNodeClient(client);
+        this.adClient = new AnomalyDetectionNodeClient(client, namedWriteableRegistry);
 
         // probably keep this overridden output parser. need to ensure the output matches what's expected
         outputParser = new Parser<>() {
@@ -190,6 +191,8 @@ public class SearchAnomalyResultsTool implements Tool {
     public static class Factory implements Tool.Factory<SearchAnomalyResultsTool> {
         private Client client;
 
+        private NamedWriteableRegistry namedWriteableRegistry;
+
         private AnomalyDetectionNodeClient adClient;
 
         private static Factory INSTANCE;
@@ -214,14 +217,15 @@ public class SearchAnomalyResultsTool implements Tool {
          * Initialize this factory
          * @param client The OpenSearch client
          */
-        public void init(Client client) {
+        public void init(Client client, NamedWriteableRegistry namedWriteableRegistry) {
             this.client = client;
-            this.adClient = new AnomalyDetectionNodeClient(client);
+            this.namedWriteableRegistry = namedWriteableRegistry;
+            this.adClient = new AnomalyDetectionNodeClient(client, namedWriteableRegistry);
         }
 
         @Override
         public SearchAnomalyResultsTool create(Map<String, Object> map) {
-            return new SearchAnomalyResultsTool(client);
+            return new SearchAnomalyResultsTool(client, namedWriteableRegistry);
         }
 
         @Override
