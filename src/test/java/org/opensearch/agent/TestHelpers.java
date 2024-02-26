@@ -41,10 +41,10 @@ public class TestHelpers {
         );
     }
 
-    public static GetAnomalyDetectorResponse generateGetAnomalyDetectorResponses(String[] detectorIds, String[] detectorStates) {
+    public static GetAnomalyDetectorResponse generateGetAnomalyDetectorResponses(String[] detectorNames, String[] detectorStates) {
         AnomalyDetector detector = Mockito.mock(AnomalyDetector.class);
         // For each subsequent call to getId(), return the next detectorId in the array
-        when(detector.getId()).thenReturn(detectorIds[0], Arrays.copyOfRange(detectorIds, 1, detectorIds.length));
+        when(detector.getName()).thenReturn(detectorNames[0], Arrays.copyOfRange(detectorNames, 1, detectorNames.length));
         ADTask realtimeAdTask = Mockito.mock(ADTask.class);
         // For each subsequent call to getState(), return the next detectorState in the array
         when(realtimeAdTask.getState()).thenReturn(detectorStates[0], Arrays.copyOfRange(detectorStates, 1, detectorStates.length));

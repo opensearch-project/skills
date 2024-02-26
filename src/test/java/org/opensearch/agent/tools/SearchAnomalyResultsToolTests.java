@@ -33,13 +33,11 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
 import org.opensearch.agent.tools.utils.ToolConstants;
-import org.opensearch.client.AdminClient;
-import org.opensearch.client.ClusterAdminClient;
-import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
@@ -48,13 +46,9 @@ import org.opensearch.search.aggregations.Aggregations;
 
 public class SearchAnomalyResultsToolTests {
     @Mock
+    private NamedWriteableRegistry namedWriteableRegistry;
+    @Mock
     private NodeClient nodeClient;
-    @Mock
-    private AdminClient adminClient;
-    @Mock
-    private IndicesAdminClient indicesAdminClient;
-    @Mock
-    private ClusterAdminClient clusterAdminClient;
 
     private Map<String, String> nullParams;
     private Map<String, String> emptyParams;
@@ -63,7 +57,7 @@ public class SearchAnomalyResultsToolTests {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
-        SearchAnomalyResultsTool.Factory.getInstance().init(nodeClient);
+        SearchAnomalyResultsTool.Factory.getInstance().init(nodeClient, namedWriteableRegistry);
 
         nullParams = null;
         emptyParams = Collections.emptyMap();
