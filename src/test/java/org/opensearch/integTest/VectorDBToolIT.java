@@ -183,7 +183,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
             );
     }
 
-    public void testNeuralSparseSearchToolInFlowAgent_withIllegalIndexField_thenThrowException() {
+    public void testVectorDBToolInFlowAgent_withIllegalIndexField_thenThrowException() {
         String agentId = createAgent(registerAgentRequestBody.replace("test_index", "test_index2"));
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
 
@@ -194,7 +194,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
             );
     }
 
-    public void testNeuralSparseSearchToolInFlowAgent_withIllegalModelIdField_thenThrowException() {
+    public void testVectorDBToolInFlowAgent_withIllegalModelIdField_thenThrowException() {
         String agentId = createAgent(registerAgentRequestBody.replace(modelId, "test_model_id"));
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}"));
 

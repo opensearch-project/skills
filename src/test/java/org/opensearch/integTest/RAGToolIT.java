@@ -260,7 +260,7 @@ public class RAGToolIT extends ToolIntegrationTest {
         String agentId = createAgent(registerAgentWithNeuralQueryAndLLMRequestBody);
 
         // neural query to test match similar text, doc1 match with higher score
-        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"use RAGTool to answer c\"}}");
+        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"use RAGTool to answer a\"}}");
         assertEquals(mockLLMResponseWithSource, result);
 
         // if blank input, call onFailure and get exception
@@ -476,7 +476,26 @@ public class RAGToolIT extends ToolIntegrationTest {
         PromptHandler RAGToolHandler = new PromptHandler() {
             @Override
             String response(String prompt) {
-                if (prompt.contains("RAGTool")) {
+                String expectPromptForNeuralSparseQuery = "\n"
+                    + "\nHuman:You are a professional data analyst. You will always answer question based on the given context first. If the answer is not directly shown in the context, you will analyze the data and find the answer. If you don't know the answer, just say don't know. \n"
+                    + "\n"
+                    + " Context:\n"
+                    + "\"_id: 1\\n_source: {\\\"text\\\":\\\"a b\\\"}\\n\"\n"
+                    + "\n"
+                    + "Human:use RAGTool to answer a\n"
+                    + "\n"
+                    + "Assistant:";
+                String expectPromptForNeuralQuery = "\n"
+                    + "\n"
+                    + "Human:You are a professional data analyst. You will always answer question based on the given context first. If the answer is not directly shown in the context, you will analyze the data and find the answer. If you don't know the answer, just say don't know. \n"
+                    + "\n"
+                    + " Context:\n"
+                    + "\"_id: 1\\n_source: {\\\"text\\\":\\\"a b\\\"}\\n_id: 0\\n_source: {\\\"text\\\":\\\"hello world\\\"}\\n\"\n"
+                    + "\n"
+                    + "Human:use RAGTool to answer a\n"
+                    + "\n"
+                    + "Assistant:";
+                if (prompt.equals(expectPromptForNeuralSparseQuery) || prompt.equals(expectPromptForNeuralQuery)) {
                     return mockLLMResponseWithSource;
                 } else {
                     return mockLLMResponseWithoutSource;
