@@ -7,7 +7,6 @@ package org.opensearch.integTest;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import java.nio.file.Files;
@@ -134,22 +133,19 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
 
         // match similar text, doc1 match with higher score
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"c\"}}");
-        assertEquals(
-            "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.7046764}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.2649903}\n",
-            result
-        );
+
+        // To allow digits variation from model output, using string contains to match
+        assertTrue(result.contains("{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.70467"));
+        assertTrue(result.contains("{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.26499"));
 
         // match exact same text case, doc0 match with higher score
         String result1 = executeAgent(agentId, "{\"parameters\": {\"question\": \"hello\"}}");
 
-        assertEquals(
-            "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.56714886}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.24236833}\n",
-            result1
+        // To allow digits variation from model output, using string contains to match
+        assertTrue(
+            result1.contains("{\"_index\":\"test_index\",\"_source\":{\"text\":\"hello world\"},\"_id\":\"0\",\"_score\":0.5671488")
         );
+        assertTrue(result1.contains("{\"_index\":\"test_index\",\"_source\":{\"text\":\"a b\"},\"_id\":\"1\",\"_score\":0.2423683"));
 
         // if blank input, call onFailure and get exception
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"\"}}"));
@@ -164,12 +160,11 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
     public void testVectorDBToolInFlowAgent_withIllegalSourceField_thenGetEmptySource() {
         String agentId = createAgent(registerAgentRequestBody.replace("text", "text2"));
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
-        assertEquals(
-            "The agent execute response not equal with expected.",
-            "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"0\",\"_score\":0.70493275}\n"
-                + "{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":0.2650575}\n",
-            result
-        );
+
+        // To allow digits variation from model output, using string contains to match
+        assertTrue(result.contains("{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"0\",\"_score\":0.70493"));
+        assertTrue(result.contains("{\"_index\":\"test_index\",\"_source\":{},\"_id\":\"1\",\"_score\":0.26505"));
+
     }
 
     public void testVectorDBToolInFlowAgent_withIllegalEmbeddingField_thenThrowException() {
