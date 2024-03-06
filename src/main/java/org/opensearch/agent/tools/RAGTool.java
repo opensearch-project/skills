@@ -56,7 +56,7 @@ public class RAGTool implements Tool {
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String OUTPUT_FIELD = "output_field";
     public static final String QUERY_TYPE = "query_type";
-    public static final String CONTENT_GENERATION_FIELD = "enable_Content_Generation";
+    public static final String CONTENT_GENERATION_FIELD = "enable_content_generation";
     public static final String K_FIELD = "k";
     private final AbstractRetrieverTool queryTool;
     private String name = TYPE;
