@@ -241,6 +241,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         assertEquals(indexName, responseInMap.get("index").toString());
     }
 
+    protected void createIngestPipelineWithConfiguration(String pipelineName, String body) throws Exception {
+        Response response = makeRequest(client(), "PUT", "/_ingest/pipeline/" + pipelineName, null, body, null);
+        Map<String, Object> responseInMap = parseResponseToMap(response);
+        assertEquals("true", responseInMap.get("acknowledged").toString());
+    }
+
     // Similar to deleteExternalIndices, but including indices with "." prefix vs. excluding them
     protected void deleteSystemIndices() throws IOException {
         final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
