@@ -362,7 +362,7 @@ public class PPLTool implements Tool {
         if (StringUtils.isBlank((String) map.get("model_id"))) {
             throw new IllegalArgumentException("PPL tool needs non blank model id.");
         }
-        if (map.containsKey("execute")) {
+        if (map.containsKey("execute") && map.get("execute") != null) {
             String execute = map.get("execute").toString().toLowerCase(Locale.ROOT);
             if (!execute.equals("true") && !execute.equals("false")) {
                 throw new IllegalArgumentException("PPL tool parameter execute must be false or true");
