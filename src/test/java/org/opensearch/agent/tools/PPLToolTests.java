@@ -131,7 +131,7 @@ public class PPLToolTests {
             IllegalArgumentException.class,
             () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("prompt", "contextPrompt"))
         );
-        assertEquals("PPL tool needs model id.", exception.getMessage());
+        assertEquals("PPL tool needs non blank model id.", exception.getMessage());
     }
 
     @Test
