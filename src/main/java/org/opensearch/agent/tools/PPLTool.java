@@ -23,7 +23,6 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
@@ -359,28 +358,27 @@ public class PPLTool implements Tool {
         return getMappingsRequest;
     }
 
-    private static void validatePPLToolParameters(Map<String, Object> map){
-        if (!map.containsKey("model_id")){
+    private static void validatePPLToolParameters(Map<String, Object> map) {
+        if (!map.containsKey("model_id")) {
             throw new IllegalArgumentException("PPL tool needs model id.");
         } else {
             String modelId = (String) map.get("model_id");
-            if (StringUtils.isBlank(modelId)){
+            if (StringUtils.isBlank(modelId)) {
                 throw new IllegalArgumentException("PPL tool needs non blank model id.");
             }
         }
         if (map.containsKey("execute")) {
-            String  execute = map.get("execute").toString().toLowerCase(Locale.ROOT);
+            String execute = map.get("execute").toString().toLowerCase(Locale.ROOT);
             if (!(execute.equals("true")) && !(execute.equals("false"))) {
                 throw new IllegalArgumentException("PPL tool parameter execute must be false or true");
             }
 
         }
-        if (map.containsKey("head")){
+        if (map.containsKey("head")) {
             String head = map.get("head").toString();
             try {
                 int headInt = NumberUtils.createInteger(head);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 throw new IllegalArgumentException("PPL tool parameter head must be integer.");
             }
         }
