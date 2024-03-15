@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
@@ -362,7 +363,7 @@ public class PPLTool implements Tool {
         if (StringUtils.isBlank((String) map.get("model_id"))) {
             throw new IllegalArgumentException("PPL tool needs non blank model id.");
         }
-        if (map.containsKey("execute") && map.get("execute") != null) {
+        if (map.containsKey("execute") && Objects.nonNull(map.get("execute"))) {
             String execute = map.get("execute").toString().toLowerCase(Locale.ROOT);
             if (!execute.equals("true") && !execute.equals("false")) {
                 throw new IllegalArgumentException("PPL tool parameter execute must be false or true");
