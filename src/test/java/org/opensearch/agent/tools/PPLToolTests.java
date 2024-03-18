@@ -126,8 +126,46 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_WithoutModelId() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("prompt", "contextPrompt"))
+        );
+        assertEquals("PPL tool needs non blank model id.", exception.getMessage());
+    }
+
+    @Test
+    public void testTool_WithBlankModelId() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "   "))
+        );
+        assertEquals("PPL tool needs non blank model id.", exception.getMessage());
+    }
+
+    @Test
+    public void testTool_WithNonIntegerHead() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "demo", "head", "11.5"))
+        );
+        assertEquals("PPL tool parameter head must be integer.", exception.getMessage());
+    }
+
+    @Test
+    public void testTool_WithNonBooleanExecute() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "demo", "execute", "hello"))
+        );
+        assertEquals("PPL tool parameter execute must be false or true", exception.getMessage());
+    }
+
+    @Test
     public void testTool() {
-        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
@@ -142,7 +180,7 @@ public class PPLToolTests {
     public void testTool_withPreviousInput() {
         PPLTool tool = PPLTool.Factory
             .getInstance()
-            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool"));
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool", "head", "-5"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         tool.run(ImmutableMap.of("previousTool.output", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
