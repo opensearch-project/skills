@@ -210,9 +210,7 @@ public class PPLToolTests {
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
         initMLTensors();
 
-        PPLTool tool = PPLTool.Factory
-            .getInstance()
-            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "5"));
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "5"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
