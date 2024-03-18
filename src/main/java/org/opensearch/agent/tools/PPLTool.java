@@ -18,12 +18,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
@@ -313,6 +315,7 @@ public class PPLTool implements Tool {
 
         @Override
         public PPLTool create(Map<String, Object> map) {
+            validatePPLToolParameters(map);
             return new PPLTool(
                 client,
                 (String) map.get("model_id"),
@@ -354,6 +357,27 @@ public class PPLTool implements Tool {
         GetMappingsRequest getMappingsRequest = new GetMappingsRequest();
         getMappingsRequest.indices(indices);
         return getMappingsRequest;
+    }
+
+    private static void validatePPLToolParameters(Map<String, Object> map) {
+        if (StringUtils.isBlank((String) map.get("model_id"))) {
+            throw new IllegalArgumentException("PPL tool needs non blank model id.");
+        }
+        if (map.containsKey("execute") && Objects.nonNull(map.get("execute"))) {
+            String execute = map.get("execute").toString().toLowerCase(Locale.ROOT);
+            if (!execute.equals("true") && !execute.equals("false")) {
+                throw new IllegalArgumentException("PPL tool parameter execute must be false or true");
+            }
+
+        }
+        if (map.containsKey("head")) {
+            String head = map.get("head").toString();
+            try {
+                int headInt = NumberUtils.createInteger(head);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("PPL tool parameter head must be integer.");
+            }
+        }
     }
 
     private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
