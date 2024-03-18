@@ -212,7 +212,7 @@ public class PPLToolTests {
 
         PPLTool tool = PPLTool.Factory
             .getInstance()
-            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "-5"));
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "5"));
         assertEquals(PPLTool.TYPE, tool.getName());
 
         tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
