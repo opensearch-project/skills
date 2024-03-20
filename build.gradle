@@ -149,7 +149,7 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240303'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.11.0'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.14.7")
+    testImplementation("net.bytebuddy:byte-buddy:1.14.9")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.14.12")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
