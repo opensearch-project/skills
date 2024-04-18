@@ -107,7 +107,7 @@ public class PPLTool implements Tool {
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
                                                // https://github.com/opensearch-project/sql/blob/2.x/docs/user/ppl/general/datatypes.rst#data-types-mapping
-                                               // and  https://opensearch.org/docs/latest/field-types/supported-field-types/index/
+                                               // and https://opensearch.org/docs/latest/field-types/supported-field-types/index/
         ALLOWED_FIELDS_TYPE.add("boolean");
         ALLOWED_FIELDS_TYPE.add("byte");
         ALLOWED_FIELDS_TYPE.add("short");
