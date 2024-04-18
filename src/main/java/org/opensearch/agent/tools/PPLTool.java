@@ -107,6 +107,7 @@ public class PPLTool implements Tool {
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
                                                // https://github.com/opensearch-project/sql/blob/2.x/docs/user/ppl/general/datatypes.rst#data-types-mapping
+                                               // and  https://opensearch.org/docs/latest/field-types/supported-field-types/index/
         ALLOWED_FIELDS_TYPE.add("boolean");
         ALLOWED_FIELDS_TYPE.add("byte");
         ALLOWED_FIELDS_TYPE.add("short");
@@ -119,10 +120,12 @@ public class PPLTool implements Tool {
         ALLOWED_FIELDS_TYPE.add("keyword");
         ALLOWED_FIELDS_TYPE.add("text");
         ALLOWED_FIELDS_TYPE.add("date");
+        ALLOWED_FIELDS_TYPE.add("date_nanos");
         ALLOWED_FIELDS_TYPE.add("ip");
         ALLOWED_FIELDS_TYPE.add("binary");
         ALLOWED_FIELDS_TYPE.add("object");
         ALLOWED_FIELDS_TYPE.add("nested");
+        ALLOWED_FIELDS_TYPE.add("geo_point");
 
         try {
             DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
