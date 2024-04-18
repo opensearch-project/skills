@@ -525,7 +525,7 @@ public class PPLTool implements Tool {
                 throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
             }
         }
-        if (!this.pplModelType.equals(PPLModelType.FINETUNE)) {
+        if (this.pplModelType == PPLModelType.FINETUNE) {
             ppl = ppl.replace("`", "");
         }
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
