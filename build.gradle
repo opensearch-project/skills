@@ -5,14 +5,13 @@
 
 import org.opensearch.gradle.test.RestIntegTestTask
 import java.util.concurrent.Callable
-import org.opensearch.gradle.testclusters.OpenSearchCluster
 import java.nio.file.Paths
 import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "2.12.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "2.13.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         version_tokens = opensearch_version.tokenize('-')
@@ -54,9 +53,9 @@ lombok {
 
 repositories {
     mavenLocal()
-    mavenCentral()
-    maven { url "https://plugins.gradle.org/m2/" }
     maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+    maven { url "https://plugins.gradle.org/m2/" }
+    mavenCentral()
 }
 
 allprojects {
@@ -108,7 +107,7 @@ task addJarsToClasspath(type: Copy) {
     into("$buildDir/classes")
 
     from(fileTree(dir: adJarDirectory)) {
-        include "opensearch-anomaly-detection-${opensearch_build}.jar"
+        include "opensearch-time-series-analytics-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
 }
@@ -125,7 +124,7 @@ dependencies {
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
-    implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
+    implementation fileTree(dir: adJarDirectory, include: ["opensearch-time-series-analytics-${opensearch_build}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
     compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -148,7 +147,7 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240205'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.10.0'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.14.7")
+    testImplementation("net.bytebuddy:byte-buddy:1.14.9")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.14.7")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.10.0'
