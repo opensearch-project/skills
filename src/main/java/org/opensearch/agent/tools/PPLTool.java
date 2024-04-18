@@ -494,7 +494,6 @@ public class PPLTool implements Tool {
 
         if (matcher.find()) {
             ppl = matcher.group(1).replaceAll("[\\r\\n]", "").replaceAll("ISNOTNULL", "isnotnull").trim();
-            ppl = ppl.replace("`", "");
         } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
             int describeIndex = llmOutput.indexOf("describe ");
@@ -525,6 +524,9 @@ public class PPLTool implements Tool {
             } else {
                 throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
             }
+        }
+        if (!this.pplModelType.equals(PPLModelType.FINETUNE)) {
+            ppl = ppl.replace("`", "");
         }
         ppl = ppl.replaceAll("\\bSPAN\\(", "span(");
         if (this.head > 0) {
