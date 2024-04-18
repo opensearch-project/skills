@@ -32,7 +32,6 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.model.AnomalyDetector;
-import org.opensearch.ad.model.IntervalTimeConfiguration;
 import org.opensearch.ad.transport.GetAnomalyDetectorAction;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.ad.transport.SearchAnomalyDetectorAction;
@@ -46,6 +45,7 @@ import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
+import org.opensearch.timeseries.model.IntervalTimeConfiguration;
 
 public class SearchAnomalyDetectorsToolTests {
     @Mock
@@ -84,6 +84,7 @@ public class SearchAnomalyDetectorsToolTests {
             1,
             Instant.now(),
             Collections.emptyList(),
+            null,
             null,
             null
         );
@@ -125,7 +126,7 @@ public class SearchAnomalyDetectorsToolTests {
         content.field("last_update_time", testDetector.getLastUpdateTime().toEpochMilli());
         content.endObject();
         SearchHit[] hits = new SearchHit[1];
-        hits[0] = new SearchHit(0, testDetector.getDetectorId(), null, null).sourceRef(BytesReference.bytes(content));
+        hits[0] = new SearchHit(0, testDetector.getId(), null, null).sourceRef(BytesReference.bytes(content));
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         String expectedResponseStr = getExpectedResponseString(testDetector);
 
@@ -460,7 +461,7 @@ public class SearchAnomalyDetectorsToolTests {
         return String
             .format(
                 "AnomalyDetectors=[{id=%s,name=%s,type=%s,description=%s,index=%s,lastUpdateTime=%d}]TotalAnomalyDetectors=%d",
-                testDetector.getDetectorId(),
+                testDetector.getId(),
                 testDetector.getName(),
                 testDetector.getDetectorType(),
                 testDetector.getDescription(),
