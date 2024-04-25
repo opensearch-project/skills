@@ -19,7 +19,6 @@ import org.opensearch.agent.tools.SearchAnomalyResultsTool;
 import org.opensearch.agent.tools.SearchIndexTool;
 import org.opensearch.agent.tools.SearchMonitorsTool;
 import org.opensearch.agent.tools.VectorDBTool;
-import org.opensearch.agent.tools.VisualizationsTool;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
@@ -63,7 +62,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         this.xContentRegistry = xContentRegistry;
 
         PPLTool.Factory.getInstance().init(client);
-        VisualizationsTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
         SearchIndexTool.Factory.getInstance().init(client, xContentRegistry);
@@ -82,7 +80,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 PPLTool.Factory.getInstance(),
                 NeuralSparseSearchTool.Factory.getInstance(),
                 VectorDBTool.Factory.getInstance(),
-                VisualizationsTool.Factory.getInstance(),
                 SearchIndexTool.Factory.getInstance(),
                 RAGTool.Factory.getInstance(),
                 SearchAlertsTool.Factory.getInstance(),
