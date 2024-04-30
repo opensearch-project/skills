@@ -387,6 +387,11 @@ public class PPLTool implements Tool {
         String firstIndexName = (String) mappings.keySet().toArray()[0];
         MappingMetadata mappingMetadata = mappings.get(firstIndexName);
         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+        if (Objects.isNull(mappingSource)) {
+            throw new IllegalArgumentException(
+                "The querying index doesn't have mapping metadata, please add data to it or using another index."
+            );
+        }
         Map<String, String> fieldsToType = new HashMap<>();
         extractNamesTypes(mappingSource, fieldsToType, "");
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
