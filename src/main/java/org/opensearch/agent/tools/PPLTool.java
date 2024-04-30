@@ -387,7 +387,7 @@ public class PPLTool implements Tool {
         String firstIndexName = (String) mappings.keySet().toArray()[0];
         MappingMetadata mappingMetadata = mappings.get(firstIndexName);
         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-        if (Objects.isNull(mappingSource)){
+        if (Objects.isNull(mappingSource)) {
             throw new IllegalArgumentException("You are querying an empty index without any data and index mapping.");
         }
         Map<String, String> fieldsToType = new HashMap<>();
