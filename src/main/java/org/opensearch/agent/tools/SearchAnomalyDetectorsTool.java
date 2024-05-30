@@ -20,7 +20,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.ad.model.ADTask;
-import org.opensearch.ad.transport.GetAnomalyDetectorRequest;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
@@ -41,6 +40,7 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
+import org.opensearch.timeseries.transport.GetConfigRequest;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -164,7 +164,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
                             listener.onFailure(e);
                         });
 
-                    GetAnomalyDetectorRequest profileRequest = new GetAnomalyDetectorRequest(
+                    GetConfigRequest profileRequest = new GetConfigRequest(
                         hit.getId(),
                         Versions.MATCH_ANY,
                         false,
