@@ -104,7 +104,8 @@ public class SearchAlertsTool implements Tool {
             alertIndex,
             monitorIds,
             workflowIds,
-            alertIds
+            alertIds,
+            null
         );
 
         // create response listener
