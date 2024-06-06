@@ -86,6 +86,13 @@ public class SearchAnomalyDetectorsToolTests {
             Collections.emptyList(),
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null
         );
     }

@@ -89,7 +89,7 @@ jobs:
           export FC=/usr/local/Cellar/gcc/12.2.0/bin/gfortran
       - name: Run build
         run: |
-          ./gradlew build
+          ./gradlew build -Dos.arch=x86_64
 
   build-windows:
     strategy:
