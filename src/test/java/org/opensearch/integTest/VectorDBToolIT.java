@@ -174,7 +174,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("all shards failed"), containsString("SearchPhaseExecutionException"))
+                allOf(containsString("[neural_sparse] query only works on [rank_features] fields"), containsString("IllegalArgumentException"))
             );
     }
 
