@@ -145,7 +145,10 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(containsString("[neural_sparse] query only works on [rank_features] fields"), containsString("IllegalArgumentException"))
+                allOf(
+                    containsString("[neural_sparse] query only works on [rank_features] fields"),
+                    containsString("IllegalArgumentException")
+                )
             );
     }
 
