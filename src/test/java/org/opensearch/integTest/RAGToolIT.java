@@ -382,10 +382,7 @@ public class RAGToolIT extends ToolIntegrationTest {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("Field 'embedding2' is not knn_vector type."),
-                    containsString("IllegalArgumentException")
-                )
+                allOf(containsString("Field 'embedding2' is not knn_vector type."), containsString("IllegalArgumentException"))
             );
     }
 
@@ -396,10 +393,7 @@ public class RAGToolIT extends ToolIntegrationTest {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("Field 'embedding2' is not knn_vector type."),
-                    containsString("IllegalArgumentException")
-                )
+                allOf(containsString("Field 'embedding2' is not knn_vector type."), containsString("IllegalArgumentException"))
             );
     }
 

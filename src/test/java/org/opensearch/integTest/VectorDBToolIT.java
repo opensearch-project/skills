@@ -174,10 +174,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         org.hamcrest.MatcherAssert
             .assertThat(
                 exception.getMessage(),
-                allOf(
-                    containsString("Field 'embedding2' is not knn_vector type."),
-                    containsString("IllegalArgumentException")
-                )
+                allOf(containsString("Field 'embedding2' is not knn_vector type."), containsString("IllegalArgumentException"))
             );
     }
 
