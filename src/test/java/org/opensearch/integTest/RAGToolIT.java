@@ -383,7 +383,7 @@ public class RAGToolIT extends ToolIntegrationTest {
             .assertThat(
                 exception.getMessage(),
                 allOf(
-                    containsString("[neural_sparse] query only works on [rank_features] fields"),
+                    containsString("Field 'embedding2' is not knn_vector type."),
                     containsString("IllegalArgumentException")
                 )
             );
@@ -397,7 +397,7 @@ public class RAGToolIT extends ToolIntegrationTest {
             .assertThat(
                 exception.getMessage(),
                 allOf(
-                    containsString("[neural_sparse] query only works on [rank_features] fields"),
+                    containsString("Field 'embedding2' is not knn_vector type."),
                     containsString("IllegalArgumentException")
                 )
             );

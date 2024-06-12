@@ -175,7 +175,7 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
             .assertThat(
                 exception.getMessage(),
                 allOf(
-                    containsString("[neural_sparse] query only works on [rank_features] fields"),
+                    containsString("Field 'embedding2' is not knn_vector type."),
                     containsString("IllegalArgumentException")
                 )
             );
