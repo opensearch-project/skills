@@ -222,7 +222,7 @@ public class PPLTool implements Tool {
                     ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
-                    if (dataAsMap.get("response") == null){
+                    if (dataAsMap.get("response") == null) {
                         listener.onFailure(new IllegalArgumentException("Remote endpoint fails to inference."));
                         return;
                     }
