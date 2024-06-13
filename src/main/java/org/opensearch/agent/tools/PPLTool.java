@@ -223,6 +223,10 @@ public class PPLTool implements Tool {
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
+                    if (ppl == null){
+                        listener.onFailure(new IllegalArgumentException("Endpoint fails to inference"));
+                        return;
+                    }
                     if (!this.execute) {
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                         listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
