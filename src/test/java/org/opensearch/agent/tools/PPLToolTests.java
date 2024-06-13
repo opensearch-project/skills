@@ -266,6 +266,42 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_withWrongEndpointInference() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        pplReturns = Collections.singletonMap("code", "424");
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
+        initMLTensors();
+
+        Exception exception = assertThrows(
+            IllegalStateException.class,
+            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
+                assertEquals(pplResult, "ppl result");
+            }, e -> { throw new IllegalStateException(e.getMessage()); }))
+        );
+        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+    }
+
+    @Test
+    public void testTool_withWrongEndpointInferenceWithNullResponse() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        pplReturns = Collections.singletonMap("response", null);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
+        initMLTensors();
+
+        Exception exception = assertThrows(
+            IllegalStateException.class,
+            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
+                assertEquals(pplResult, "ppl result");
+            }, e -> { throw new IllegalStateException(e.getMessage()); }))
+        );
+        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+    }
+
+    @Test
     public void testTool_withDescribeStartPPL() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());

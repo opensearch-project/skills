@@ -222,6 +222,10 @@ public class PPLTool implements Tool {
                     ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
+                    if (dataAsMap.get("response") == null) {
+                        listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
+                        return;
+                    }
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
                     if (!this.execute) {
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
