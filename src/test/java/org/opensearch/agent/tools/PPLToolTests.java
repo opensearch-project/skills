@@ -275,10 +275,10 @@ public class PPLToolTests {
         initMLTensors();
 
         Exception exception = assertThrows(
-            IllegalArgumentException.class,
+            IllegalStateException.class,
             () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
                 assertEquals(pplResult, "ppl result");
-            }, e -> { throw new IllegalArgumentException(e.getMessage()); }))
+            }, e -> { throw new IllegalStateException(e.getMessage()); }))
         );
         assertEquals("Remote endpoint fails to inference.", exception.getMessage());
     }
@@ -293,10 +293,10 @@ public class PPLToolTests {
         initMLTensors();
 
         Exception exception = assertThrows(
-            IllegalArgumentException.class,
+            IllegalStateException.class,
             () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
                 assertEquals(pplResult, "ppl result");
-            }, e -> { throw new IllegalArgumentException(e.getMessage()); }))
+            }, e -> { throw new IllegalStateException(e.getMessage()); }))
         );
         assertEquals("Remote endpoint fails to inference.", exception.getMessage());
     }
