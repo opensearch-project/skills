@@ -65,7 +65,7 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorId\": \"" + monitorId + "\"}}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("name=%s", monitorName)));
+        assertTrue(result.contains(String.format(Locale.ROOT, "name=%s", monitorName)));
         assertTrue(result.contains("TotalMonitors=1"));
         deleteMonitor(monitorId);
     }
@@ -78,7 +78,7 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("name=%s", monitorName)));
+        assertTrue(result.contains(String.format(Locale.ROOT, "name=%s", monitorName)));
         assertTrue(result.contains("TotalMonitors=1"));
         deleteMonitor(monitorId);
     }
@@ -101,8 +101,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{}}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("name=%s", monitorName)));
-        assertTrue(result.contains(String.format("name=%s", monitorName2)));
+        assertTrue(result.contains(String.format(Locale.ROOT, "name=%s", monitorName)));
+        assertTrue(result.contains(String.format(Locale.ROOT, "name=%s", monitorName2)));
         assertTrue(result.contains("enabled=true"));
         assertTrue(result.contains("enabled=false"));
         assertTrue(result.contains("TotalMonitors=2"));
@@ -119,8 +119,8 @@ public class SearchMonitorsToolIT extends BaseAgentToolsIT {
         String agentId = createAgent(registerAgentRequestBody);
         String agentInput = "{\"parameters\":{\"monitorName\": \"" + monitorName + "\"}}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("name=%s", monitorName)));
-        assertFalse(result.contains(String.format("name=%s", monitorName2)));
+        assertTrue(result.contains(String.format(Locale.ROOT, "name=%s", monitorName)));
+        assertFalse(result.contains(String.format(Locale.ROOT, "name=%s", monitorName2)));
         assertTrue(result.contains("enabled=true"));
         assertTrue(result.contains("TotalMonitors=1"));
         deleteMonitor(monitorId1);
