@@ -189,7 +189,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             if (condition.test(responseInMap)) {
                 return responseInMap;
             }
-            logger.info("The " + i + "-th response: " + responseInMap.toString());
+            logger.error(String.format(Locale.ROOT, "The %s-th response: %s", i, responseInMap.toString()));
             Thread.sleep(DEFAULT_TASK_RESULT_QUERY_INTERVAL_IN_MILLISECOND);
         }
         fail("The response failed to meet condition after " + MAX_TASK_RESULT_QUERY_TIME_IN_SECOND + " seconds.");
