@@ -90,7 +90,7 @@ configurations {
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
-            force "com.google.guava:guava:33.0.0-jre" // CVE for 31.1
+            force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
         }
     }
@@ -120,7 +120,7 @@ dependencies {
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.0"
     compileOnly group: 'org.json', name: 'json', version: '20240303'
-    compileOnly("com.google.guava:guava:33.0.0-jre")
+    compileOnly("com.google.guava:guava:33.2.1-jre")
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.11.0'
 
