@@ -172,9 +172,9 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId)));
-        assertTrue(response.contains(String.format("name=%s", detectorName)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -220,9 +220,9 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId)));
-        assertTrue(response.contains(String.format("name=%s", detectorName)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -248,9 +248,9 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId)));
-        assertTrue(response.contains(String.format("name=%s", detectorName)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -275,9 +275,9 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId)));
-        assertTrue(response.contains(String.format("name=%s", detectorName)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -309,13 +309,13 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId1)));
-        assertTrue(response.contains(String.format("name=%s", detectorName1)));
-        assertTrue(response.contains(String.format("id=%s", detectorId2)));
-        assertTrue(response.contains(String.format("name=%s", detectorName2)));
-        assertTrue(response.contains(String.format("id=%s", detectorId3)));
-        assertTrue(response.contains(String.format("name=%s", detectorName3)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", hits.length)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId2)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName2)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId3)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName3)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", hits.length)));
     }
 
     @Test
@@ -347,11 +347,11 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId1)));
-        assertTrue(response.contains(String.format("name=%s", detectorName1)));
-        assertTrue(response.contains(String.format("id=%s", detectorId3)));
-        assertTrue(response.contains(String.format("name=%s", detectorName3)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", 2)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId3)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName3)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", 2)));
     }
 
     @Test
@@ -414,9 +414,9 @@ public class SearchAnomalyDetectorsToolTests {
         ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
         verify(listener, times(1)).onResponse(responseCaptor.capture());
         String response = responseCaptor.getValue();
-        assertTrue(response.contains(String.format("id=%s", detectorId1)));
-        assertTrue(response.contains(String.format("name=%s", detectorName1)));
-        assertTrue(response.contains(String.format("TotalAnomalyDetectors=%d", 1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "id=%s", detectorId1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "name=%s", detectorName1)));
+        assertTrue(response.contains(String.format(Locale.ROOT, "TotalAnomalyDetectors=%d", 1)));
     }
 
     @Test

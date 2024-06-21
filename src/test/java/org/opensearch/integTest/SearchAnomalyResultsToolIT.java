@@ -117,7 +117,10 @@ public class SearchAnomalyResultsToolIT extends BaseAgentToolsIT {
             + "\"realTime\": true, \"anomalyGradeThreshold\": 0, \"sortOrder\": \"asc\","
             + "\"sortString\": \"data_start_time\", \"size\": 10, \"startIndex\": 0 }}";
         String result = executeAgent(agentId, agentInput);
-        assertTrue(result.contains(String.format("TotalAnomalyResults=%d", 1)));
+        assertTrue(
+            String.format(Locale.ROOT, "total anomaly results is not 1, result: %s", result),
+            result.contains(String.format(Locale.ROOT, "TotalAnomalyResults=%d", 1))
+        );
     }
 
     @SneakyThrows
