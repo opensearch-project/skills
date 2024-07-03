@@ -9,6 +9,7 @@ import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
@@ -16,6 +17,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.lucene.search.TotalHits;
 import org.junit.Before;
@@ -24,17 +26,24 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.agent.common.SkillSettings;
+import org.opensearch.agent.tools.utils.ClusterSettingHelper;
 import org.opensearch.client.AdminClient;
 import org.opensearch.client.Client;
 import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.ml.common.conversation.ConversationalIndexConstants;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.search.SearchHit;
@@ -122,7 +131,13 @@ public class PPLToolTests {
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
 
-        PPLTool.Factory.getInstance().init(client);
+        Settings settings = Settings.builder().put(SkillSettings.PPL_EXECUTION_ENABLED.getKey(), true).build();
+        ClusterService clusterService = mock(ClusterService.class);
+        when(clusterService.getSettings()).thenReturn(settings);
+        when(clusterService.getClusterSettings())
+            .thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
+        ClusterSettingHelper clusterSettingHelper = new ClusterSettingHelper(settings, clusterService);
+        PPLTool.Factory.getInstance().init(client, clusterSettingHelper);
     }
 
     @Test
@@ -435,6 +450,27 @@ public class PPLToolTests {
                     assertEquals("execute ppl:source=demo| head 1, get error: execute ppl error", e.getMessage());
                 })
             );
+    }
+
+    @Test
+    public void test_pplTool_whenPPLExecutionDisabled_returnOnlyContainsPPL() {
+        Settings settings = Settings.builder().put(SkillSettings.PPL_EXECUTION_ENABLED.getKey(), false).build();
+        ClusterService clusterService = mock(ClusterService.class);
+        when(clusterService.getSettings()).thenReturn(settings);
+        when(clusterService.getClusterSettings())
+            .thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
+        ClusterSettingHelper clusterSettingHelper = new ClusterSettingHelper(settings, clusterService);
+        PPLTool.Factory.getInstance().init(client, clusterSettingHelper);
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertNull(returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, log::error));
     }
 
     private void createMappings() {

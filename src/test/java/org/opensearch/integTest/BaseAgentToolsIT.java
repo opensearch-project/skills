@@ -63,6 +63,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         updateClusterSettings("plugins.ml_commons.jvm_heap_memory_threshold", 100);
         updateClusterSettings("plugins.ml_commons.allow_registering_model_via_url", true);
         updateClusterSettings("plugins.ml_commons.agent_framework_enabled", true);
+        updateClusterSettings("plugins.skills.ppl_execution_enabled", true);
     }
 
     @SneakyThrows
