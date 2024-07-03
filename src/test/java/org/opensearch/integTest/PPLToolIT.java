@@ -63,10 +63,7 @@ public class PPLToolIT extends ToolIntegrationTest {
         prepareIndex();
         String agentId = registerAgent();
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}");
-        assertEquals(
-            "{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\"}",
-            result
-        );
+        assertEquals("{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\"}", result);
     }
 
     public void testPPLTool_withWrongPPLGenerated_thenThrowException() {

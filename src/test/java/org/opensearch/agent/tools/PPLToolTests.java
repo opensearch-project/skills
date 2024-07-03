@@ -38,12 +38,10 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
-import org.opensearch.ml.common.conversation.ConversationalIndexConstants;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
-import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.search.SearchHit;
@@ -134,8 +132,7 @@ public class PPLToolTests {
         Settings settings = Settings.builder().put(SkillSettings.PPL_EXECUTION_ENABLED.getKey(), true).build();
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getSettings()).thenReturn(settings);
-        when(clusterService.getClusterSettings())
-            .thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
+        when(clusterService.getClusterSettings()).thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
         ClusterSettingHelper clusterSettingHelper = new ClusterSettingHelper(settings, clusterService);
         PPLTool.Factory.getInstance().init(client, clusterSettingHelper);
     }
@@ -457,8 +454,7 @@ public class PPLToolTests {
         Settings settings = Settings.builder().put(SkillSettings.PPL_EXECUTION_ENABLED.getKey(), false).build();
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getSettings()).thenReturn(settings);
-        when(clusterService.getClusterSettings())
-            .thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
+        when(clusterService.getClusterSettings()).thenReturn(new ClusterSettings(settings, Set.of(SkillSettings.PPL_EXECUTION_ENABLED)));
         ClusterSettingHelper clusterSettingHelper = new ClusterSettingHelper(settings, clusterService);
         PPLTool.Factory.getInstance().init(client, clusterSettingHelper);
         PPLTool tool = PPLTool.Factory

@@ -258,7 +258,7 @@ public class PPLTool implements Tool {
                     listener.onFailure(e);
                 }));
             }, e -> {
-                log.error(String.format(Locale.ROOT,"fail to search model: %s with error: %s", modelId, e.getMessage()), e);
+                log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
                 listener.onFailure(e);
             }));
         }, e -> {
@@ -486,7 +486,7 @@ public class PPLTool implements Tool {
             try {
                 Map<String, String> chatParameters = gson.fromJson(input, Map.class);
                 parameters.putAll(chatParameters);
-            } catch (Exception e){
+            } catch (Exception e) {
                 log.error(String.format(Locale.ROOT, "Failed to parse chat parameters, input is: %s, which is not a valid json", input), e);
             }
         }
