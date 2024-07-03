@@ -226,7 +226,6 @@ public class PPLTool implements Tool {
                         return;
                     }
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
-                    System.out.println("###################### current ppl execution enabled value is: " + clusterSettingHelper.getClusterSettings(SkillSettings.PPL_EXECUTION_ENABLED) + ", execute value is: " + execute + " ######################");
                     if (!clusterSettingHelper.getClusterSettings(SkillSettings.PPL_EXECUTION_ENABLED) || !this.execute) {
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                         listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
