@@ -229,7 +229,10 @@ public class PPLTool implements Tool {
                     boolean pplExecutedEnabled = clusterSettingHelper.getClusterSettings(SkillSettings.PPL_EXECUTION_ENABLED);
                     if (!pplExecutedEnabled || !this.execute) {
                         if (!pplExecutedEnabled) {
-                            log.debug("PPL execution is disabled, the query will be returned directly, to enable this, please set plugins.skills.ppl_execution_enabled to true");
+                            log
+                                .debug(
+                                    "PPL execution is disabled, the query will be returned directly, to enable this, please set plugins.skills.ppl_execution_enabled to true"
+                                );
                         }
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                         listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
