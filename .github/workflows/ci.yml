@@ -36,6 +36,8 @@ jobs:
     strategy:
       matrix:
         java: [11, 17, 21]
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     name: Build and Test skills plugin on Linux
     runs-on: ubuntu-latest
     container:
