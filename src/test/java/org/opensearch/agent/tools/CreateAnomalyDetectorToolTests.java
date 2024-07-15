@@ -198,7 +198,7 @@ public class CreateAnomalyDetectorToolTests {
                     throw new IllegalStateException(e.getMessage());
                 }))
         );
-        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+        assertEquals("Remote endpoint fails to inference, no response found.", exception.getMessage());
     }
 
     @Test
