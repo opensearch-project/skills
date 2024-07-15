@@ -23,6 +23,7 @@ public class NeuralSparseSearchToolTests {
     public static final String TEST_QUERY_TEXT = "123fsd23134sdfouh";
     public static final String TEST_EMBEDDING_FIELD = "test embedding";
     public static final String TEST_MODEL_ID = "123fsd23134";
+    public static final String TEST_NESTED_PATH = "nested_path";
     private Map<String, Object> params = new HashMap<>();
 
     @Before
@@ -58,6 +59,23 @@ public class NeuralSparseSearchToolTests {
         Map<String, Map<String, Map<String, Map<String, String>>>> queryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
         assertEquals("123fsd23134sdfouh", queryBody.get("query").get("neural_sparse").get("test embedding").get("query_text"));
         assertEquals("123fsd23134", queryBody.get("query").get("neural_sparse").get("test embedding").get("model_id"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetQueryBodyWithNestedPath() {
+        Map nestedParams = new HashMap<>(params);
+        nestedParams.put(NeuralSparseSearchTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
+        NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(nestedParams);
+        Map<String, Map<String, Map<String, Object>>> nestedQueryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
+        assertEquals("nested_path", nestedQueryBody.get("query").get("nested").get("path"));
+        assertEquals("max", nestedQueryBody.get("query").get("nested").get("score_mode"));
+        Map<String, Map<String, Map<String, String>>> queryBody = (Map<String, Map<String, Map<String, String>>>) nestedQueryBody
+            .get("query")
+            .get("nested")
+            .get("query");
+        assertEquals("123fsd23134sdfouh", queryBody.get("neural_sparse").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("neural_sparse").get("test embedding").get("model_id"));
     }
 
     @Test
@@ -108,6 +126,11 @@ public class NeuralSparseSearchToolTests {
         assertThrows(
             ClassCastException.class,
             () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.MODEL_ID_FIELD, 123))
+        );
+
+        assertThrows(
+            ClassCastException.class,
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.NESTED_PATH_FIELD, 123))
         );
 
         assertThrows(

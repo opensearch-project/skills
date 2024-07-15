@@ -7,7 +7,6 @@ package org.opensearch.integTest;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +21,7 @@ import lombok.SneakyThrows;
 
 public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
     public static String TEST_INDEX_NAME = "test_index";
+    public static String TEST_NESTED_INDEX_NAME = "test_index_nested";
 
     private String modelId;
     private String registerAgentRequestBody;
@@ -64,12 +64,55 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
         addDocToIndex(TEST_INDEX_NAME, "2", List.of("text", "embedding"), List.of("text doc 3", Map.of("test", 5, "a", 6)));
     }
 
+    @SneakyThrows
+    private void prepareNestedIndex() {
+        createIndexWithConfiguration(
+            TEST_NESTED_INDEX_NAME,
+            "{\n"
+                + "  \"mappings\": {\n"
+                + "    \"properties\": {\n"
+                + "      \"text\": {\n"
+                + "        \"type\": \"text\"\n"
+                + "      },\n"
+                + "      \"embedding\": {\n"
+                + "        \"type\": \"nested\",\n"
+                + "        \"properties\":{\n"
+                + "            \"sparse\":{\n"
+                + "                \"type\":\"rank_features\"\n"
+                + "            }\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}"
+        );
+        addDocToIndex(
+            TEST_NESTED_INDEX_NAME,
+            "0",
+            List.of("text", "embedding"),
+            List.of("text doc 1", Map.of("sparse", List.of(Map.of("hello", 1, "world", 2))))
+        );
+        addDocToIndex(
+            TEST_NESTED_INDEX_NAME,
+            "1",
+            List.of("text", "embedding"),
+            List.of("text doc 2", Map.of("sparse", List.of(Map.of("a", 3, "b", 4))))
+        );
+        addDocToIndex(
+            TEST_NESTED_INDEX_NAME,
+            "2",
+            List.of("text", "embedding"),
+            List.of("text doc 3", Map.of("sparse", List.of(Map.of("test", 5, "a", 6))))
+        );
+    }
+
     @Before
     @SneakyThrows
     public void setUp() {
         super.setUp();
         prepareModel();
         prepareIndex();
+        prepareNestedIndex();
         registerAgentRequestBody = Files
             .readString(
                 Path
@@ -124,6 +167,23 @@ public class NeuralSparseSearchToolIT extends BaseAgentToolsIT {
             "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 3\"},\"_id\":\"2\",\"_score\":2.4136734}\n"
                 + "{\"_index\":\"test_index\",\"_source\":{\"text\":\"text doc 2\"},\"_id\":\"1\",\"_score\":1.2068367}\n",
             result3
+        );
+    }
+
+    public void testNeuralSparseSearchToolInFlowAgent_withNestedIndex() {
+        String registerAgentRequestBodyNested = registerAgentRequestBody;
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested.replace("\"nested_path\": \"\"", "\"nested_path\": \"embedding\"");
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested
+            .replace("\"embedding_field\": \"embedding\"", "\"embedding_field\": \"embedding.sparse\"");
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested
+            .replace("\"index\": \"test_index\"", "\"index\": \"test_index_nested\"");
+        String agentId = createAgent(registerAgentRequestBodyNested);
+        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
+        assertEquals(
+            "The agent execute response not equal with expected.",
+            "{\"_index\":\"test_index_nested\",\"_source\":{\"text\":\"text doc 3\"},\"_id\":\"2\",\"_score\":2.4136734}\n"
+                + "{\"_index\":\"test_index_nested\",\"_source\":{\"text\":\"text doc 2\"},\"_id\":\"1\",\"_score\":1.2068367}\n",
+            result
         );
     }
 
