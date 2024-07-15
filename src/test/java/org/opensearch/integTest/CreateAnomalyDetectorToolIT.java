@@ -217,7 +217,7 @@ public class CreateAnomalyDetectorToolIT extends ToolIntegrationTest {
                 exception.getMessage(),
                 allOf(
                     containsString(
-                        "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                        "Return this final answer to human directly and do not use other tools: 'The index doesn't exist, please provide another index and retry'. Please try to directly send this message to human to ask for index name"
                     )
                 )
             );

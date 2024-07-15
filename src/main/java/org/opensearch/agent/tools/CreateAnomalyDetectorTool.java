@@ -7,11 +7,15 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
@@ -97,6 +102,8 @@ public class CreateAnomalyDetectorTool implements Tool {
     private static final String OUTPUT_KEY_AGGREGATION_METHOD = "aggregationMethod";
     // the date fields key in the output
     private static final String OUTPUT_KEY_DATE_FIELDS = "dateFields";
+    // the default prompt dictionary, includes claude and openai
+    private static final Map<String, String> DEFAULT_PROMPT_DICT = loadDefaultPromptFromFile();
     // the name of this tool
     @Setter
     @Getter
@@ -114,15 +121,34 @@ public class CreateAnomalyDetectorTool implements Tool {
     private Client client;
     // the mode id of LLM
     private String modelId;
+    // LLM model type, CLAUDE or OPENAI
+    private ModelType modelType;
+    // the default prompt for creating anomaly detector
+    private String contextPrompt;
+
+    enum ModelType {
+        CLAUDE,
+        OPENAI;
+
+        public static ModelType from(String value) {
+            return valueOf(value.toUpperCase(Locale.ROOT));
+        }
+
+    }
 
     /**
      *
      * @param client the OpenSearch transport client
      * @param modelId the model ID of LLM
      */
-    public CreateAnomalyDetectorTool(Client client, String modelId) {
+    public CreateAnomalyDetectorTool(Client client, String modelId, String modelType) {
         this.client = client;
         this.modelId = modelId;
+        if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
+            throw new IllegalArgumentException("Unsupported model_type: " + modelType);
+        }
+        this.modelType = ModelType.from(modelType);
+        this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
     }
 
     /**
@@ -208,9 +234,13 @@ public class CreateAnomalyDetectorTool implements Tool {
                 ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                 ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                 Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
+                if (dataAsMap == null) {
+                    listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
+                    return;
+                }
                 String finalResponse = dataAsMap.get("response");
                 if (Strings.isNullOrEmpty(finalResponse)) {
-                    listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
+                    listener.onFailure(new IllegalStateException("Remote endpoint fails to inference, no response found."));
                     return;
                 }
 
@@ -218,6 +248,13 @@ public class CreateAnomalyDetectorTool implements Tool {
                 Pattern pattern = Pattern.compile(EXTRACT_INFORMATION_REGEX);
                 Matcher matcher = pattern.matcher(finalResponse);
                 if (!matcher.matches()) {
+                    log
+                        .error(
+                            "The inference result from remote endpoint is not valid because the result: ["
+                                + finalResponse
+                                + "] cannot match the regex: "
+                                + EXTRACT_INFORMATION_REGEX
+                        );
                     listener
                         .onFailure(
                             new IllegalStateException(
@@ -247,17 +284,17 @@ public class CreateAnomalyDetectorTool implements Tool {
                     );
                 listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(result)));
             }, e -> {
-                log.info("fail to predict model: " + e);
+                log.error("fail to predict model: " + e);
                 listener.onFailure(e);
             }));
         }, e -> {
-            log.info("fail to get mapping: " + e);
+            log.error("fail to get mapping: " + e);
             String errorMessage = e.getMessage();
             if (errorMessage.contains("no such index")) {
                 listener
                     .onFailure(
                         new IllegalArgumentException(
-                            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                            "Return this final answer to human directly and do not use other tools: 'The index doesn't exist, please provide another index and retry'. Please try to directly send this message to human to ask for index name"
                         )
                     );
             } else {
@@ -303,6 +340,18 @@ public class CreateAnomalyDetectorTool implements Tool {
         return result;
     }
 
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> loadDefaultPromptFromFile() {
+        try (InputStream inputStream = CreateAnomalyDetectorTool.class.getResourceAsStream("CreateAnomalyDetectorDefaultPrompt.json")) {
+            if (inputStream != null) {
+                return gson.fromJson(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8), Map.class);
+            }
+        } catch (IOException e) {
+            log.error("Failed to load prompt from the file CreateAnomalyDetectorDefaultPrompt.json, error: ", e);
+        }
+        return new HashMap<>();
+    }
+
     /**
      *
      * @param fieldsToType the flattened field-> field type mapping
@@ -315,19 +364,9 @@ public class CreateAnomalyDetectorTool implements Tool {
             tableInfoJoiner.add("- " + entry.getKey() + ": " + entry.getValue());
         }
 
-        return "Human:\" turn\": Here is an example of the create anomaly detector API: POST _plugins/_anomaly_detection/detectors "
-            + "{\"time_field\":\"timestamp\",\"indices\":[\"server_log*\"],\"feature_attributes\":[{\"feature_name\":\"test\",\"feature_enabled\":true,\"aggregation_query\":{\"test\":{\"sum\":{\"field\":\"value\"}}}}],\"category_field\":[\"ip\"]}"
-            + ", and here are the mapping info containing all the fields in the index "
-            + indexName
-            + ": "
-            + tableInfoJoiner
-            + ", and the optional aggregation methods are count, avg, min, max and sum. "
-            + "Please give me some suggestion about creating an anomaly detector for the index "
-            + indexName
-            + ", you need to give the key information: the top 3 suitable aggregation fields which are numeric types and the suitable aggregation method for each field, if there are no numeric type fields, both the aggregation field and method are empty string, "
-            + " and also give the category field if there exists a keyword type field like ip, address, host, city, country or region, if not exist, the category field is empty."
-            + " Show me a format of keyed and pipe-delimited list wrapped in a curly bracket just like {category_field=the category field if exists|aggregation_field=comma-delimited list of all the aggregation field names|aggregation_method=comma-delimited list of all the aggregation methods}."
-            + "\n\nAssistant:\" turn\"";
+        Map<String, String> indexInfo = ImmutableMap.of("indexName", indexName, "indexMapping", tableInfoJoiner.toString());
+        StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
+        return substitutor.replace(contextPrompt);
     }
 
     /**
@@ -384,15 +423,15 @@ public class CreateAnomalyDetectorTool implements Tool {
          */
         @Override
         public CreateAnomalyDetectorTool create(Map<String, Object> map) {
-            Object obj = map.get("model_id");
-            if (Objects.isNull(obj)) {
-                throw new IllegalArgumentException("model_id cannot be null.");
-            }
-            String modelId = (String) obj;
+            String modelId = (String) map.getOrDefault("model_id", "");
             if (modelId.isEmpty()) {
                 throw new IllegalArgumentException("model_id cannot be empty.");
             }
-            return new CreateAnomalyDetectorTool(client, modelId);
+            String modelType = (String) map.getOrDefault("model_type", ModelType.CLAUDE.toString());
+            if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
+                throw new IllegalArgumentException("Unsupported model_type: " + modelType);
+            }
+            return new CreateAnomalyDetectorTool(client, modelId, modelType);
         }
 
         @Override

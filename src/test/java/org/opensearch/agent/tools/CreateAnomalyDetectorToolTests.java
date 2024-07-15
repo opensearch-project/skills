@@ -102,10 +102,32 @@ public class CreateAnomalyDetectorToolTests {
     }
 
     @Test
+    public void testModelType() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> CreateAnomalyDetectorTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "unknown"))
+        );
+        assertEquals("Unsupported model_type: unknown", exception.getMessage());
+
+        CreateAnomalyDetectorTool tool = CreateAnomalyDetectorTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "model_type", "openai"));
+        assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("OPENAI", tool.getModelType().toString());
+
+        tool = CreateAnomalyDetectorTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "claude"));
+        assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("CLAUDE", tool.getModelType().toString());
+    }
+
+    @Test
     public void testTool() {
         CreateAnomalyDetectorTool tool = CreateAnomalyDetectorTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId"));
         assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
         assertEquals("modelId", tool.getModelId());
+        assertEquals("CLAUDE", tool.getModelType().toString());
 
         tool
             .run(
@@ -144,7 +166,7 @@ public class CreateAnomalyDetectorToolTests {
                     throw new IllegalStateException(e.getMessage());
                 }))
         );
-        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+        assertEquals("Remote endpoint fails to inference, no response found.", exception.getMessage());
 
         modelReturns = Collections.singletonMap("response", "not valid response");
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
