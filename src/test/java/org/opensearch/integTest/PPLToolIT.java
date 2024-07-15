@@ -22,8 +22,6 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class PPLToolIT extends ToolIntegrationTest {
 
-    private String TEST_INDEX_NAME = "employee";
-
     @Override
     List<PromptHandler> promptHandlers() {
         PromptHandler PPLHandler = new PromptHandler() {
@@ -58,6 +56,14 @@ public class PPLToolIT extends ToolIntegrationTest {
             "{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\",\"executionResult\":\"{\\n  \\\"schema\\\": [\\n    {\\n      \\\"name\\\": \\\"cnt\\\",\\n      \\\"type\\\": \\\"integer\\\"\\n    }\\n  ],\\n  \\\"datarows\\\": [\\n    [\\n      0\\n    ]\\n  ],\\n  \\\"total\\\": 1,\\n  \\\"size\\\": 1\\n}\"}",
             result
         );
+    }
+
+    public void test_PPLTool_whenPPLExecutionDisabled_ResultOnlyContainsPPL() {
+        updateClusterSettings("plugins.skills.ppl_execution_enabled", false);
+        prepareIndex();
+        String agentId = registerAgent();
+        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}");
+        assertEquals("{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\"}", result);
     }
 
     public void testPPLTool_withWrongPPLGenerated_thenThrowException() {
@@ -148,8 +154,7 @@ public class PPLToolIT extends ToolIntegrationTest {
                     )
             );
         registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", modelId);
-        String agentId = createAgent(registerAgentRequestBody);
-        return agentId;
+        return createAgent(registerAgentRequestBody);
     }
 
     @SneakyThrows
@@ -166,14 +171,14 @@ public class PPLToolIT extends ToolIntegrationTest {
                     )
             );
         registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", "wrong_model_id");
-        String agentId = createAgent(registerAgentRequestBody);
-        return agentId;
+        return createAgent(registerAgentRequestBody);
     }
 
     @SneakyThrows
     private void prepareIndex() {
+        String testIndexName = "employee";
         createIndexWithConfiguration(
-            TEST_INDEX_NAME,
+            testIndexName,
             "{\n"
                 + "  \"mappings\": {\n"
                 + "    \"properties\": {\n"
@@ -187,8 +192,8 @@ public class PPLToolIT extends ToolIntegrationTest {
                 + "  }\n"
                 + "}"
         );
-        addDocToIndex(TEST_INDEX_NAME, "0", List.of("age", "name"), List.of(56, "john"));
-        addDocToIndex(TEST_INDEX_NAME, "1", List.of("age", "name"), List.of(56, "smith"));
+        addDocToIndex(testIndexName, "0", List.of("age", "name"), List.of(56, "john"));
+        addDocToIndex(testIndexName, "1", List.of("age", "name"), List.of(56, "smith"));
     }
 
 }

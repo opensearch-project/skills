@@ -8,6 +8,7 @@ package org.opensearch.integTest;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -62,6 +63,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         updateClusterSettings("plugins.ml_commons.jvm_heap_memory_threshold", 100);
         updateClusterSettings("plugins.ml_commons.allow_registering_model_via_url", true);
         updateClusterSettings("plugins.ml_commons.agent_framework_enabled", true);
+        updateClusterSettings("plugins.skills.ppl_execution_enabled", true);
     }
 
     @SneakyThrows
@@ -235,10 +237,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
-        Response response = makeRequest(client(), "PUT", indexName, null, indexConfiguration, null);
-        Map<String, Object> responseInMap = parseResponseToMap(response);
-        assertEquals("true", responseInMap.get("acknowledged").toString());
-        assertEquals(indexName, responseInMap.get("index").toString());
+        boolean indexExists = indexExists(indexName);
+        if (!indexExists) {
+            Response response = makeRequest(client(), "PUT", indexName, null, indexConfiguration, null);
+            Map<String, Object> responseInMap = parseResponseToMap(response);
+            assertEquals("true", responseInMap.get("acknowledged").toString());
+            assertEquals(indexName, responseInMap.get("index").toString());
+        }
     }
 
     protected void createIngestPipelineWithConfiguration(String pipelineName, String body) throws Exception {
@@ -276,7 +281,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
                 .collect(Collectors.toList());
 
             for (final String indexName : externalIndices) {
-                adminClient().performRequest(new Request("DELETE", "/" + indexName));
+                Response deleteResponse = adminClient().performRequest(new Request("DELETE", "/" + indexName));
+                Map<String, Object> responseInMap = parseResponseToMap(deleteResponse);
+                assertEquals(
+                    String.format(Locale.ROOT, "delete index %s failed with response: %s", indexName, gson.toJson(responseInMap)),
+                    "true",
+                    responseInMap.get("acknowledged").toString()
+                );
             }
         }
     }
