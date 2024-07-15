@@ -233,10 +233,10 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         // To allow digits variation from model output, using string contains to match
         assertTrue(
             result
-                .contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"hello world\"]},\"_id\":\"0\",\"_score\":0.70493275}")
+                .contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"hello world\"]},\"_id\":\"0\",\"_score\":0.7")
         );
         assertTrue(
-            result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"a b\"]},\"_id\":\"1\",\"_score\":0.26505747}")
+            result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"a b\"]},\"_id\":\"1\",\"_score\":0.2")
         );
     }
 
