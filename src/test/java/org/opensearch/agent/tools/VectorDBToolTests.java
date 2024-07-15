@@ -24,6 +24,7 @@ public class VectorDBToolTests {
     public static final String TEST_EMBEDDING_FIELD = "test embedding";
     public static final String TEST_MODEL_ID = "123fsd23134";
     public static final Integer TEST_K = 123;
+    public static final String TEST_NESTED_PATH = "nested_path";
     private Map<String, Object> params = new HashMap<>();
 
     @Before
@@ -59,6 +60,23 @@ public class VectorDBToolTests {
         assertEquals("123fsd23134sdfouh", queryBody.get("query").get("neural").get("test embedding").get("query_text"));
         assertEquals("123fsd23134", queryBody.get("query").get("neural").get("test embedding").get("model_id"));
         assertEquals(123.0, queryBody.get("query").get("neural").get("test embedding").get("k"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetQueryBodyWithNestedPath() {
+        Map nestedParams = new HashMap<>(params);
+        nestedParams.put(VectorDBTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(nestedParams);
+        Map<String, Map<String, Map<String, Object>>> nestedQueryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
+        assertEquals("nested_path", nestedQueryBody.get("query").get("nested").get("path"));
+        assertEquals("max", nestedQueryBody.get("query").get("nested").get("score_mode"));
+        Map<String, Map<String, Map<String, String>>> queryBody = (Map<String, Map<String, Map<String, String>>>) nestedQueryBody
+            .get("query")
+            .get("nested")
+            .get("query");
+        assertEquals("123fsd23134sdfouh", queryBody.get("neural").get("test embedding").get("query_text"));
+        assertEquals("123fsd23134", queryBody.get("neural").get("test embedding").get("model_id"));
     }
 
     @Test
@@ -102,6 +120,11 @@ public class VectorDBToolTests {
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.EMBEDDING_FIELD, 123)));
 
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.MODEL_ID_FIELD, 123)));
+
+        assertThrows(
+            ClassCastException.class,
+            () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.NESTED_PATH_FIELD, 123))
+        );
 
         assertThrows(JsonSyntaxException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.SOURCE_FIELD, "123")));
 

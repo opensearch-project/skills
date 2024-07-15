@@ -22,6 +22,7 @@ import lombok.SneakyThrows;
 public class VectorDBToolIT extends BaseAgentToolsIT {
 
     public static String TEST_INDEX_NAME = "test_index";
+    public static String TEST_NESTED_INDEX_NAME = "test_index_nested";
 
     private String modelId;
     private String registerAgentRequestBody;
@@ -99,12 +100,75 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         addDocToIndex(TEST_INDEX_NAME, "1", List.of("text"), List.of("a b"));
     }
 
+    @SneakyThrows
+    private void prepareNestedIndex() {
+        String pipelineConfig = "{\n"
+            + "  \"description\": \"text embedding pipeline\",\n"
+            + "  \"processors\": [\n"
+            + "    {\n"
+            + "      \"text_embedding\": {\n"
+            + "        \"model_id\": \""
+            + modelId
+            + "\",\n"
+            + "        \"field_map\": {\n"
+            + "          \"text\": \"embedding\"\n"
+            + "        }\n"
+            + "      }\n"
+            + "    }\n"
+            + "  ]\n"
+            + "}";
+        createIngestPipelineWithConfiguration("test-embedding-model", pipelineConfig);
+
+        String indexMapping = "{\n"
+            + "  \"mappings\": {\n"
+            + "    \"properties\": {\n"
+            + "      \"text\": {\n"
+            + "        \"type\": \"text\"\n"
+            + "      },\n"
+            + "      \"embedding\": {\n"
+            + "        \"type\":\"nested\",\n"
+            + "        \"properties\":{\n"
+            + "            \"knn\":{\n"
+            + "                \"type\": \"knn_vector\",\n"
+            + "                \"dimension\": 768,\n"
+            + "                \"method\": {\n"
+            + "                  \"name\": \"hnsw\",\n"
+            + "                  \"space_type\": \"l2\",\n"
+            + "                  \"engine\": \"lucene\",\n"
+            + "                  \"parameters\": {\n"
+            + "                    \"ef_construction\": 128,\n"
+            + "                    \"m\": 24\n"
+            + "                  }\n"
+            + "                }\n"
+            + "            }\n"
+            + "        }\n"
+            + "        \n"
+            + "      }\n"
+            + "    }\n"
+            + "  },\n"
+            + "  \"settings\": {\n"
+            + "    \"index\": {\n"
+            + "      \"knn.space_type\": \"cosinesimil\",\n"
+            + "      \"default_pipeline\": \"test-embedding-model\",\n"
+            + "      \"knn\": \"true\"\n"
+            + "    }\n"
+            + "  }\n"
+            + "}";
+
+        createIndexWithConfiguration(TEST_NESTED_INDEX_NAME, indexMapping);
+
+        addDocToIndex(TEST_NESTED_INDEX_NAME, "0", List.of("text"), List.of(List.of("hello world")));
+
+        addDocToIndex(TEST_NESTED_INDEX_NAME, "1", List.of("text"), List.of(List.of("a b")));
+    }
+
     @Before
     @SneakyThrows
     public void setUp() {
         super.setUp();
         prepareModel();
         prepareIndex();
+        prepareNestedIndex();
         registerAgentRequestBody = Files
             .readString(
                 Path
@@ -155,6 +219,25 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
                 exception.getMessage(),
                 allOf(containsString("[input] is null or empty, can not process it."), containsString("IllegalArgumentException"))
             );
+    }
+
+    public void testVectorDBToolInFlowAgent_withNestedIndex() {
+        String registerAgentRequestBodyNested = registerAgentRequestBody;
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested.replace("\"nested_path\": \"\"", "\"nested_path\": \"embedding\"");
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested
+            .replace("\"embedding_field\": \"embedding\"", "\"embedding_field\": \"embedding.knn\"");
+        registerAgentRequestBodyNested = registerAgentRequestBodyNested
+            .replace("\"index\": \"test_index\"", "\"index\": \"test_index_nested\"");
+        String agentId = createAgent(registerAgentRequestBodyNested);
+        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
+        // To allow digits variation from model output, using string contains to match
+        assertTrue(
+            result
+                .contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"hello world\"]},\"_id\":\"0\",\"_score\":0.70493275}")
+        );
+        assertTrue(
+            result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"a b\"]},\"_id\":\"1\",\"_score\":0.26505747}")
+        );
     }
 
     public void testVectorDBToolInFlowAgent_withIllegalSourceField_thenGetEmptySource() {
