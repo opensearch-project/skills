@@ -64,9 +64,8 @@ public class NeuralSparseSearchToolTests {
     @Test
     @SneakyThrows
     public void testGetQueryBodyWithNestedPath() {
-        Map nestedParams = new HashMap<>(params);
-        nestedParams.put(NeuralSparseSearchTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
-        NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(nestedParams);
+        params.put(NeuralSparseSearchTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
+        NeuralSparseSearchTool tool = NeuralSparseSearchTool.Factory.getInstance().create(params);
         Map<String, Map<String, Map<String, Object>>> nestedQueryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
         assertEquals("nested_path", nestedQueryBody.get("query").get("nested").get("path"));
         assertEquals("max", nestedQueryBody.get("query").get("nested").get("score_mode"));

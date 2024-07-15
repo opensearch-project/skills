@@ -65,9 +65,8 @@ public class VectorDBToolTests {
     @Test
     @SneakyThrows
     public void testGetQueryBodyWithNestedPath() {
-        Map nestedParams = new HashMap<>(params);
-        nestedParams.put(VectorDBTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
-        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(nestedParams);
+        params.put(VectorDBTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
         Map<String, Map<String, Map<String, Object>>> nestedQueryBody = gson.fromJson(tool.getQueryBody(TEST_QUERY_TEXT), Map.class);
         assertEquals("nested_path", nestedQueryBody.get("query").get("nested").get("path"));
         assertEquals("max", nestedQueryBody.get("query").get("nested").get("score_mode"));
