@@ -33,6 +33,7 @@ import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.common.SkillSettings;
 import org.opensearch.agent.tools.utils.ClusterSettingHelper;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
@@ -401,7 +402,7 @@ public class PPLTool implements Tool {
             );
         }
         Map<String, String> fieldsToType = new HashMap<>();
-        extractNamesTypes(mappingSource, fieldsToType, "");
+        ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "");
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
@@ -437,28 +438,6 @@ public class PPLTool implements Tool {
         Map<String, String> indexInfo = ImmutableMap.of("mappingInfo", tableInfo, "question", question, "indexName", indexName);
         StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
         return substitutor.replace(contextPrompt);
-    }
-
-    private void extractNamesTypes(Map<String, Object> mappingSource, Map<String, String> fieldsToType, String prefix) {
-        if (!prefix.isEmpty()) {
-            prefix += ".";
-        }
-
-        for (Map.Entry<String, Object> entry : mappingSource.entrySet()) {
-            String n = entry.getKey();
-            Object v = entry.getValue();
-
-            if (v instanceof Map) {
-                Map<String, Object> vMap = (Map<String, Object>) v;
-                if (vMap.containsKey("type")) {
-                    if (!((vMap.getOrDefault("type", "")).equals("alias"))) {
-                        fieldsToType.put(prefix + n, (String) vMap.get("type"));
-                    }
-                } else if (vMap.containsKey("properties")) {
-                    extractNamesTypes((Map<String, Object>) vMap.get("properties"), fieldsToType, prefix + n);
-                }
-            }
-        }
     }
 
     private static void extractSamples(Map<String, Object> sampleSource, Map<String, String> fieldsToSample, String prefix)
