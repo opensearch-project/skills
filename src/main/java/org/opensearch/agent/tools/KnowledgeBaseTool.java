@@ -29,7 +29,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 @Setter
 @Getter
-@ToolAnnotation(PPLTool.TYPE)
+@ToolAnnotation(KnowledgeBaseTool.TYPE)
 public class KnowledgeBaseTool implements Tool {
 
     public static final String TYPE = "KnowledgeBaseTool";
