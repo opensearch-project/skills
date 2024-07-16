@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 
@@ -13,6 +15,7 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -40,7 +43,7 @@ public class KnowledgeBaseTool implements Tool {
 
     private String modelId;
 
-    public static final String INPUT_FIELD = "query";
+    public static final String INPUT_FIELD = "text";
 
     private Client client;
 
@@ -54,19 +57,35 @@ public class KnowledgeBaseTool implements Tool {
     @Override
     @SuppressWarnings("unchecked")
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        ActionRequest request = new MLPredictionTaskRequest(modelId, MLInput.builder().algorithm(FunctionName.REMOTE).build(), null);
+        String text = parameters.get(INPUT_FIELD);
+        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
+            .builder()
+            .parameters(Collections.singletonMap(INPUT_FIELD, text))
+            .build();
+        MLInput mlInput = MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build();
+        ActionRequest request = new MLPredictionTaskRequest(modelId, mlInput, null);
 
         client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
             ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
             ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
             ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
-            Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
-            if (dataAsMap.get("response") == null) {
+            Map<String, Object> dataAsMap = (Map<String, Object>) modelTensor.getDataAsMap();
+            if (dataAsMap.get("retrievalResults") == null) {
                 listener.onFailure(new IllegalStateException("Remote endpoint fails to retrieve documents"));
                 return;
             }
-            String retrievedDocuments = dataAsMap.get("response");
-            listener.onResponse((T) retrievedDocuments);
+            ArrayList<Map<String, Object>> retrievedDocuments = (ArrayList<Map<String, Object>>) dataAsMap.get("retrievalResults");
+            StringBuilder formattedDocuments = new StringBuilder();
+            for (Map<String, Object> retrievedDocument : retrievedDocuments) {
+                if (retrievedDocument.containsKey("content")) {
+                    Map<String, String> content = (Map<String, String>) retrievedDocument.get("content");
+                    if (content.containsKey("text")) {
+                        String contentText = content.get("text");
+                        formattedDocuments.append(contentText).append("\n\n");
+                    }
+                }
+            }
+            listener.onResponse((T) formattedDocuments.toString());
         }, e -> {
             log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
             listener.onFailure(e);
