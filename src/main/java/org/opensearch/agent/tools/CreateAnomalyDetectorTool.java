@@ -288,9 +288,8 @@ public class CreateAnomalyDetectorTool implements Tool {
                 listener.onFailure(e);
             }));
         }, e -> {
-            log.error("fail to get mapping: " + e);
-            String errorMessage = e.getMessage();
-            if (errorMessage.contains("no such index")) {
+            log.error("failed to get mapping: " + e);
+            if (e.toString().contains("IndexNotFoundException")) {
                 listener
                     .onFailure(
                         new IllegalArgumentException(
