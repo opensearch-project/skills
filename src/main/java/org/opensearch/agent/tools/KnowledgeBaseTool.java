@@ -47,7 +47,7 @@ public class KnowledgeBaseTool implements Tool {
 
     private Client client;
 
-    private static final String DEFAULT_DESCRIPTION = "Knowledge base tool description";
+    private static final String DEFAULT_DESCRIPTION = "Use this tool to retrieve related documentation on OpenSearch.";
 
     public KnowledgeBaseTool(Client client, String modelId) {
         this.client = client;
