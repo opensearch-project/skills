@@ -58,6 +58,10 @@ public class KnowledgeBaseTool implements Tool {
     @SuppressWarnings("unchecked")
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         String text = parameters.get(INPUT_FIELD);
+        if (StringUtils.isBlank(text)) {
+            throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it in knowledge base tool.");
+        }
+
         RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
             .builder()
             .parameters(Collections.singletonMap(INPUT_FIELD, text))
