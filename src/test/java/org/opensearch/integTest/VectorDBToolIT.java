@@ -232,12 +232,9 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"a\"}}");
         // To allow digits variation from model output, using string contains to match
         assertTrue(
-            result
-                .contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"hello world\"]},\"_id\":\"0\",\"_score\":0.7")
+            result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"hello world\"]},\"_id\":\"0\",\"_score\":0.7")
         );
-        assertTrue(
-            result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"a b\"]},\"_id\":\"1\",\"_score\":0.2")
-        );
+        assertTrue(result.contains("{\"_index\":\"test_index_nested\",\"_source\":{\"text\":[\"a b\"]},\"_id\":\"1\",\"_score\":0.2"));
     }
 
     public void testVectorDBToolInFlowAgent_withIllegalSourceField_thenGetEmptySource() {
