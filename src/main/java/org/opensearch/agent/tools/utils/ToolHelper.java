@@ -9,9 +9,9 @@ import java.util.Map;
 
 public class ToolHelper {
     /**
-     * Flatten all the fields in the mappings, insert the field->field type mapping to a map
+     * Flatten all the fields in the mappings, insert the field to fieldType mapping to a map
      * @param mappingSource the mappings of an index
-     * @param fieldsToType the result containing the field->field type mapping
+     * @param fieldsToType the result containing the field to fieldType mapping
      * @param prefix the parent field path
      */
     public static void extractFieldNamesTypes(Map<String, Object> mappingSource, Map<String, String> fieldsToType, String prefix) {
