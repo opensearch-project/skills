@@ -120,8 +120,10 @@ public class CreateAnomalyDetectorTool implements Tool {
     // the OpenSearch transport client
     private Client client;
     // the mode id of LLM
+    @Getter
     private String modelId;
     // LLM model type, CLAUDE or OPENAI
+    @Getter
     private ModelType modelType;
     // the default prompt for creating anomaly detector
     private String contextPrompt;
