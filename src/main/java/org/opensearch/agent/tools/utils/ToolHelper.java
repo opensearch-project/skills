@@ -5,9 +5,32 @@
 
 package org.opensearch.agent.tools.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 
+import com.google.gson.Gson;
+
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class ToolHelper {
+    private static final Gson gson = new Gson();
+
+    public static Map<String, String> loadDefaultPromptDictFromFile(Class<?> source, String fileName) {
+        try (InputStream searchResponseIns = source.getResourceAsStream(fileName)) {
+            if (searchResponseIns != null) {
+                String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+                return gson.fromJson(defaultPromptContent, Map.class);
+            }
+        } catch (IOException e) {
+            log.error("Failed to load default prompt dict from file: {}", fileName, e);
+        }
+        return new HashMap<>();
+    }
+
     /**
      * Flatten all the fields in the mappings, insert the field to fieldType mapping to a map
      * @param mappingSource the mappings of an index
