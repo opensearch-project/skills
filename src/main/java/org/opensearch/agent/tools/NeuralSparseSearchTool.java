@@ -33,10 +33,12 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
     public static final String TYPE = "NeuralSparseSearchTool";
     public static final String MODEL_ID_FIELD = "model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
+    public static final String NESTED_PATH_FIELD = "nested_path";
 
     private String name = TYPE;
     private String modelId;
     private String embeddingField;
+    private String nestedPath;
 
     @Builder
     public NeuralSparseSearchTool(
@@ -46,11 +48,13 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
         String embeddingField,
         String[] sourceFields,
         Integer docSize,
-        String modelId
+        String modelId,
+        String nestedPath
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
         this.modelId = modelId;
         this.embeddingField = embeddingField;
+        this.nestedPath = nestedPath;
     }
 
     @Override
@@ -61,8 +65,29 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
             );
         }
 
-        Map<String, Object> queryBody = Map
-            .of("query", Map.of("neural_sparse", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId))));
+        Map<String, Object> queryBody;
+        if (StringUtils.isBlank(nestedPath)) {
+            queryBody = Map
+                .of("query", Map.of("neural_sparse", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId))));
+        } else {
+            queryBody = Map
+                .of(
+                    "query",
+                    Map
+                        .of(
+                            "nested",
+                            Map
+                                .of(
+                                    "path",
+                                    nestedPath,
+                                    "score_mode",
+                                    "max",
+                                    "query",
+                                    Map.of("neural_sparse", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId)))
+                                )
+                        )
+                );
+        }
 
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(queryBody));
@@ -99,6 +124,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
             String[] sourceFields = gson.fromJson((String) params.get(SOURCE_FIELD), String[].class);
             String modelId = (String) params.get(MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
+            String nestedPath = (String) params.get(NESTED_PATH_FIELD);
             return NeuralSparseSearchTool
                 .builder()
                 .client(client)
@@ -108,6 +134,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
                 .sourceFields(sourceFields)
                 .modelId(modelId)
                 .docSize(docSize)
+                .nestedPath(nestedPath)
                 .build();
         }
 

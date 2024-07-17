@@ -30,9 +30,9 @@ import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
-import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
 import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
+import org.opensearch.agent.common.SkillSettings;
+import org.opensearch.agent.tools.utils.ClusterSettingHelper;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
@@ -47,7 +47,6 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
-import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.repackage.com.google.common.collect.ImmutableMap;
@@ -99,6 +98,8 @@ public class PPLTool implements Tool {
 
     private int head;
 
+    private ClusterSettingHelper clusterSettingHelper;
+
     private static Gson gson = new Gson();
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
@@ -128,12 +129,7 @@ public class PPLTool implements Tool {
         ALLOWED_FIELDS_TYPE.add("nested");
         ALLOWED_FIELDS_TYPE.add("geo_point");
 
-        try {
-            DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
-        } catch (IOException e) {
-            log.error("fail to load default prompt dict" + e.getMessage());
-            DEFAULT_PROMPT_DICT = new HashMap<>();
-        }
+        DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
     }
 
     public enum PPLModelType {
@@ -157,6 +153,7 @@ public class PPLTool implements Tool {
 
     public PPLTool(
         Client client,
+        ClusterSettingHelper clusterSettingHelper,
         String modelId,
         String contextPrompt,
         String pplModelType,
@@ -168,18 +165,20 @@ public class PPLTool implements Tool {
         this.modelId = modelId;
         this.pplModelType = PPLModelType.from(pplModelType);
         if (contextPrompt.isEmpty()) {
-            this.contextPrompt = this.DEFAULT_PROMPT_DICT.getOrDefault(this.pplModelType.toString(), "");
+            this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.pplModelType.toString(), "");
         } else {
             this.contextPrompt = contextPrompt;
         }
         this.previousToolKey = previousToolKey;
         this.head = head;
         this.execute = execute;
+        this.clusterSettingHelper = clusterSettingHelper;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        parameters = extractFromChatParameters(parameters);
+        extractFromChatParameters(parameters);
         String indexName = getIndexNameFromParameters(parameters);
         if (StringUtils.isBlank(indexName)) {
             throw new IllegalArgumentException(
@@ -198,14 +197,14 @@ public class PPLTool implements Tool {
         }
 
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
-        client.admin().indices().getMappings(getMappingsRequest, ActionListener.<GetMappingsResponse>wrap(getMappingsResponse -> {
+        client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
-            if (mappings.size() == 0) {
+            if (mappings.isEmpty()) {
                 throw new IllegalArgumentException("No matching mapping with index name: " + indexName);
             }
             String firstIndexName = (String) mappings.keySet().toArray()[0];
             SearchRequest searchRequest = buildSearchRequest(firstIndexName);
-            client.search(searchRequest, ActionListener.<SearchResponse>wrap(searchResponse -> {
+            client.search(searchRequest, ActionListener.wrap(searchResponse -> {
                 SearchHit[] searchHits = searchResponse.getHits().getHits();
                 String tableInfo = constructTableInfo(searchHits, mappings);
                 String prompt = constructPrompt(tableInfo, question.strip(), indexName);
@@ -217,13 +216,20 @@ public class PPLTool implements Tool {
                     modelId,
                     MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
                 );
-                client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.<MLTaskResponse>wrap(mlTaskResponse -> {
+                client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
                     ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
                     ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
-                    if (!this.execute) {
+                    boolean pplExecutedEnabled = clusterSettingHelper.getClusterSettings(SkillSettings.PPL_EXECUTION_ENABLED);
+                    if (!pplExecutedEnabled || !this.execute) {
+                        if (!pplExecutedEnabled) {
+                            log
+                                .debug(
+                                    "PPL execution is disabled, the query will be returned directly, to enable this, please set plugins.skills.ppl_execution_enabled to true"
+                                );
+                        }
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                         listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
                         return;
@@ -235,7 +241,7 @@ public class PPLTool implements Tool {
                         .execute(
                             PPLQueryAction.INSTANCE,
                             transportPPLQueryRequest,
-                            getPPLTransportActionListener(ActionListener.<TransportPPLQueryResponse>wrap(transportPPLQueryResponse -> {
+                            getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
                                 String results = transportPPLQueryResponse.getResult();
                                 Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
                                 listener
@@ -251,17 +257,15 @@ public class PPLTool implements Tool {
                         );
                     // Execute output here
                 }, e -> {
-                    log.info("fail to predict model: " + e);
+                    log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
                     listener.onFailure(e);
                 }));
             }, e -> {
-                log.info("fail to search: " + e);
+                log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
                 listener.onFailure(e);
-            }
-
-            ));
+            }));
         }, e -> {
-            log.info("fail to get mapping: " + e);
+            log.error(String.format(Locale.ROOT, "fail to get mapping of index: %s with error: %s", indexName, e.getMessage()), e);
             String errorMessage = e.getMessage();
             if (errorMessage.contains("no such index")) {
                 listener
@@ -288,14 +292,13 @@ public class PPLTool implements Tool {
 
     @Override
     public boolean validate(Map<String, String> parameters) {
-        if (parameters == null || parameters.size() == 0) {
-            return false;
-        }
-        return true;
+        return parameters != null && !parameters.isEmpty();
     }
 
     public static class Factory implements Tool.Factory<PPLTool> {
         private Client client;
+
+        private ClusterSettingHelper clusterSettingHelper;
 
         private static Factory INSTANCE;
 
@@ -312,8 +315,9 @@ public class PPLTool implements Tool {
             }
         }
 
-        public void init(Client client) {
+        public void init(Client client, ClusterSettingHelper clusterSettingHelper) {
             this.client = client;
+            this.clusterSettingHelper = clusterSettingHelper;
         }
 
         @Override
@@ -321,12 +325,13 @@ public class PPLTool implements Tool {
             validatePPLToolParameters(map);
             return new PPLTool(
                 client,
+                clusterSettingHelper,
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
-                Integer.valueOf((String) map.getOrDefault("head", "-1")),
-                Boolean.valueOf((String) map.getOrDefault("execute", "true"))
+                NumberUtils.toInt((String) map.get("head"), -1),
+                Boolean.parseBoolean((String) map.getOrDefault("execute", "true"))
             );
         }
 
@@ -351,8 +356,7 @@ public class PPLTool implements Tool {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.size(1).query(new MatchAllQueryBuilder());
         // client;
-        SearchRequest request = new SearchRequest(new String[] { indexName }, searchSourceBuilder);
-        return request;
+        return new SearchRequest(new String[] { indexName }, searchSourceBuilder);
     }
 
     private GetMappingsRequest buildGetMappingRequest(String indexName) {
@@ -422,20 +426,18 @@ public class PPLTool implements Tool {
             }
         }
 
-        String tableInfo = tableInfoJoiner.toString();
-        return tableInfo;
+        return tableInfoJoiner.toString();
     }
 
     private String constructPrompt(String tableInfo, String question, String indexName) {
         Map<String, String> indexInfo = ImmutableMap.of("mappingInfo", tableInfo, "question", question, "indexName", indexName);
         StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
-        String finalPrompt = substitutor.replace(contextPrompt);
-        return finalPrompt;
+        return substitutor.replace(contextPrompt);
     }
 
     private static void extractSamples(Map<String, Object> sampleSource, Map<String, String> fieldsToSample, String prefix)
         throws PrivilegedActionException {
-        if (prefix.length() > 0) {
+        if (!prefix.isEmpty()) {
             prefix += ".";
         }
 
@@ -458,16 +460,17 @@ public class PPLTool implements Tool {
         return ActionListener.wrap(r -> { listener.onResponse(TransportPPLQueryResponse.fromActionResponse(r)); }, listener::onFailure);
     }
 
-    private Map<String, String> extractFromChatParameters(Map<String, String> parameters) {
+    @SuppressWarnings("unchecked")
+    private void extractFromChatParameters(Map<String, String> parameters) {
         if (parameters.containsKey("input")) {
+            String input = parameters.get("input");
             try {
-                Map<String, String> chatParameters = gson.fromJson(parameters.get("input"), Map.class);
+                Map<String, String> chatParameters = gson.fromJson(input, Map.class);
                 parameters.putAll(chatParameters);
-            } finally {
-                return parameters;
+            } catch (Exception e) {
+                log.error(String.format(Locale.ROOT, "Failed to parse chat parameters, input is: %s, which is not a valid json", input), e);
             }
         }
-        return parameters;
     }
 
     private String parseOutput(String llmOutput, String indexName) {
@@ -531,14 +534,16 @@ public class PPLTool implements Tool {
         return indexName.trim();
     }
 
-    private static Map<String, String> loadDefaultPromptDict() throws IOException {
-        InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json");
-        if (searchResponseIns != null) {
-            String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
-            Map<String, String> defaultPromptDict = gson.fromJson(defaultPromptContent, Map.class);
-            return defaultPromptDict;
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> loadDefaultPromptDict() {
+        try (InputStream searchResponseIns = PPLTool.class.getResourceAsStream("PPLDefaultPrompt.json")) {
+            if (searchResponseIns != null) {
+                String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+                return gson.fromJson(defaultPromptContent, Map.class);
+            }
+        } catch (IOException e) {
+            log.error("Failed to load default prompt dict", e);
         }
         return new HashMap<>();
     }
-
 }
