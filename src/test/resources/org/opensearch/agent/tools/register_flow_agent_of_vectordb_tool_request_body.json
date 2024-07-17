@@ -10,7 +10,8 @@
         "index": "test_index",
         "embedding_field": "embedding",
         "source_field": ["text"],
-        "input": "${parameters.question}"
+        "input": "${parameters.question}",
+        "nested_path": ""
       }
     }
   ]

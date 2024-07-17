@@ -38,11 +38,13 @@ public class VectorDBTool extends AbstractRetrieverTool {
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String K_FIELD = "k";
     public static final Integer DEFAULT_K = 10;
+    public static final String NESTED_PATH_FIELD = "nested_path";
 
     private String name = TYPE;
     private String modelId;
     private String embeddingField;
     private Integer k;
+    private String nestedPath;
 
     @Builder
     public VectorDBTool(
@@ -53,12 +55,14 @@ public class VectorDBTool extends AbstractRetrieverTool {
         String[] sourceFields,
         Integer docSize,
         String modelId,
-        Integer k
+        Integer k,
+        String nestedPath
     ) {
         super(client, xContentRegistry, index, sourceFields, docSize);
         this.modelId = modelId;
         this.embeddingField = embeddingField;
         this.k = k;
+        this.nestedPath = nestedPath;
     }
 
     @Override
@@ -69,8 +73,30 @@ public class VectorDBTool extends AbstractRetrieverTool {
             );
         }
 
-        Map<String, Object> queryBody = Map
-            .of("query", Map.of("neural", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId, "k", k))));
+        Map<String, Object> queryBody;
+        if (StringUtils.isBlank(nestedPath)) {
+            queryBody = Map
+                .of("query", Map.of("neural", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId, "k", k))));
+
+        } else {
+            queryBody = Map
+                .of(
+                    "query",
+                    Map
+                        .of(
+                            "nested",
+                            Map
+                                .of(
+                                    "path",
+                                    nestedPath,
+                                    "score_mode",
+                                    "max",
+                                    "query",
+                                    Map.of("neural", Map.of(embeddingField, Map.of("query_text", queryText, "model_id", modelId, "k", k)))
+                                )
+                        )
+                );
+        }
 
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(queryBody));
@@ -108,6 +134,7 @@ public class VectorDBTool extends AbstractRetrieverTool {
             String modelId = (String) params.get(MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
+            String nestedPath = (String) params.get(NESTED_PATH_FIELD);
             return VectorDBTool
                 .builder()
                 .client(client)
@@ -118,6 +145,7 @@ public class VectorDBTool extends AbstractRetrieverTool {
                 .modelId(modelId)
                 .docSize(docSize)
                 .k(k)
+                .nestedPath(nestedPath)
                 .build();
         }
 

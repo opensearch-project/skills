@@ -55,6 +55,7 @@ public class RAGToolTests {
     public static final String TEST_INFERENCE_MODEL_ID = "1234";
     public static final String TEST_NEURAL_QUERY_TYPE = "neural";
     public static final String TEST_NEURAL_SPARSE_QUERY_TYPE = "neural_sparse";
+    public static final String TEST_NESTED_PATH = "nested_path";
 
     static public final NamedXContentRegistry TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY = getQueryNamedXContentRegistry();
     private RAGTool ragTool;
@@ -422,6 +423,7 @@ public class RAGToolTests {
         assertEquals(factoryMock.getDefaultVersion(), null);
         assertNotNull(RAGTool.Factory.getInstance());
 
+        params.put(VectorDBTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
         RAGTool rAGtool1 = factoryMock.create(params);
         VectorDBTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
         params.put(VectorDBTool.MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
@@ -436,6 +438,7 @@ public class RAGToolTests {
         assertEquals(rAGtool1.getQueryTool().getSourceFields(), rAGtool2.getQueryTool().getSourceFields());
         assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
         assertEquals(rAGtool1.getQueryType(), rAGtool2.getQueryType());
+        assertEquals(((VectorDBTool) rAGtool1.getQueryTool()).getNestedPath(), ((VectorDBTool) rAGtool2.getQueryTool()).getNestedPath());
     }
 
     @Test
@@ -450,6 +453,8 @@ public class RAGToolTests {
         assertEquals(factoryMock.getDefaultType(), RAGTool.TYPE);
         assertEquals(factoryMock.getDefaultVersion(), null);
 
+        params.put(NeuralSparseSearchTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
+        params.put("query_type", "neural_sparse");
         RAGTool rAGtool1 = factoryMock.create(params);
         NeuralSparseSearchTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
         NeuralSparseSearchTool queryTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
@@ -463,7 +468,10 @@ public class RAGToolTests {
         assertEquals(rAGtool1.getQueryTool().getSourceFields(), rAGtool2.getQueryTool().getSourceFields());
         assertEquals(rAGtool1.getXContentRegistry(), rAGtool2.getXContentRegistry());
         assertEquals(rAGtool1.getQueryType(), rAGtool2.getQueryType());
-
+        assertEquals(
+            ((NeuralSparseSearchTool) rAGtool1.getQueryTool()).getNestedPath(),
+            ((NeuralSparseSearchTool) rAGtool2.getQueryTool()).getNestedPath()
+        );
     }
 
     private static NamedXContentRegistry getQueryNamedXContentRegistry() {
