@@ -120,7 +120,7 @@ public class KnowledgeBaseTool implements Tool {
             if (INSTANCE != null) {
                 return INSTANCE;
             }
-            synchronized (PPLTool.class) {
+            synchronized (KnowledgeBaseTool.class) {
                 if (INSTANCE != null) {
                     return INSTANCE;
                 }
