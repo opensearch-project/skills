@@ -81,7 +81,7 @@ public class SearchMonitorsToolTests {
             new CronSchedule("31 * * * *", ZoneId.of("Asia/Kolkata"), null),
             Instant.now(),
             Instant.now(),
-            Monitor.MonitorType.QUERY_LEVEL_MONITOR,
+            Monitor.MonitorType.QUERY_LEVEL_MONITOR.name(),
             new User("test-user", Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
             0,
             Collections.emptyList(),
