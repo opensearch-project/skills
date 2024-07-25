@@ -29,6 +29,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.logging.LoggerMessageFormat;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
@@ -78,9 +79,10 @@ public class CreateAlertTool implements Tool {
         Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(this.getClass(), promptFilePath);
         if (!promptDict.containsKey(modelType)) {
             throw new IllegalArgumentException(
-                String
+                LoggerMessageFormat
                     .format(
-                        "Failed to find the right prompt for modelType: %s, this tool supports prompts for these models: [%s]",
+                        null,
+                        "Failed to find the right prompt for modelType: {}, this tool supports prompts for these models: [{}]",
                         modelType,
                         String.join(",", promptDict.keySet())
                     )
@@ -148,7 +150,9 @@ public class CreateAlertTool implements Tool {
                     response = StringUtils.toJson(dataMap);
                 }
                 if (!isJson(response)) {
-                    throw new IllegalArgumentException(String.format("The response from LLM is not a json: [%s]", response));
+                    throw new IllegalArgumentException(
+                        LoggerMessageFormat.format(null, "The response from LLM is not a json: [{}]", response)
+                    );
                 }
                 listener.onResponse((T) response);
             }, e -> {
@@ -183,9 +187,10 @@ public class CreateAlertTool implements Tool {
             );
         } else if (indexList.stream().anyMatch(index -> index.startsWith("."))) {
             throw new IllegalArgumentException(
-                String
+                LoggerMessageFormat
                     .format(
-                        "The provided indices [%s] contains system index, which is not allowed. Ask user to "
+                        null,
+                        "The provided indices [{}] contains system index, which is not allowed. Ask user to "
                             + "check the provided indices as your final answer without using any other.",
                         rawIndex
                     )
@@ -200,9 +205,10 @@ public class CreateAlertTool implements Tool {
         GetIndexResponse getIndexResponse = client.admin().indices().getIndex(getIndexRequest).get();
         if (getIndexResponse.indices().length == 0) {
             throw new IllegalArgumentException(
-                String
+                LoggerMessageFormat
                     .format(
-                        "Cannot find provided indices %s. Ask "
+                        null,
+                        "Cannot find provided indices {}. Ask "
                             + "user to check the provided indices as your final answer without using any other "
                             + "tools",
                         rawIndex
