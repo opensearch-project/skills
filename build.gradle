@@ -64,11 +64,6 @@ allprojects {
     version = "${opensearch_build}"
 }
 
-java {
-    targetCompatibility = JavaVersion.VERSION_21
-    sourceCompatibility = JavaVersion.VERSION_21
-}
-
 apply plugin: 'java'
 apply plugin: 'jacoco'
 apply plugin: 'idea'
@@ -79,6 +74,11 @@ apply from: 'build-tools/opensearchplugin-coverage.gradle'
 apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
+
+java {
+    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_21
+}
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
