@@ -156,9 +156,14 @@ public class CreateAlertToolTests {
     public void testTool_WithNonSupportedModelType() {
         Exception exception = assertThrows(
             IllegalArgumentException.class,
-            () -> CreateAlertTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"))
+            () -> CreateAlertTool.Factory
+                .getInstance()
+                .create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"))
         );
-        assertEquals("Failed to find the right prompt for modelType: non_supported_modelType, this tool supports prompts for these models: [CLAUDE,OPENAI]", exception.getMessage());
+        assertEquals(
+            "Failed to find the right prompt for modelType: non_supported_modelType, this tool supports prompts for these models: [CLAUDE,OPENAI]",
+            exception.getMessage()
+        );
     }
 
     @Test
@@ -267,7 +272,10 @@ public class CreateAlertToolTests {
                     })
                 )
         );
-        assertEquals("No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
+        assertEquals(
+            "No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools",
+            exception.getMessage()
+        );
 
         // empty string as indices
         exception = assertThrows(
@@ -280,8 +288,10 @@ public class CreateAlertToolTests {
                     })
                 )
         );
-        assertEquals("No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
-
+        assertEquals(
+            "No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools",
+            exception.getMessage()
+        );
 
         // indices is an empty list
         exception = assertThrows(
@@ -294,7 +304,10 @@ public class CreateAlertToolTests {
                     })
                 )
         );
-        assertEquals("The input indices is empty. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
+        assertEquals(
+            "The input indices is empty. Ask user to provide index as your final answer directly without using any other tools",
+            exception.getMessage()
+        );
 
         // indices contain system index
         exception = assertThrows(
@@ -307,10 +320,13 @@ public class CreateAlertToolTests {
                     })
                 )
         );
-        assertEquals("The provided indices [[.kibana]] contains system index, which is not allowed. Ask user to check the provided indices as your final answer without using any other.", exception.getMessage());
+        assertEquals(
+            "The provided indices [[.kibana]] contains system index, which is not allowed. Ask user to check the provided indices as your final answer without using any other.",
+            exception.getMessage()
+        );
 
         // Cannot find provided indices in opensearch
-        when(getIndexResponse.indices()).thenReturn(new String[]{});
+        when(getIndexResponse.indices()).thenReturn(new String[] {});
         exception = assertThrows(
             RuntimeException.class,
             () -> tool
@@ -321,6 +337,9 @@ public class CreateAlertToolTests {
                     })
                 )
         );
-        assertEquals("Cannot find provided indices [non_existed_index]. Ask user to check the provided indices as your final answer without using any other tools", exception.getMessage());
+        assertEquals(
+            "Cannot find provided indices [non_existed_index]. Ask user to check the provided indices as your final answer without using any other tools",
+            exception.getMessage()
+        );
     }
 }

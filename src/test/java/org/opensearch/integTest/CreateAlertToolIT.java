@@ -9,12 +9,14 @@ import static org.hamcrest.Matchers.containsString;
 
 import java.io.IOException;
 import java.util.List;
-import lombok.SneakyThrows;
-import lombok.extern.log4j.Log4j2;
+
 import org.hamcrest.MatcherAssert;
 import org.junit.Before;
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.client.ResponseException;
+
+import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class CreateAlertToolIT extends ToolIntegrationTest {
@@ -23,7 +25,8 @@ public class CreateAlertToolIT extends ToolIntegrationTest {
     private final String NON_EXISTENT_INDEX = "non-existent";
     private final String SYSTEM_INDEX = ".kibana";
 
-    private final String alertJson = "{\"name\": \"Error 500 Response Alert\",\"search\": {\"indices\": [\"opensearch_dashboards_sample_data_logs\"],\"timeField\": \"timestamp\",\"bucketValue\": 60,\"bucketUnitOfTime\": \"m\",\"filters\": [{\"fieldName\": [{\"label\": \"response\",\"type\": \"text\"}],\"fieldValue\": \"500\",\"operator\": \"is\"}],\"aggregations\": [{\"aggregationType\": \"count\",\"fieldName\": \"bytes\"}]},\"triggers\": [{\"name\": \"Error 500 Response Count Above 1\",\"severity\": 1,\"thresholdValue\": 1,\"thresholdEnum\": \"ABOVE\"}]}";
+    private final String alertJson =
+        "{\"name\": \"Error 500 Response Alert\",\"search\": {\"indices\": [\"opensearch_dashboards_sample_data_logs\"],\"timeField\": \"timestamp\",\"bucketValue\": 60,\"bucketUnitOfTime\": \"m\",\"filters\": [{\"fieldName\": [{\"label\": \"response\",\"type\": \"text\"}],\"fieldValue\": \"500\",\"operator\": \"is\"}],\"aggregations\": [{\"aggregationType\": \"count\",\"fieldName\": \"bytes\"}]},\"triggers\": [{\"name\": \"Error 500 Response Count Above 1\",\"severity\": 1,\"thresholdValue\": 1,\"thresholdEnum\": \"ABOVE\"}]}";
     private final String question = "Create alert on the index when count of peoples whose age greater than 50 exceeds 10";
     private final String pureJsonResponseIndicator = "$PURE_JSON";
     private final String noJsonResponseIndicator = "$NO_JSON";
@@ -64,74 +67,55 @@ public class CreateAlertToolIT extends ToolIntegrationTest {
     @SneakyThrows
     public void testCreateAlertTool() {
         prepareIndex();
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NORMAL_INDEX);
+        String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NORMAL_INDEX);
         String result = executeAgent(agentId, requestBody);
-        assertEquals(
-            alertJson,
-            result
-        );
+        assertEquals(alertJson, result);
     }
 
     public void testCreateAlertToolWithPureJsonResponse() {
         prepareIndex();
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question + pureJsonResponseIndicator, NORMAL_INDEX);
+        String requestBody = String
+            .format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question + pureJsonResponseIndicator, NORMAL_INDEX);
         String result = executeAgent(agentId, requestBody);
-        assertEquals(
-            alertJson,
-            result
-        );
+        assertEquals(alertJson, result);
     }
 
     public void testCreateAlertToolWithNoJsonResponse() {
         prepareIndex();
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question + noJsonResponseIndicator, NORMAL_INDEX);
-        Exception exception = assertThrows(
-            ResponseException.class,
-            () -> executeAgent(agentId, requestBody)
-        );
+        String requestBody = String
+            .format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question + noJsonResponseIndicator, NORMAL_INDEX);
+        Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, requestBody));
         MatcherAssert.assertThat(exception.getMessage(), containsString("The response from LLM is not a json"));
     }
 
     public void testCreateAlertToolWithNonExistentModelId() {
         prepareIndex();
         String abnormalAgentId = registerAgent("NON_EXISTENT_MODEL_ID", requestBodyResourceFile);
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NORMAL_INDEX);
-        Exception exception = assertThrows(
-            ResponseException.class,
-            () -> executeAgent(abnormalAgentId, requestBody)
-        );
+        String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NORMAL_INDEX);
+        Exception exception = assertThrows(ResponseException.class, () -> executeAgent(abnormalAgentId, requestBody));
         MatcherAssert.assertThat(exception.getMessage(), containsString("Failed to find model"));
     }
 
     public void testCreateAlertToolWithNonExistentIndex() {
         prepareIndex();
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NON_EXISTENT_INDEX);
-        Exception exception = assertThrows(
-            ResponseException.class,
-            () -> executeAgent(agentId, requestBody)
-        );
+        String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NON_EXISTENT_INDEX);
+        Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, requestBody));
         MatcherAssert.assertThat(exception.getMessage(), containsString("no such index"));
     }
 
     public void testCreateAlertToolWithSystemIndex() {
         prepareIndex();
         String agentId = registerAgent(modelId, requestBodyResourceFile);
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, SYSTEM_INDEX);
-        Exception exception = assertThrows(
-            ResponseException.class,
-            () -> executeAgent(agentId, requestBody)
-        );
+        String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, SYSTEM_INDEX);
+        Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, requestBody));
         MatcherAssert.assertThat(exception.getMessage(), containsString("contains system index, which is not allowed"));
     }
 
     public void testCreateAlertToolWithEmptyIndex() {
         prepareIndex();
         String agentId = registerAgent(modelId, requestBodyResourceFile);
-        String requestBody =  String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"\"}}", question);
-        Exception exception = assertThrows(
-            ResponseException.class,
-            () -> executeAgent(agentId, requestBody)
-        );
+        String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"\"}}", question);
+        Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, requestBody));
         MatcherAssert.assertThat(exception.getMessage(), containsString("No indices in the input parameter"));
     }
 

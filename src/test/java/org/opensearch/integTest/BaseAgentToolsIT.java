@@ -397,16 +397,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     @SneakyThrows
     protected String registerAgent(String modelId, String requestBodyResourceFile) {
         String registerAgentRequestBody = Files
-            .readString(
-                Path
-                    .of(
-                        this
-                            .getClass()
-                            .getClassLoader()
-                            .getResource(requestBodyResourceFile)
-                            .toURI()
-                    )
-            );
+            .readString(Path.of(this.getClass().getClassLoader().getResource(requestBodyResourceFile).toURI()));
         registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", modelId);
         return createAgent(registerAgentRequestBody);
     }

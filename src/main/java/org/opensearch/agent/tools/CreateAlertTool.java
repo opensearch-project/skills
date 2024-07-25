@@ -8,7 +8,6 @@ package org.opensearch.agent.tools;
 import static org.opensearch.action.support.clustermanager.ClusterManagerNodeRequest.DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -180,8 +179,7 @@ public class CreateAlertTool implements Tool {
         }
         if (indexList.isEmpty()) {
             throw new IllegalArgumentException(
-                "The input indices is empty. Ask user to "
-                    + "provide index as your final answer directly without using any other tools"
+                "The input indices is empty. Ask user to " + "provide index as your final answer directly without using any other tools"
             );
         } else if (indexList.stream().anyMatch(index -> index.startsWith("."))) {
             throw new IllegalArgumentException(

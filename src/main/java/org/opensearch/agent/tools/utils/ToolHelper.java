@@ -19,6 +19,12 @@ import lombok.extern.log4j.Log4j2;
 public class ToolHelper {
     private static final Gson gson = new Gson();
 
+    /**
+     * Load prompt from the resource file of the invoking class
+     * @param source class which calls this function
+     * @param fileName the resource file name of prompt
+     * @return the LLM request prompt template.
+     */
     public static Map<String, String> loadDefaultPromptDictFromFile(Class<?> source, String fileName) {
         try (InputStream searchResponseIns = source.getResourceAsStream(fileName)) {
             if (searchResponseIns != null) {
