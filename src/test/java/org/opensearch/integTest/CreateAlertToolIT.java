@@ -26,7 +26,7 @@ public class CreateAlertToolIT extends ToolIntegrationTest {
     private final String SYSTEM_INDEX = ".kibana";
 
     private final String alertJson =
-            "{\"name\":\"Error 500 Response Alert\",\"search\":{\"indices\":[\"opensearch_dashboards_sample_data_logs\"],\"timeField\":\"timestamp\",\"bucketValue\":60.0,\"bucketUnitOfTime\":\"m\",\"filters\":[{\"fieldName\":[{\"label\":\"response\",\"type\":\"text\"}],\"fieldValue\":\"500\",\"operator\":\"is\"}],\"aggregations\":[{\"aggregationType\":\"count\",\"fieldName\":\"bytes\"}]},\"triggers\":[{\"name\":\"Error 500 Response Count Above 1\",\"severity\":1.0,\"thresholdValue\":1.0,\"thresholdEnum\":\"ABOVE\"}]}";
+        "{\"name\":\"Error 500 Response Alert\",\"search\":{\"indices\":[\"opensearch_dashboards_sample_data_logs\"],\"timeField\":\"timestamp\",\"bucketValue\":60.0,\"bucketUnitOfTime\":\"m\",\"filters\":[{\"fieldName\":[{\"label\":\"response\",\"type\":\"text\"}],\"fieldValue\":\"500\",\"operator\":\"is\"}],\"aggregations\":[{\"aggregationType\":\"count\",\"fieldName\":\"bytes\"}]},\"triggers\":[{\"name\":\"Error 500 Response Count Above 1\",\"severity\":1.0,\"thresholdValue\":1.0,\"thresholdEnum\":\"ABOVE\"}]}";
     private final String question = "Create alert on the index when count of peoples whose age greater than 50 exceeds 10";
     private final String pureJsonResponseIndicator = "$PURE_JSON";
     private final String noJsonResponseIndicator = "$NO_JSON";
