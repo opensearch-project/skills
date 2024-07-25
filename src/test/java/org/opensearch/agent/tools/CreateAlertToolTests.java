@@ -153,12 +153,30 @@ public class CreateAlertToolTests {
     }
 
     @Test
+    public void testTool_WithNonSupportedModelType() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> CreateAlertTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"))
+        );
+        assertEquals("Failed to find the right prompt for modelType: non_supported_modelType, this tool supports prompts for these models: [CLAUDE,OPENAI]", exception.getMessage());
+    }
+
+    @Test
     public void testTool() {
         // test json response
         initMLTensors(jsonResponse);
         tool
             .run(
                 ImmutableMap.of("indices", mockedIndices, "question", "test_question"),
+                ActionListener
+                    .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
+            );
+
+        // test indices no in json format
+        initMLTensors(jsonResponse);
+        tool
+            .run(
+                ImmutableMap.of("indices", mockedIndexName, "question", "test_question"),
                 ActionListener
                     .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
             );
@@ -234,5 +252,75 @@ public class CreateAlertToolTests {
                 )
         );
         assertEquals("Failed to predict", exception.getMessage());
+    }
+
+    @Test
+    public void testToolWithIllegalIndices() {
+        // no indices in input parameters
+        Exception exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals("No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
+
+        // empty string as indices
+        exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("indices", "", "question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals("No indices in the input parameter. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
+
+
+        // indices is an empty list
+        exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("indices", "[]", "question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals("The input indices is empty. Ask user to provide index as your final answer directly without using any other tools", exception.getMessage());
+
+        // indices contain system index
+        exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("indices", "[.kibana]", "question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals("The provided indices [[.kibana]] contains system index, which is not allowed. Ask user to check the provided indices as your final answer without using any other.", exception.getMessage());
+
+        // Cannot find provided indices in opensearch
+        when(getIndexResponse.indices()).thenReturn(new String[]{});
+        exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("indices", "[non_existed_index]", "question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals("Cannot find provided indices [non_existed_index]. Ask user to check the provided indices as your final answer without using any other tools", exception.getMessage());
     }
 }

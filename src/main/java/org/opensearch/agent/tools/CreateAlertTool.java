@@ -8,6 +8,8 @@ package org.opensearch.agent.tools;
 import static org.opensearch.action.support.clustermanager.ClusterManagerNodeRequest.DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,8 +55,7 @@ public class CreateAlertTool implements Tool {
 
     private static final String DEFAULT_DESCRIPTION =
         "This is a tool that helps to create an alert(i.e. monitor with triggers), some parameters should be parsed based on user's question and context. The parameters should include: \n"
-            + "1. question: user's question about creating a new alert\n"
-            + "2. indices: The input indices of the monitor, should be a list of string in json format.\n";
+            + "1. indices: The input indices of the monitor, should be a list of string in json format.\n";
 
     @Setter
     @Getter
@@ -70,18 +71,18 @@ public class CreateAlertTool implements Tool {
     private static final Gson gson = new Gson();
     private static final String MODEL_ID = "model_id";
     private static final String promptFilePath = "CreateAlertDefaultPrompt.json";
+    private static final String defaultQuestion = "Create an alert as your recommendation based on the context";
 
     public CreateAlertTool(Client client, String modelId, String modelType) {
         this.client = client;
         this.modelId = modelId;
         Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(this.getClass(), promptFilePath);
         if (!promptDict.containsKey(modelType)) {
-            throw new IllegalStateException(
+            throw new IllegalArgumentException(
                 String
                     .format(
-                        "Failed to find the right prompt for" + "modelType: %s in file: %s which has prompts for these models: [%s]",
+                        "Failed to find the right prompt for modelType: %s, this tool supports prompts for these models: [%s]",
                         modelType,
-                        promptFilePath,
                         String.join(",", promptDict.keySet())
                     )
             );
@@ -105,11 +106,6 @@ public class CreateAlertTool implements Tool {
     }
 
     @Override
-    public boolean needHistory() {
-        return true;
-    }
-
-    @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
             Map<String, String> tmpParams = new HashMap<>(parameters);
@@ -117,7 +113,7 @@ public class CreateAlertTool implements Tool {
             tmpParams.put("mapping_info", mappingInfo);
             tmpParams.putIfAbsent("indices", "");
             tmpParams.putIfAbsent("chat_history", "");
-            tmpParams.putIfAbsent("question", "");
+            tmpParams.putIfAbsent("question", defaultQuestion); // In case no question is provided, use a default question.
             StringSubstitutor substitute = new StringSubstitutor(tmpParams, "${parameters.", "}");
             String finalToolPrompt = substitute.replace(TOOL_PROMPT_TEMPLATE);
             tmpParams.put("prompt", finalToolPrompt);
@@ -174,13 +170,24 @@ public class CreateAlertTool implements Tool {
             );
         }
         String rawIndex = parameters.getOrDefault("indices", "");
-        List<String> indexList = gson.fromJson(rawIndex, new TypeToken<List<String>>() {
-        }.getType());
-        if (indexList.stream().anyMatch(index -> index.startsWith("."))) {
+        List<String> indexList;
+        try {
+            indexList = gson.fromJson(rawIndex, new TypeToken<List<String>>() {
+            }.getType());
+        } catch (Exception e) {
+            // LLM sometimes returns the indices as a string instead of a json list, although we require that in the tool description.
+            indexList = Collections.singletonList(rawIndex);
+        }
+        if (indexList.isEmpty()) {
+            throw new IllegalArgumentException(
+                "The input indices is empty. Ask user to "
+                    + "provide index as your final answer directly without using any other tools"
+            );
+        } else if (indexList.stream().anyMatch(index -> index.startsWith("."))) {
             throw new IllegalArgumentException(
                 String
                     .format(
-                        "The provided indices [%s] contains system index, which is not allowed. Ask user to"
+                        "The provided indices [%s] contains system index, which is not allowed. Ask user to "
                             + "check the provided indices as your final answer without using any other.",
                         rawIndex
                     )
@@ -250,9 +257,6 @@ public class CreateAlertTool implements Tool {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
             String modelType = (String) params.getOrDefault("model_type", ModelType.CLAUDE.toString());
-            if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
-                throw new IllegalArgumentException("Unsupported model_type: " + modelType);
-            }
             return new CreateAlertTool(client, modelId, modelType);
         }
 
