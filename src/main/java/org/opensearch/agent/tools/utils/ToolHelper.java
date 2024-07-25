@@ -11,14 +11,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.google.gson.Gson;
+import org.opensearch.ml.common.utils.StringUtils;
 
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class ToolHelper {
-    private static final Gson gson = new Gson();
-
     /**
      * Load prompt from the resource file of the invoking class
      * @param source class which calls this function
@@ -29,7 +27,7 @@ public class ToolHelper {
         try (InputStream searchResponseIns = source.getResourceAsStream(fileName)) {
             if (searchResponseIns != null) {
                 String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
-                return gson.fromJson(defaultPromptContent, Map.class);
+                return StringUtils.gson.fromJson(defaultPromptContent, Map.class);
             }
         } catch (IOException e) {
             log.error("Failed to load default prompt dict from file: {}", fileName, e);

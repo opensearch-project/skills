@@ -41,7 +41,6 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.StringUtils;
 
-import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import lombok.Getter;
@@ -68,15 +67,14 @@ public class CreateAlertTool implements Tool {
     private final String modelId;
     private final String TOOL_PROMPT_TEMPLATE;
 
-    private static final Gson gson = new Gson();
     private static final String MODEL_ID = "model_id";
-    private static final String promptFilePath = "CreateAlertDefaultPrompt.json";
-    private static final String defaultQuestion = "Create an alert as your recommendation based on the context";
+    private static final String PROMPT_FILE_PATH = "CreateAlertDefaultPrompt.json";
+    private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
 
     public CreateAlertTool(Client client, String modelId, String modelType) {
         this.client = client;
         this.modelId = modelId;
-        Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(this.getClass(), promptFilePath);
+        Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(this.getClass(), PROMPT_FILE_PATH);
         if (!promptDict.containsKey(modelType)) {
             throw new IllegalArgumentException(
                 LoggerMessageFormat
@@ -114,7 +112,7 @@ public class CreateAlertTool implements Tool {
             tmpParams.put("mapping_info", mappingInfo);
             tmpParams.putIfAbsent("indices", "");
             tmpParams.putIfAbsent("chat_history", "");
-            tmpParams.putIfAbsent("question", defaultQuestion); // In case no question is provided, use a default question.
+            tmpParams.putIfAbsent("question", DEFAULT_QUESTION); // In case no question is provided, use a default question.
             StringSubstitutor substitute = new StringSubstitutor(tmpParams, "${parameters.", "}");
             String finalToolPrompt = substitute.replace(TOOL_PROMPT_TEMPLATE);
             tmpParams.put("prompt", finalToolPrompt);
@@ -166,7 +164,7 @@ public class CreateAlertTool implements Tool {
     }
 
     private String getIndexMappingInfo(Map<String, String> parameters) throws InterruptedException, ExecutionException {
-        if (!parameters.containsKey("indices") || parameters.get("indices").isEmpty()) {
+        if (!parameters.containsKey("indices") || Strings.isEmpty(parameters.get("indices"))) {
             throw new IllegalArgumentException(
                 "No indices in the input parameter. Ask user to "
                     + "provide index as your final answer directly without using any other tools"
@@ -175,7 +173,7 @@ public class CreateAlertTool implements Tool {
         String rawIndex = parameters.getOrDefault("indices", "");
         List<String> indexList;
         try {
-            indexList = gson.fromJson(rawIndex, new TypeToken<List<String>>() {
+            indexList = StringUtils.gson.fromJson(rawIndex, new TypeToken<List<String>>() {
             }.getType());
         } catch (Exception e) {
             // LLM sometimes returns the indices as a string instead of a json list, although we require that in the tool description.
