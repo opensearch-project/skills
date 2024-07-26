@@ -8,13 +8,12 @@ package org.opensearch.agent.tools;
 import static org.opensearch.action.support.clustermanager.ClusterManagerNodeRequest.DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,7 +21,6 @@ import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.get.GetIndexRequest;
-import org.opensearch.action.admin.indices.get.GetIndexResponse;
 import org.opensearch.action.support.IndicesOptions;
 import org.opensearch.agent.tools.utils.ToolConstants.ModelType;
 import org.opensearch.agent.tools.utils.ToolHelper;
@@ -106,22 +104,44 @@ public class CreateAlertTool implements Tool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        try {
-            Map<String, String> tmpParams = new HashMap<>(parameters);
-            String mappingInfo = getIndexMappingInfo(tmpParams);
-            tmpParams.put("mapping_info", mappingInfo);
-            tmpParams.putIfAbsent("indices", "");
-            tmpParams.putIfAbsent("chat_history", "");
-            tmpParams.putIfAbsent("question", DEFAULT_QUESTION); // In case no question is provided, use a default question.
-            StringSubstitutor substitute = new StringSubstitutor(tmpParams, "${parameters.", "}");
-            String finalToolPrompt = substitute.replace(TOOL_PROMPT_TEMPLATE);
-            tmpParams.put("prompt", finalToolPrompt);
-
-            RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(tmpParams).build();
-            ActionRequest request = new MLPredictionTaskRequest(
-                modelId,
-                MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+        Map<String, String> tmpParams = new HashMap<>(parameters);
+        if (!tmpParams.containsKey("indices") || Strings.isEmpty(tmpParams.get("indices"))) {
+            throw new IllegalArgumentException(
+                "No indices in the input parameter. Ask user to "
+                    + "provide index as your final answer directly without using any other tools"
             );
+        }
+        String rawIndex = tmpParams.getOrDefault("indices", "");
+        Boolean isLocal = Boolean.parseBoolean(tmpParams.getOrDefault("local", "true"));
+        final GetIndexRequest getIndexRequest = constructIndexRequest(rawIndex, isLocal);
+        client.admin().indices().getIndex(getIndexRequest, ActionListener.wrap(response -> {
+            if (response.indices().length == 0) {
+                throw new IllegalArgumentException(
+                    LoggerMessageFormat
+                        .format(
+                            null,
+                            "Cannot find provided indices {}. Ask "
+                                + "user to check the provided indices as your final answer without using any other "
+                                + "tools",
+                            rawIndex
+                        )
+                );
+            }
+            StringBuilder sb = new StringBuilder();
+            for (String index : response.indices()) {
+                sb.append("index: ").append(index).append("\n\n");
+
+                MappingMetadata mapping = response.mappings().get(index);
+                if (mapping != null) {
+                    sb.append("mappings:\n");
+                    for (Entry<String, Object> entry : mapping.sourceAsMap().entrySet()) {
+                        sb.append(entry.getKey()).append("=").append(entry.getValue()).append('\n');
+                    }
+                    sb.append("\n\n");
+                }
+            }
+            String mappingInfo = sb.toString();
+            ActionRequest request = constructMLPredictRequest(tmpParams, mappingInfo);
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(r -> {
                 ModelTensorOutput modelTensorOutput = (ModelTensorOutput) r.getOutput();
                 Map<String, ?> dataMap = Optional
@@ -133,51 +153,77 @@ public class CreateAlertTool implements Tool {
                 if (dataMap == null) {
                     throw new IllegalArgumentException("No dataMap returned from LLM.");
                 }
-                String response = "";
+                String alertInfo = "";
                 if (dataMap.containsKey("response")) {
-                    response = (String) dataMap.get("response");
+                    alertInfo = (String) dataMap.get("response");
                     Pattern jsonPattern = Pattern.compile("```json(.*?)```", Pattern.DOTALL);
-                    Matcher jsonBlockMatcher = jsonPattern.matcher(response);
+                    Matcher jsonBlockMatcher = jsonPattern.matcher(alertInfo);
                     if (jsonBlockMatcher.find()) {
-                        response = jsonBlockMatcher.group(1);
-                        response = response.replace("\\\"", "\"");
+                        alertInfo = jsonBlockMatcher.group(1);
+                        alertInfo = alertInfo.replace("\\\"", "\"");
                     }
                 } else {
                     // LLM sometimes returns the tensor results as a json object directly instead of
                     // string response, and the json object is stored as a map.
-                    response = StringUtils.toJson(dataMap);
+                    alertInfo = StringUtils.toJson(dataMap);
                 }
-                if (!isJson(response)) {
+                if (!isJson(alertInfo)) {
                     throw new IllegalArgumentException(
-                        LoggerMessageFormat.format(null, "The response from LLM is not a json: [{}]", response)
+                        LoggerMessageFormat.format(null, "The response from LLM is not a json: [{}]", alertInfo)
                     );
                 }
-                listener.onResponse((T) response);
+                listener.onResponse((T) alertInfo);
             }, e -> {
                 log.error("Failed to run model " + modelId, e);
                 listener.onFailure(e);
             }));
-        } catch (Exception e) {
-            log.error("Failed to call CreateAlertTool", e);
-            listener.onFailure(e);
-        }
+        }, e -> {
+            log.error("failed to get index mapping: " + e);
+            if (e.toString().contains("IndexNotFoundException")) {
+                listener
+                    .onFailure(
+                        new IllegalArgumentException(
+                            LoggerMessageFormat
+                                .format(
+                                    null,
+                                    "Cannot find provided indices {}. Ask "
+                                        + "user to check the provided indices as your final answer without using any other "
+                                        + "tools",
+                                    rawIndex
+                                )
+                        )
+                    );
+            } else {
+                listener.onFailure(e);
+            }
+        }));
     }
 
-    private String getIndexMappingInfo(Map<String, String> parameters) throws InterruptedException, ExecutionException {
-        if (!parameters.containsKey("indices") || Strings.isEmpty(parameters.get("indices"))) {
-            throw new IllegalArgumentException(
-                "No indices in the input parameter. Ask user to "
-                    + "provide index as your final answer directly without using any other tools"
-            );
-        }
-        String rawIndex = parameters.getOrDefault("indices", "");
+    private ActionRequest constructMLPredictRequest(Map<String, String> tmpParams, String mappingInfo) {
+        tmpParams.put("mapping_info", mappingInfo);
+        tmpParams.putIfAbsent("indices", "");
+        tmpParams.putIfAbsent("chat_history", "");
+        tmpParams.putIfAbsent("question", DEFAULT_QUESTION); // In case no question is provided, use a default question.
+        StringSubstitutor substitute = new StringSubstitutor(tmpParams, "${parameters.", "}");
+        String finalToolPrompt = substitute.replace(TOOL_PROMPT_TEMPLATE);
+        tmpParams.put("prompt", finalToolPrompt);
+
+        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(tmpParams).build();
+        ActionRequest request = new MLPredictionTaskRequest(
+            modelId,
+            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+        );
+        return request;
+    }
+
+    private static GetIndexRequest constructIndexRequest(String rawIndex, Boolean isLocal) {
         List<String> indexList;
         try {
             indexList = StringUtils.gson.fromJson(rawIndex, new TypeToken<List<String>>() {
             }.getType());
         } catch (Exception e) {
-            // LLM sometimes returns the indices as a string instead of a json list, although we require that in the tool description.
-            indexList = Collections.singletonList(rawIndex);
+            // LLM sometimes returns the indices as a string but not json format, although we require that in the tool description.
+            indexList = Arrays.asList(rawIndex.split("\\."));
         }
         if (indexList.isEmpty()) {
             throw new IllegalArgumentException(
@@ -198,35 +244,9 @@ public class CreateAlertTool implements Tool {
         final GetIndexRequest getIndexRequest = new GetIndexRequest()
             .indices(indices)
             .indicesOptions(IndicesOptions.strictExpand())
-            .local(Boolean.parseBoolean(parameters.getOrDefault("local", "true")))
+            .local(isLocal)
             .clusterManagerNodeTimeout(DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT);
-        GetIndexResponse getIndexResponse = client.admin().indices().getIndex(getIndexRequest).get();
-        if (getIndexResponse.indices().length == 0) {
-            throw new IllegalArgumentException(
-                LoggerMessageFormat
-                    .format(
-                        null,
-                        "Cannot find provided indices {}. Ask "
-                            + "user to check the provided indices as your final answer without using any other "
-                            + "tools",
-                        rawIndex
-                    )
-            );
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String index : getIndexResponse.indices()) {
-            sb.append("index: ").append(index).append("\n\n");
-
-            MappingMetadata mapping = getIndexResponse.mappings().get(index);
-            if (mapping != null) {
-                sb.append("mappings:\n");
-                for (Entry<String, Object> entry : mapping.sourceAsMap().entrySet()) {
-                    sb.append(entry.getKey()).append("=").append(entry.getValue()).append('\n');
-                }
-                sb.append("\n\n");
-            }
-        }
-        return sb.toString();
+        return getIndexRequest;
     }
 
     public static class Factory implements Tool.Factory<CreateAlertTool> {

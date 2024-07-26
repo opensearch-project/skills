@@ -33,6 +33,7 @@ import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.common.action.ActionFuture;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -79,8 +80,12 @@ public class CreateAlertToolTests {
         createMappings();
         when(client.admin()).thenReturn(adminClient);
         when(adminClient.indices()).thenReturn(indicesAdminClient);
-        when(indicesAdminClient.getIndex(any())).thenReturn(actionFuture);
-        when(actionFuture.get()).thenReturn(getIndexResponse);
+        doAnswer(invocation -> {
+            ActionListener<GetIndexResponse> listener = (ActionListener<GetIndexResponse>) invocation.getArguments()[1];
+            listener.onResponse(getIndexResponse);
+            return null;
+        }).when(indicesAdminClient).getIndex(any(), any());
+
         when(getIndexResponse.indices()).thenReturn(new String[] { mockedIndexName });
         when(getIndexResponse.mappings()).thenReturn(mockedMappings);
         when(mappingMetadata.getSourceAsMap()).thenReturn(indexMappings);
@@ -177,15 +182,6 @@ public class CreateAlertToolTests {
                     .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
             );
 
-        // test indices no in json format
-        initMLTensors(jsonResponse);
-        tool
-            .run(
-                ImmutableMap.of("indices", mockedIndexName, "question", "test_question"),
-                ActionListener
-                    .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
-            );
-
         // test text response wrapping json
         final String textResponseWithJson = String.format("RESPONSE_HEADER\n Tool output: ```json%s```, RESPONSE_FOOTER\n", jsonResponse);
         initMLTensors(textResponseWithJson);
@@ -204,6 +200,26 @@ public class CreateAlertToolTests {
                 ActionListener
                     .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
             );
+    }
+
+    @Test
+    public void testToolWithIndicesNotInJsonFormat() {
+        // test indices no in json format
+        initMLTensors(jsonResponse);
+        tool
+            .run(
+                ImmutableMap.of("indices", mockedIndexName, "question", "test_question"),
+                ActionListener
+                    .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
+            );
+
+        tool
+            .run(
+                ImmutableMap.of("indices", mockedIndexName + "," + mockedIndexName, "question", "test_question"),
+                ActionListener
+                    .<String>wrap(response -> assertEquals(jsonResponse, response), e -> fail("Tool runs failed: " + e.getMessage()))
+            );
+
     }
 
     @Test
@@ -327,6 +343,27 @@ public class CreateAlertToolTests {
 
         // Cannot find provided indices in opensearch
         when(getIndexResponse.indices()).thenReturn(new String[] {});
+        exception = assertThrows(
+            RuntimeException.class,
+            () -> tool
+                .run(
+                    ImmutableMap.of("indices", "[non_existed_index]", "question", "test_question"),
+                    ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), e -> {
+                        throw new RuntimeException(e.getMessage());
+                    })
+                )
+        );
+        assertEquals(
+            "Cannot find provided indices [non_existed_index]. Ask user to check the provided indices as your final answer without using any other tools",
+            exception.getMessage()
+        );
+
+        doAnswer(invocation -> {
+            ActionListener<GetIndexResponse> listener = (ActionListener<GetIndexResponse>) invocation.getArguments()[1];
+            listener.onFailure(new IndexNotFoundException("no such index"));
+            return null;
+        }).when(indicesAdminClient).getIndex(any(), any());
+
         exception = assertThrows(
             RuntimeException.class,
             () -> tool
