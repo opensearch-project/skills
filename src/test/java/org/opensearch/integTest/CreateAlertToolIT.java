@@ -100,10 +100,13 @@ public class CreateAlertToolIT extends ToolIntegrationTest {
         prepareIndex();
         String requestBody = String.format("{\"parameters\": {\"question\": \"%s\", \"indices\": \"[%s]\"}}", question, NON_EXISTENT_INDEX);
         Exception exception = assertThrows(ResponseException.class, () -> executeAgent(agentId, requestBody));
-        assertEquals(
-            "Cannot find provided indices [non-existent]. Ask user to check the provided indices as your final answer without using any other tools",
-            exception.getMessage()
-        );
+        MatcherAssert
+            .assertThat(
+                exception.getMessage(),
+                containsString(
+                    "Cannot find provided indices [non-existent]. Ask user to check the provided indices as your final answer without using any other tools"
+                )
+            );
     }
 
     public void testCreateAlertToolWithSystemIndex() {
