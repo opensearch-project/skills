@@ -68,11 +68,11 @@ public class CreateAlertTool implements Tool {
     private static final String MODEL_ID = "model_id";
     private static final String PROMPT_FILE_PATH = "CreateAlertDefaultPrompt.json";
     private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
+    private static final Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(CreateAlertTool.class, PROMPT_FILE_PATH);
 
     public CreateAlertTool(Client client, String modelId, String modelType) {
         this.client = client;
         this.modelId = modelId;
-        Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(this.getClass(), PROMPT_FILE_PATH);
         if (!promptDict.containsKey(modelType)) {
             throw new IllegalArgumentException(
                 LoggerMessageFormat
