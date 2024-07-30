@@ -21,7 +21,6 @@ public class ToolHelperTests {
     public void TestExtractFieldNamesTypes() {
         Map<String, Object> indexMappings = Map
             .of(
-
                 "response",
                 Map.of("type", "integer"),
                 "responseLatency",
@@ -36,7 +35,6 @@ public class ToolHelperTests {
                 Map.of("type", "text", "fields", Map.of("subC", Map.of("type", "keyword"))),
                 "aliasD",
                 Map.of("type", "alias", "path", "date")
-
             );
         Map<String, String> result = new HashMap<>();
         ToolHelper.extractFieldNamesTypes(indexMappings, result, "", true);
