@@ -40,7 +40,7 @@ public class GetClusterStatsTool implements Tool {
 
     private Client client;
 
-    private static final String DEFAULT_DESCRIPTION = "Use this tool to retrieve related documentation on OpenSearch.";
+    private static final String DEFAULT_DESCRIPTION = "Use this tool to retrieve cluster stats on OpenSearch.";
 
     public GetClusterStatsTool(Client client) {
         this.client = client;
