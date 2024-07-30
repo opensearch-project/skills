@@ -12,6 +12,7 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.common.SkillSettings;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
+import org.opensearch.agent.tools.GetClusterStatsTool;
 import org.opensearch.agent.tools.KnowledgeBaseTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -77,6 +78,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         SearchMonitorsTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         KnowledgeBaseTool.Factory.getInstance().init(client);
+        GetClusterStatsTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
@@ -93,7 +95,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 SearchAnomalyResultsTool.Factory.getInstance(),
                 SearchMonitorsTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
-                KnowledgeBaseTool.Factory.getInstance()
+                KnowledgeBaseTool.Factory.getInstance(),
+                GetClusterStatsTool.Factory.getInstance()
             );
     }
 
