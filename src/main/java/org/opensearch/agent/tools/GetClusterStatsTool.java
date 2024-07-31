@@ -23,7 +23,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
-
 @Log4j2
 @Setter
 @Getter
@@ -72,7 +71,8 @@ public class GetClusterStatsTool implements Tool {
             public void onResponse(ClusterAllocationExplainResponse allocationExplainResponse) {
                 try {
                     ClusterAllocationExplanation clusterAllocationExplanation = allocationExplainResponse.getExplanation();
-                    XContentBuilder xContentBuilder = clusterAllocationExplanation.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+                    XContentBuilder xContentBuilder = clusterAllocationExplanation
+                        .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
                     @SuppressWarnings("unchecked")
                     T response = (T) xContentBuilder.toString();
                     listener.onResponse(response);
