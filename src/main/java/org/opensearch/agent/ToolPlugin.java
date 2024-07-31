@@ -12,9 +12,12 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.common.SkillSettings;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
+import org.opensearch.agent.tools.GetClusterStatsTool;
+import org.opensearch.agent.tools.KnowledgeBaseTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
 import org.opensearch.agent.tools.RAGTool;
+import org.opensearch.agent.tools.RCATool;
 import org.opensearch.agent.tools.SearchAlertsTool;
 import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
 import org.opensearch.agent.tools.SearchAnomalyResultsTool;
@@ -75,6 +78,9 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         SearchAnomalyResultsTool.Factory.getInstance().init(client, namedWriteableRegistry);
         SearchMonitorsTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
+        KnowledgeBaseTool.Factory.getInstance().init(client);
+        GetClusterStatsTool.Factory.getInstance().init(client);
+        RCATool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
@@ -90,7 +96,10 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 SearchAnomalyDetectorsTool.Factory.getInstance(),
                 SearchAnomalyResultsTool.Factory.getInstance(),
                 SearchMonitorsTool.Factory.getInstance(),
-                CreateAnomalyDetectorTool.Factory.getInstance()
+                CreateAnomalyDetectorTool.Factory.getInstance(),
+                KnowledgeBaseTool.Factory.getInstance(),
+                GetClusterStatsTool.Factory.getInstance(),
+                RCATool.Factory.getInstance()
             );
     }
 
