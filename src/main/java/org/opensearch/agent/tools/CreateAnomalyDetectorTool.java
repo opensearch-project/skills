@@ -199,7 +199,7 @@ public class CreateAnomalyDetectorTool implements Tool {
 
             // flatten all the fields in the mapping
             Map<String, String> fieldsToType = new HashMap<>();
-            ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "");
+            ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
 
             // find all date type fields from the mapping
             final Set<String> dateFields = findDateTypeFields(fieldsToType);
