@@ -66,7 +66,7 @@ public class GetClusterStatsTool implements Tool {
             request.setShard(shard);
         }
 
-        ActionListener<ClusterAllocationExplainResponse> internalListener = new ActionListener<ClusterAllocationExplainResponse>() {
+        ActionListener<ClusterAllocationExplainResponse> internalListener = new ActionListener<>() {
 
             @Override
             public void onResponse(ClusterAllocationExplainResponse allocationExplainResponse) {
