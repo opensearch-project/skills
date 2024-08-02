@@ -70,6 +70,44 @@ public class RCATool implements Tool {
             + "${parameters.causes} \n\n"
             + "Assistant: ";
 
+    @SuppressWarnings("unchecked")
+    public <T> void runOption1(Map<String, String> parameters, ActionListener<T> listener) {
+        String knowledge = parameters.get(KNOWLEDGE_BASE_TOOL_OUTPUT_FIELD);
+        knowledge = unescapeJson(knowledge);
+        Map<String, ?> knowledgeBase = StringUtils.gson.fromJson(knowledge, Map.class);
+        List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
+        Map<String, String> apiToResponse = causes
+            .stream()
+            .map(c -> c.get(API_URL_FIELD))
+            .distinct()
+            .collect(Collectors.toMap(url -> url, url -> invokeAPI(url, parameters)));
+        causes.forEach(cause -> cause.put("response", apiToResponse.get(cause.get(API_URL_FIELD))));
+        Map<String, String> LLMParams = new java.util.HashMap<>(
+            Map.of("phenomenon", (String) knowledgeBase.get("phenomenon"), "causes", StringUtils.gson.toJson(causes))
+        );
+        StringSubstitutor substitute = new StringSubstitutor(LLMParams, "${parameters.", "}");
+        String finalToolPrompt = substitute.replace(TOOL_PROMPT);
+        LLMParams.put("prompt", finalToolPrompt);
+        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(LLMParams).build();
+        ActionRequest request = new MLPredictionTaskRequest(
+            modelId,
+            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+        );
+        client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(response -> {
+            ModelTensorOutput modelTensorOutput = (ModelTensorOutput) response.getOutput();
+            Map<String, ?> dataMap = Optional
+                .ofNullable(modelTensorOutput.getMlModelOutputs())
+                .flatMap(outputs -> outputs.stream().findFirst())
+                .flatMap(modelTensors -> modelTensors.getMlModelTensors().stream().findFirst())
+                .map(ModelTensor::getDataAsMap)
+                .orElse(null);
+            if (dataMap == null) {
+                throw new IllegalArgumentException("No dataMap returned from LLM.");
+            }
+            listener.onResponse((T) dataMap.get("completion"));
+        }, listener::onFailure));
+    }
+
     /**
      *
      * @param parameters contains parameters:
@@ -79,45 +117,11 @@ public class RCATool implements Tool {
      * @param <T>
      */
     @Override
-    @SuppressWarnings("unchecked")
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
-            String knowledge = parameters.get(KNOWLEDGE_BASE_TOOL_OUTPUT_FIELD);
-            knowledge = unescapeJson(knowledge);
-            Map<String, ?> knowledgeBase = StringUtils.gson.fromJson(knowledge, Map.class);
-            List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
-            Map<String, String> apiToResponse = causes
-                .stream()
-                .map(c -> c.get(API_URL_FIELD))
-                .distinct()
-                .collect(Collectors.toMap(url -> url, url -> invokeAPI(url, parameters)));
-            causes.forEach(cause -> cause.put("response", apiToResponse.get(cause.get(API_URL_FIELD))));
-            Map<String, String> LLMParams = new java.util.HashMap<>(
-                Map.of("phenomenon", (String) knowledgeBase.get("phenomenon"), "causes", StringUtils.gson.toJson(causes))
-            );
-            StringSubstitutor substitute = new StringSubstitutor(LLMParams, "${parameters.", "}");
-            String finalToolPrompt = substitute.replace(TOOL_PROMPT);
-            LLMParams.put("prompt", finalToolPrompt);
-            RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(LLMParams).build();
-            ActionRequest request = new MLPredictionTaskRequest(
-                modelId,
-                MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
-            );
-            client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(response -> {
-                ModelTensorOutput modelTensorOutput = (ModelTensorOutput) response.getOutput();
-                Map<String, ?> dataMap = Optional
-                    .ofNullable(modelTensorOutput.getMlModelOutputs())
-                    .flatMap(outputs -> outputs.stream().findFirst())
-                    .flatMap(modelTensors -> modelTensors.getMlModelTensors().stream().findFirst())
-                    .map(ModelTensor::getDataAsMap)
-                    .orElse(null);
-                if (dataMap == null) {
-                    throw new IllegalArgumentException("No dataMap returned from LLM.");
-                }
-                listener.onResponse((T) dataMap.get("completion"));
-            }, listener::onFailure));
+            runOption1(parameters, listener);
         } catch (Exception e) {
-            log.error("Failed to search index", e);
+            log.error("Failed to run RCA tool", e);
             listener.onFailure(e);
         }
     }
