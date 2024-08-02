@@ -40,8 +40,15 @@ public class ToolHelper {
      * @param mappingSource the mappings of an index
      * @param fieldsToType the result containing the field to fieldType mapping
      * @param prefix the parent field path
+     * @param includeFields whether include the `fields` in a text type field, for some use case like PPLTool, `fields` in a text type field
+     *                      cannot be included, but for CreateAnomalyDetectorTool, `fields` must be included.
      */
-    public static void extractFieldNamesTypes(Map<String, Object> mappingSource, Map<String, String> fieldsToType, String prefix) {
+    public static void extractFieldNamesTypes(
+        Map<String, Object> mappingSource,
+        Map<String, String> fieldsToType,
+        String prefix,
+        boolean includeFields
+    ) {
         if (prefix.length() > 0) {
             prefix += ".";
         }
@@ -53,15 +60,17 @@ public class ToolHelper {
             if (v instanceof Map) {
                 Map<String, Object> vMap = (Map<String, Object>) v;
                 if (vMap.containsKey("type")) {
-                    if (!((vMap.getOrDefault("type", "")).equals("alias"))) {
+                    String fieldType = (String) vMap.getOrDefault("type", "");
+                    // no need to extract alias into the result, and for object field, extract the subfields only
+                    if (!fieldType.equals("alias") && !fieldType.equals("object")) {
                         fieldsToType.put(prefix + n, (String) vMap.get("type"));
                     }
                 }
                 if (vMap.containsKey("properties")) {
-                    extractFieldNamesTypes((Map<String, Object>) vMap.get("properties"), fieldsToType, prefix + n);
+                    extractFieldNamesTypes((Map<String, Object>) vMap.get("properties"), fieldsToType, prefix + n, includeFields);
                 }
-                if (vMap.containsKey("fields")) {
-                    extractFieldNamesTypes((Map<String, Object>) vMap.get("fields"), fieldsToType, prefix + n);
+                if (includeFields && vMap.containsKey("fields")) {
+                    extractFieldNamesTypes((Map<String, Object>) vMap.get("fields"), fieldsToType, prefix + n, true);
                 }
             }
         }
