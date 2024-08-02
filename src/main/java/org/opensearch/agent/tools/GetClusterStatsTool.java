@@ -11,6 +11,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplainRequest;
 import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplainResponse;
 import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplanation;
+import org.opensearch.agent.tools.utils.ClusterStatsUtil;
 import org.opensearch.client.Client;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
@@ -88,7 +89,7 @@ public class GetClusterStatsTool implements Tool {
 
         };
 
-        client.admin().cluster().allocationExplain(request, internalListener);
+        ClusterStatsUtil.getClusterAllocationExplain(client, request, internalListener);
     }
 
     @Override
