@@ -6,6 +6,8 @@
 package org.opensearch.integTest;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -390,5 +392,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             request.setEntity(entity);
         }
         return client.performRequest(request);
+    }
+
+    @SneakyThrows
+    protected String registerAgent(String modelId, String requestBodyResourceFile) {
+        String registerAgentRequestBody = Files
+            .readString(Path.of(this.getClass().getClassLoader().getResource(requestBodyResourceFile).toURI()));
+        registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", modelId);
+        return createAgent(registerAgentRequestBody);
     }
 }
