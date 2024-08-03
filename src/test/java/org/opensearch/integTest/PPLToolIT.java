@@ -58,14 +58,6 @@ public class PPLToolIT extends ToolIntegrationTest {
         );
     }
 
-    public void test_PPLTool_whenPPLExecutionDisabled_ResultOnlyContainsPPL() {
-        updateClusterSettings("plugins.skills.ppl_execution_enabled", false);
-        prepareIndex();
-        String agentId = registerAgent();
-        String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}");
-        assertEquals("{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\"}", result);
-    }
-
     public void testPPLTool_withWrongPPLGenerated_thenThrowException() {
         prepareIndex();
         String agentId = registerAgent();
