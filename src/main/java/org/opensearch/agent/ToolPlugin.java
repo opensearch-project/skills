@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
-import org.opensearch.agent.common.SkillSettings;
+import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -20,12 +20,9 @@ import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
 import org.opensearch.agent.tools.SearchAnomalyResultsTool;
 import org.opensearch.agent.tools.SearchMonitorsTool;
 import org.opensearch.agent.tools.VectorDBTool;
-import org.opensearch.agent.tools.utils.ClusterSettingHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.common.settings.Setting;
-import org.opensearch.common.settings.Settings;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
@@ -64,9 +61,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         this.client = client;
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
-        Settings settings = environment.settings();
-        ClusterSettingHelper clusterSettingHelper = new ClusterSettingHelper(settings, clusterService);
-        PPLTool.Factory.getInstance().init(client, clusterSettingHelper);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
         RAGTool.Factory.getInstance().init(client, xContentRegistry);
@@ -74,6 +68,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         SearchAnomalyDetectorsTool.Factory.getInstance().init(client, namedWriteableRegistry);
         SearchAnomalyResultsTool.Factory.getInstance().init(client, namedWriteableRegistry);
         SearchMonitorsTool.Factory.getInstance().init(client);
+        CreateAlertTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
@@ -90,12 +85,9 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 SearchAnomalyDetectorsTool.Factory.getInstance(),
                 SearchAnomalyResultsTool.Factory.getInstance(),
                 SearchMonitorsTool.Factory.getInstance(),
+                CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance()
             );
     }
 
-    @Override
-    public List<Setting<?>> getSettings() {
-        return List.of(SkillSettings.PPL_EXECUTION_ENABLED);
-    }
 }

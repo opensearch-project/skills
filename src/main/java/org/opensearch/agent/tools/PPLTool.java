@@ -31,8 +31,6 @@ import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
-import org.opensearch.agent.common.SkillSettings;
-import org.opensearch.agent.tools.utils.ClusterSettingHelper;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
@@ -98,9 +96,7 @@ public class PPLTool implements Tool {
 
     private int head;
 
-    private ClusterSettingHelper clusterSettingHelper;
-
-    private static Gson gson = new Gson();
+    private static Gson gson = org.opensearch.ml.common.utils.StringUtils.gson;
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
 
@@ -153,7 +149,6 @@ public class PPLTool implements Tool {
 
     public PPLTool(
         Client client,
-        ClusterSettingHelper clusterSettingHelper,
         String modelId,
         String contextPrompt,
         String pplModelType,
@@ -172,7 +167,6 @@ public class PPLTool implements Tool {
         this.previousToolKey = previousToolKey;
         this.head = head;
         this.execute = execute;
-        this.clusterSettingHelper = clusterSettingHelper;
     }
 
     @SuppressWarnings("unchecked")
@@ -222,14 +216,7 @@ public class PPLTool implements Tool {
                     ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
                     Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
                     String ppl = parseOutput(dataAsMap.get("response"), indexName);
-                    boolean pplExecutedEnabled = clusterSettingHelper.getClusterSettings(SkillSettings.PPL_EXECUTION_ENABLED);
-                    if (!pplExecutedEnabled || !this.execute) {
-                        if (!pplExecutedEnabled) {
-                            log
-                                .debug(
-                                    "PPL execution is disabled, the query will be returned directly, to enable this, please set plugins.skills.ppl_execution_enabled to true"
-                                );
-                        }
+                    if (!this.execute) {
                         Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                         listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
                         return;
@@ -298,8 +285,6 @@ public class PPLTool implements Tool {
     public static class Factory implements Tool.Factory<PPLTool> {
         private Client client;
 
-        private ClusterSettingHelper clusterSettingHelper;
-
         private static Factory INSTANCE;
 
         public static Factory getInstance() {
@@ -315,9 +300,8 @@ public class PPLTool implements Tool {
             }
         }
 
-        public void init(Client client, ClusterSettingHelper clusterSettingHelper) {
+        public void init(Client client) {
             this.client = client;
-            this.clusterSettingHelper = clusterSettingHelper;
         }
 
         @Override
@@ -325,7 +309,6 @@ public class PPLTool implements Tool {
             validatePPLToolParameters(map);
             return new PPLTool(
                 client,
-                clusterSettingHelper,
                 (String) map.get("model_id"),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
