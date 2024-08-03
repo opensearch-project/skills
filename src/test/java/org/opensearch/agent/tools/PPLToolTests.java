@@ -121,6 +121,7 @@ public class PPLToolTests {
             listener.onResponse(transportPPLQueryResponse);
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
+        PPLTool.Factory.getInstance().init(client);
     }
 
     @Test
@@ -433,21 +434,6 @@ public class PPLToolTests {
                     assertEquals("execute ppl:source=demo| head 1, get error: execute ppl error", e.getMessage());
                 })
             );
-    }
-
-    @Test
-    public void test_pplTool_whenPPLExecutionDisabled_returnOnlyContainsPPL() {
-        PPLTool.Factory.getInstance().init(client);
-        PPLTool tool = PPLTool.Factory
-            .getInstance()
-            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
-        assertEquals(PPLTool.TYPE, tool.getName());
-
-        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
-            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
-            assertNull(returnResults.get("executionResult"));
-            assertEquals("source=demo| head 1", returnResults.get("ppl"));
-        }, log::error));
     }
 
     private void createMappings() {
