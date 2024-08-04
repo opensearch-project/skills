@@ -7,12 +7,18 @@ package org.opensearch.agent.tools;
 
 import static org.apache.commons.text.StringEscapeUtils.unescapeJson;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.RealVector;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionRequest;
@@ -23,14 +29,18 @@ import org.opensearch.agent.tools.utils.ClusterStatsUtil;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.routing.allocation.NodeAllocationResult;
 import org.opensearch.cluster.routing.allocation.decider.Decision;
+import org.opensearch.common.action.ActionFuture;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.FunctionName;
+import org.opensearch.ml.common.dataset.TextDocsInputDataSet;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.model.ModelResultFilter;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.StringUtils;
@@ -51,16 +61,22 @@ public class RCATool implements Tool {
 
     private final Client client;
     private final String modelId;
+    private final String embeddingModelId;
+    private final Boolean isLLMOption;
     private static final String MODEL_ID = "model_id";
+    private static final String EMBEDDING_MODEL_ID_FIELD = "embedding_model_id";
+    private static final String IS_LLM_OPTION = "is_llm_option";
 
     private static final String KNOWLEDGE_BASE_TOOL_OUTPUT_FIELD = KnowledgeBaseTool.TYPE + ".output";
     private static final String API_URL_FIELD = "api_url";
     private static final String INDEX_FIELD = "index";
     private static final String DEFAULT_DESCRIPTION = "Use this tool to perform RCA analysis";
 
-    public RCATool(Client client, String modelId) {
+    public RCATool(Client client, String modelId, String embeddingModelId, Boolean isLLMOption) {
         this.client = client;
         this.modelId = modelId;
+        this.embeddingModelId = embeddingModelId;
+        this.isLLMOption = isLLMOption;
     }
 
     @Override
@@ -137,6 +153,43 @@ public class RCATool implements Tool {
         apiList.forEach(api -> invokeAPI(api, parameters, groupedListener));
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> void runOption2(Map<String, ?> knowledgeBase, ActionListener<T> listener) {
+        // input phenomenon's embedded dense vector
+        String phenomenon = (String) knowledgeBase.get("phenomenon");
+        List<RealVector> inputVector = getEmbeddedVector(Collections.singletonList(phenomenon));
+
+        // api response embedded dense vectors
+        List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
+        List<String> apiResponses = causes.stream()
+            .map(cause -> cause.get("response"))
+            .collect(Collectors.toList());
+        List<RealVector> rootCauseVectors = getEmbeddedVector(apiResponses);
+
+        Map<String, Double> dotProductMap = IntStream.range(0, rootCauseVectors.size())
+            .boxed()
+            .collect(Collectors.toMap(
+                i -> causes.get(i).get("reason"),
+                i -> inputVector.get(0).dotProduct(rootCauseVectors.get(i))
+            ));
+
+        Optional<Map.Entry<String, Double>> mapEntry =
+            dotProductMap.entrySet().stream()
+                .max(Map.Entry.comparingByValue());
+
+        String rootCauseReason = "No root cause found";
+        if (mapEntry.isPresent()) {
+            Entry<String, Double> entry = mapEntry.get();
+            log.info("kNN RCA reason: {} with score: {} for the phenomenon: {}",
+                entry.getKey(), entry.getValue(), phenomenon);
+            rootCauseReason = entry.getKey();
+        } else {
+            log.warn("No root cause found for the phenomenon: {}", phenomenon);
+        }
+
+        listener.onResponse((T) rootCauseReason);
+    }
+
     /**
      *
      * @param parameters contains parameters:
@@ -148,7 +201,22 @@ public class RCATool implements Tool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         try {
-            runOption1(parameters, listener);
+            String knowledge = parameters.get(KNOWLEDGE_BASE_TOOL_OUTPUT_FIELD);
+            knowledge = unescapeJson(knowledge);
+            Map<String, ?> knowledgeBase = StringUtils.gson.fromJson(knowledge, Map.class);
+            List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
+            Map<String, String> apiToResponse = causes
+                .stream()
+                .map(c -> c.get(API_URL_FIELD))
+                .distinct()
+                .collect(Collectors.toMap(url -> url, url -> invokeAPI(url, parameters)));
+            causes.forEach(cause -> cause.put("response", apiToResponse.get(cause.get(API_URL_FIELD))));
+
+            if (isLLMOption) {
+                runOption1(knowledgeBase, listener);
+            } else {
+                runOption2(knowledgeBase, listener);
+            }
         } catch (Exception e) {
             log.error("Failed to run RCA tool", e);
             listener.onFailure(e);
@@ -197,6 +265,43 @@ public class RCATool implements Tool {
         }
     }
 
+    private List<RealVector> getEmbeddedVector(List<String> docs) {
+        TextDocsInputDataSet inputDataSet = TextDocsInputDataSet.builder()
+            .docs(docs)
+            .resultFilter(ModelResultFilter.builder()
+                .returnNumber(true)
+                .targetResponse(List.of("sentence_embedding"))
+                .build())
+            .build();
+        ActionRequest request = new MLPredictionTaskRequest(
+            embeddingModelId,
+            MLInput.builder().algorithm(FunctionName.TEXT_EMBEDDING).inputDataset(inputDataSet).build());
+        ActionFuture<MLTaskResponse> mlTaskRspFuture =  client.execute(MLPredictionTaskAction.INSTANCE, request);
+        ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskRspFuture.actionGet().getOutput();
+        List<ModelTensor> mlModelOutputs = modelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors();
+        return mlModelOutputs.stream()
+            .map(tensor -> {
+                Number[] data = tensor.getData();
+                // Simplify the computation in POC, every MLResultDataType will use high precision FLOAT32, aka double in Java.
+                return new ArrayRealVector(Arrays.stream(data).mapToDouble(Number::doubleValue).toArray());
+            }).collect(Collectors.toList());
+    }
+
+    @Override
+    public String getType() {
+        return TYPE;
+    }
+
+    @Override
+    public String getVersion() {
+        return null;
+    }
+
+    @Override
+    public boolean validate(Map<String, String> parameters) {
+        return parameters != null;
+    }
+
     public static class Factory implements Tool.Factory<RCATool> {
         private Client client;
 
@@ -221,11 +326,16 @@ public class RCATool implements Tool {
 
         @Override
         public RCATool create(Map<String, Object> parameters) {
+            Boolean isLLMOption  = (Boolean) parameters.get(IS_LLM_OPTION);
             String modelId = (String) parameters.get(MODEL_ID);
-            if (Strings.isBlank(modelId)) {
+            if (isLLMOption && Strings.isBlank(modelId)) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
-            return new RCATool(client, modelId);
+            String embeddingModelId = (String) parameters.get(EMBEDDING_MODEL_ID_FIELD);
+            if (!isLLMOption && Strings.isBlank(embeddingModelId)) {
+                throw new IllegalArgumentException("embedding_model_id cannot be null or blank.");
+            }
+            return new RCATool(client, modelId, embeddingModelId, isLLMOption);
         }
 
         @Override
