@@ -155,22 +155,26 @@ public class RCATool implements Tool {
 
     @SuppressWarnings("unchecked")
     public <T> void runOption2(Map<String, ?> knowledgeBase, ActionListener<T> listener) {
-        // input phenomenon's embedded dense vector
         String phenomenon = (String) knowledgeBase.get("phenomenon");
-        List<RealVector> inputVector = getEmbeddedVector(Collections.singletonList(phenomenon));
 
-        // api response embedded dense vectors
+        // API response embedded vectors
         List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
-        List<String> apiResponses = causes.stream()
+        List<String> responses = causes.stream()
             .map(cause -> cause.get("response"))
             .collect(Collectors.toList());
-        List<RealVector> rootCauseVectors = getEmbeddedVector(apiResponses);
+        List<RealVector> responseVectors = getEmbeddedVector(responses);
 
-        Map<String, Double> dotProductMap = IntStream.range(0, rootCauseVectors.size())
+        // expected API response embedded vectors
+        List<String> expectedResponses = causes.stream()
+            .map(cause -> cause.get("expected_response"))
+            .collect(Collectors.toList());
+        List<RealVector> expectedResponseVectors = getEmbeddedVector(expectedResponses);
+
+        Map<String, Double> dotProductMap = IntStream.range(0, causes.size())
             .boxed()
             .collect(Collectors.toMap(
                 i -> causes.get(i).get("reason"),
-                i -> inputVector.get(0).dotProduct(rootCauseVectors.get(i))
+                i -> responseVectors.get(i).dotProduct(expectedResponseVectors.get(i))
             ));
 
         Optional<Map.Entry<String, Double>> mapEntry =
