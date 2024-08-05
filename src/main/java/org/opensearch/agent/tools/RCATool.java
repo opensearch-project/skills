@@ -326,7 +326,7 @@ public class RCATool implements Tool {
 
         @Override
         public RCATool create(Map<String, Object> parameters) {
-            Boolean isLLMOption  = (Boolean) parameters.get(IS_LLM_OPTION);
+            Boolean isLLMOption  = Boolean.valueOf((String) parameters.getOrDefault(IS_LLM_OPTION, "true"));
             String modelId = (String) parameters.get(MODEL_ID);
             if (isLLMOption && Strings.isBlank(modelId)) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
