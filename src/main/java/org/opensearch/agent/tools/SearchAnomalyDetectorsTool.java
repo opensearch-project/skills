@@ -156,9 +156,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
                         .orTimeout(30000, TimeUnit.MILLISECONDS);
                     profileFutures.add(profileFuture);
                     ActionListener<GetAnomalyDetectorResponse> profileListener = ActionListener
-                        .<GetAnomalyDetectorResponse>wrap(profileResponse -> {
-                            profileFuture.complete(profileResponse);
-                        }, e -> {
+                        .<GetAnomalyDetectorResponse>wrap(profileFuture::complete, e -> {
                             log.error("Failed to get anomaly detector profile.", e);
                             profileFuture.completeExceptionally(e);
                             listener.onFailure(e);

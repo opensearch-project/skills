@@ -7,16 +7,21 @@ package org.opensearch.agent.tools;
 
 import static org.apache.commons.text.StringEscapeUtils.unescapeJson;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplainRequest;
-import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplanation;
+import org.opensearch.action.admin.cluster.allocation.ClusterAllocationExplainResponse;
+import org.opensearch.agent.tools.utils.ClusterStatsUtil;
 import org.opensearch.client.Client;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
@@ -53,11 +58,27 @@ public class RCATool implements Tool {
 
     private static final String KNOWLEDGE_BASE_TOOL_OUTPUT_FIELD = KnowledgeBaseTool.TYPE + ".output";
     private static final String API_URL_FIELD = "api_url";
+    private static final String INDEX_FIELD = "index";
     private static final String DEFAULT_DESCRIPTION = "Use this tool to perform RCA analysis";
 
     public RCATool(Client client, String modelId) {
         this.client = client;
         this.modelId = modelId;
+    }
+
+    @Override
+    public String getType() {
+        return TYPE;
+    }
+
+    @Override
+    public String getVersion() {
+        return null;
+    }
+
+    @Override
+    public boolean validate(Map<String, String> parameters) {
+        return parameters != null;
     }
 
     public static final String TOOL_PROMPT =
@@ -76,36 +97,45 @@ public class RCATool implements Tool {
         knowledge = unescapeJson(knowledge);
         Map<String, ?> knowledgeBase = StringUtils.gson.fromJson(knowledge, Map.class);
         List<Map<String, String>> causes = (List<Map<String, String>>) knowledgeBase.get("causes");
-        Map<String, String> apiToResponse = causes
-            .stream()
-            .map(c -> c.get(API_URL_FIELD))
-            .distinct()
-            .collect(Collectors.toMap(url -> url, url -> invokeAPI(url, parameters)));
-        causes.forEach(cause -> cause.put("response", apiToResponse.get(cause.get(API_URL_FIELD))));
-        Map<String, String> LLMParams = new java.util.HashMap<>(
-            Map.of("phenomenon", (String) knowledgeBase.get("phenomenon"), "causes", StringUtils.gson.toJson(causes))
-        );
-        StringSubstitutor substitute = new StringSubstitutor(LLMParams, "${parameters.", "}");
-        String finalToolPrompt = substitute.replace(TOOL_PROMPT);
-        LLMParams.put("prompt", finalToolPrompt);
-        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(LLMParams).build();
-        ActionRequest request = new MLPredictionTaskRequest(
-            modelId,
-            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
-        );
-        client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(response -> {
-            ModelTensorOutput modelTensorOutput = (ModelTensorOutput) response.getOutput();
-            Map<String, ?> dataMap = Optional
-                .ofNullable(modelTensorOutput.getMlModelOutputs())
-                .flatMap(outputs -> outputs.stream().findFirst())
-                .flatMap(modelTensors -> modelTensors.getMlModelTensors().stream().findFirst())
-                .map(ModelTensor::getDataAsMap)
-                .orElse(null);
-            if (dataMap == null) {
-                throw new IllegalArgumentException("No dataMap returned from LLM.");
+        Set<String> apis = causes.stream().map(c -> c.get(API_URL_FIELD)).collect(Collectors.toSet());
+        ActionListener<Map<String, String>> apiListener = new ActionListener<>() {
+            @Override
+            public void onResponse(Map<String, String> apiToResponse) {
+                causes.forEach(cause -> cause.put("response", apiToResponse.get(cause.get(API_URL_FIELD))));
+                Map<String, String> LLMParams = new java.util.HashMap<>(
+                    Map.of("phenomenon", (String) knowledgeBase.get("phenomenon"), "causes", StringUtils.gson.toJson(causes))
+                );
+                StringSubstitutor substitute = new StringSubstitutor(LLMParams, "${parameters.", "}");
+                String finalToolPrompt = substitute.replace(TOOL_PROMPT);
+                LLMParams.put("prompt", finalToolPrompt);
+                RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(LLMParams).build();
+                ActionRequest request = new MLPredictionTaskRequest(
+                    modelId,
+                    MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+                );
+                client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(response -> {
+                    ModelTensorOutput modelTensorOutput = (ModelTensorOutput) response.getOutput();
+                    Map<String, ?> dataMap = Optional
+                        .ofNullable(modelTensorOutput.getMlModelOutputs())
+                        .flatMap(outputs -> outputs.stream().findFirst())
+                        .flatMap(modelTensors -> modelTensors.getMlModelTensors().stream().findFirst())
+                        .map(ModelTensor::getDataAsMap)
+                        .orElse(null);
+                    if (dataMap == null) {
+                        throw new IllegalArgumentException("No dataMap returned from LLM.");
+                    }
+                    listener.onResponse((T) dataMap.get("completion"));
+                }, listener::onFailure));
             }
-            listener.onResponse((T) dataMap.get("completion"));
-        }, listener::onFailure));
+
+            @Override
+            public void onFailure(Exception e) {
+                listener.onFailure(e);
+            }
+        };
+        // TODO: support different parameters for different apis
+        Map<String, Map<String, String>> apiToParameters = apis.stream().collect(Collectors.toMap(api -> api, api -> parameters));
+        invokeAPIs(apis, apiToParameters, apiListener);
     }
 
     /**
@@ -126,45 +156,79 @@ public class RCATool implements Tool {
         }
     }
 
-    private String invokeAPI(String url, Map<String, String> parameters) {
+    private void invokeAPIs(Set<String> urls, Map<String, Map<String, String>> parameters, ActionListener<Map<String, String>> listener) {
+        Map<String, CompletableFuture<String>> apiFutures = new HashMap<>();
+        for (String url : urls) {
+            Map<String, String> parameter = parameters.get(url);
+            CompletableFuture<String> apiFuture = new CompletableFuture<>();
+            apiFutures.put(url, apiFuture);
+
+            ActionListener<String> apiListener = new ActionListener<>() {
+                @Override
+                public void onResponse(String response) {
+                    apiFuture.complete(response);
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    apiFuture.completeExceptionally(e);
+                    listener.onFailure(e);
+                }
+            };
+
+            invokeAPI(url, parameter, apiListener);
+        }
+
+        try {
+            CompletableFuture<Map<String, String>> mapFuture = CompletableFuture
+                .allOf(apiFutures.values().toArray(new CompletableFuture<?>[0]))
+                .thenApply(
+                    v -> apiFutures.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().join()))
+                );
+            Map<String, String> apiToResponse = mapFuture.join();
+            listener.onResponse(apiToResponse);
+        } catch (Exception e) {
+            log.error("Failed to get all api results from rca tool", e);
+            listener.onFailure(e);
+        }
+    }
+
+    private void invokeAPI(String url, Map<String, String> parameters, ActionListener<String> listener) {
+        // TODO: add other API urls
         switch (url) {
             case "_cluster/allocation/explain":
+                ActionListener<ClusterAllocationExplainResponse> apiListener = new ActionListener<>() {
+                    @Override
+                    public void onResponse(ClusterAllocationExplainResponse allocationExplainResponse) {
+                        try {
+                            XContentBuilder xContentBuilder = allocationExplainResponse
+                                .getExplanation()
+                                .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+                            listener.onResponse(xContentBuilder.toString());
+                        } catch (IOException e) {
+                            log.error("Failed to invoke api _cluster/allocation/explain due to exception:", e);
+                            listener.onFailure(e);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        listener.onFailure(e);
+                    }
+                };
+
+                // TODO: support primary false when alert yellow and true when alert true
                 ClusterAllocationExplainRequest request = new ClusterAllocationExplainRequest();
                 request.setIndex(parameters.get("index"));
                 request.setPrimary(false);
                 request.setShard(0);
-                try {
-                    // TODO: need to be optimized to use listener to avoid block wait
-                    ClusterAllocationExplanation clusterAllocationExplanation = client
-                        .admin()
-                        .cluster()
-                        .allocationExplain(request)
-                        .get()
-                        .getExplanation();
-                    XContentBuilder xContentBuilder = clusterAllocationExplanation
-                        .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
-                    return xContentBuilder.toString();
-                } catch (Exception e) {
-                    return "Meet with exception when calling API _cluster/allocation/explain";
-                }
+
+                ClusterStatsUtil.getClusterAllocationExplain(client, request, apiListener);
+                break;
             default:
-                return "API not supported";
+                Exception exception = new IllegalArgumentException("API not supported");
+                listener.onFailure(exception);
         }
-    }
-
-    @Override
-    public String getType() {
-        return TYPE;
-    }
-
-    @Override
-    public String getVersion() {
-        return null;
-    }
-
-    @Override
-    public boolean validate(Map<String, String> parameters) {
-        return parameters != null;
     }
 
     public static class Factory implements Tool.Factory<RCATool> {
