@@ -282,7 +282,9 @@ public class RCATool implements Tool {
             MLInput.builder().algorithm(FunctionName.TEXT_EMBEDDING).inputDataset(inputDataSet).build());
         ActionFuture<MLTaskResponse> mlTaskRspFuture =  client.execute(MLPredictionTaskAction.INSTANCE, request);
         ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskRspFuture.actionGet().getOutput();
-        List<ModelTensor> mlModelOutputs = modelTensorOutput.getMlModelOutputs().get(0).getMlModelTensors();
+        List<ModelTensor> mlModelOutputs = modelTensorOutput.getMlModelOutputs().stream()
+            .map(modelTensors -> modelTensors.getMlModelTensors().get(0))
+            .collect(Collectors.toList());
         return mlModelOutputs.stream()
             .map(tensor -> {
                 Number[] data = tensor.getData();
