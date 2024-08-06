@@ -293,21 +293,6 @@ public class RCATool implements Tool {
             }).collect(Collectors.toList());
     }
 
-    @Override
-    public String getType() {
-        return TYPE;
-    }
-
-    @Override
-    public String getVersion() {
-        return null;
-    }
-
-    @Override
-    public boolean validate(Map<String, String> parameters) {
-        return parameters != null;
-    }
-
     public static class Factory implements Tool.Factory<RCATool> {
         private Client client;
 
