@@ -159,7 +159,7 @@ public class RCATool implements Tool {
             .range(0, causes.size())
             .boxed()
             .collect(
-                Collectors.toMap(i -> causes.get(i).get("reason"), i -> responseVectors.get(i).dotProduct(expectedResponseVectors.get(i)))
+                Collectors.toMap(i -> causes.get(i).get("reason"), i -> responseVectors.get(0).dotProduct(expectedResponseVectors.get(i)))
             );
 
         Optional<Map.Entry<String, Double>> mapEntry = dotProductMap.entrySet().stream().max(Map.Entry.comparingByValue());
@@ -201,7 +201,7 @@ public class RCATool implements Tool {
                     if (isLLMOption) {
                         runOption1(phenomenon, causes, apiToResponse, listener);
                     } else {
-                        runOption1(phenomenon, causes, apiToResponse, listener);
+                        runOption2(phenomenon, causes, apiToResponse, listener);
                     }
                 }, listener::onFailure),
                 apiList.size()
