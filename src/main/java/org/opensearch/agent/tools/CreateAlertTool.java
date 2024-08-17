@@ -275,7 +275,7 @@ public class CreateAlertTool implements Tool {
         @Override
         public CreateAlertTool create(Map<String, Object> params) {
             String modelId = (String) params.get(MODEL_ID);
-            if (Strings.isNullOrEmpty(modelId)) {
+            if (Strings.isNullOrEmpty(modelId) || modelId.isBlank()) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
             String modelType = (String) params.getOrDefault("model_type", ModelType.CLAUDE.toString());
