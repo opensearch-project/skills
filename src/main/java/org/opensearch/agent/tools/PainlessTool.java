@@ -10,14 +10,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptService;
 import org.opensearch.script.ScriptType;
 import org.opensearch.script.TemplateScript;
-
-import com.google.gson.Gson;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -49,7 +49,6 @@ public class PainlessTool implements Tool {
     private String version;
 
     private ScriptService scriptService;
-    @Setter
     private String scriptCode;
 
     public PainlessTool(ScriptService scriptEngine, String script) {
@@ -57,22 +56,10 @@ public class PainlessTool implements Tool {
         this.scriptCode = script;
     }
 
-    private Gson gson = new Gson();
-
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         Script script = new Script(ScriptType.INLINE, "painless", scriptCode, Collections.emptyMap());
-        Map<String, Object> flattenedParameters = new HashMap<>();
-        for (Map.Entry<String, String> entry : parameters.entrySet()) {
-            // keep original values and flatten
-            flattenedParameters.put(entry.getKey(), entry.getValue());
-            // TODO default is json parser. we may support format
-            try {
-                String value = org.apache.commons.text.StringEscapeUtils.unescapeJson(entry.getValue());
-                Map<String, ?> map = gson.fromJson(value, Map.class);
-                flattenMap(map, flattenedParameters, entry.getKey());
-            } catch (Throwable ignored) {}
-        }
+        Map<String, Object> flattenedParameters = getFlattenedParameters(parameters);
         TemplateScript templateScript = scriptService.compile(script, TemplateScript.CONTEXT).newInstance(flattenedParameters);
         try {
             String result = templateScript.execute();
@@ -82,7 +69,27 @@ public class PainlessTool implements Tool {
         }
     }
 
-    private void flattenMap(Map<String, ?> map, Map<String, Object> flatMap, String prefix) {
+    @Override
+    public boolean validate(Map<String, String> map) {
+        return true;
+    }
+
+    Map<String, Object> getFlattenedParameters(Map<String, String> parameters) {
+        Map<String, Object> flattenedParameters = new HashMap<>();
+        for (Map.Entry<String, String> entry : parameters.entrySet()) {
+            // keep both original values and flatten
+            flattenedParameters.put(entry.getKey(), entry.getValue());
+            try {
+                // default is json parser, we may add more...
+                String value = org.apache.commons.text.StringEscapeUtils.unescapeJson(entry.getValue());
+                Map<String, ?> map = StringUtils.fromJson(value, "");
+                flattenMap(map, flattenedParameters, entry.getKey());
+            } catch (Throwable ignored) {}
+        }
+        return flattenedParameters;
+    }
+
+    void flattenMap(Map<String, ?> map, Map<String, Object> flatMap, String prefix) {
         for (Map.Entry<String, ?> entry : map.entrySet()) {
             String key = entry.getKey();
             if (prefix != null && !prefix.isEmpty()) {
@@ -95,11 +102,6 @@ public class PainlessTool implements Tool {
                 flatMap.put(key, value);
             }
         }
-    }
-
-    @Override
-    public boolean validate(Map<String, String> map) {
-        return true;
     }
 
     public static class Factory implements Tool.Factory<PainlessTool> {
@@ -127,7 +129,9 @@ public class PainlessTool implements Tool {
         @Override
         public PainlessTool create(Map<String, Object> map) {
             String script = (String) map.get("script");
-            // TODO add script non null/empty check
+            if (Strings.isNullOrEmpty(script)) {
+                throw new IllegalArgumentException("script is required");
+            }
             return new PainlessTool(scriptService, script);
         }
 

@@ -49,7 +49,7 @@ public class PainlessToolIT extends BaseAgentToolsIT {
         Assert.assertEquals("12", result);
     }
 
-    public void test_execute_with_parameter2() throws URISyntaxException, IOException {
+    public void test_execute_with_parsing_input() throws URISyntaxException, IOException {
         String script =
             "return 'An example output: with ppl:<ppl>' + params.get('PPL.output.ppl') + '</ppl>, and this is ppl result: <ppl_result>' + params.get('PPL.output.executionResult') + '</ppl_result>'";
         String mockPPLOutput = "return '{\\\\\"executionResult\\\\\":\\\\\"result\\\\\",\\\\\"ppl\\\\\":\\\\\"source=demo| head 1\\\\\"}'";
