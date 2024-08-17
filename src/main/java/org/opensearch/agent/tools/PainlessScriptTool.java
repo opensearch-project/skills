@@ -29,8 +29,8 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 @Setter
 @Getter
-@ToolAnnotation(PainlessTool.TYPE)
-public class PainlessTool implements Tool {
+@ToolAnnotation(PainlessScriptTool.TYPE)
+public class PainlessScriptTool implements Tool {
     public static final String TYPE = "PainlessTool";
     private static final String DEFAULT_DESCRIPTION = "Use this tool to execute painless script";
 
@@ -51,7 +51,7 @@ public class PainlessTool implements Tool {
     private ScriptService scriptService;
     private String scriptCode;
 
-    public PainlessTool(ScriptService scriptEngine, String script) {
+    public PainlessScriptTool(ScriptService scriptEngine, String script) {
         this.scriptService = scriptEngine;
         this.scriptCode = script;
     }
@@ -104,20 +104,20 @@ public class PainlessTool implements Tool {
         }
     }
 
-    public static class Factory implements Tool.Factory<PainlessTool> {
+    public static class Factory implements Tool.Factory<PainlessScriptTool> {
         private ScriptService scriptService;
 
-        private static PainlessTool.Factory INSTANCE;
+        private static PainlessScriptTool.Factory INSTANCE;
 
-        public static PainlessTool.Factory getInstance() {
+        public static PainlessScriptTool.Factory getInstance() {
             if (INSTANCE != null) {
                 return INSTANCE;
             }
-            synchronized (PainlessTool.class) {
+            synchronized (PainlessScriptTool.class) {
                 if (INSTANCE != null) {
                     return INSTANCE;
                 }
-                INSTANCE = new PainlessTool.Factory();
+                INSTANCE = new PainlessScriptTool.Factory();
                 return INSTANCE;
             }
         }
@@ -127,12 +127,12 @@ public class PainlessTool implements Tool {
         }
 
         @Override
-        public PainlessTool create(Map<String, Object> map) {
+        public PainlessScriptTool create(Map<String, Object> map) {
             String script = (String) map.get("script");
             if (Strings.isNullOrEmpty(script)) {
                 throw new IllegalArgumentException("script is required");
             }
-            return new PainlessTool(scriptService, script);
+            return new PainlessScriptTool(scriptService, script);
         }
 
         @Override

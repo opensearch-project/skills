@@ -29,7 +29,7 @@ import com.google.gson.Gson;
 /**
  * this is a test file to test PainlessTool with junit
  */
-public class PainlessToolTests {
+public class PainlessScriptToolTests {
     @Mock
     private ScriptService scriptService;
     @Mock
@@ -49,13 +49,13 @@ public class PainlessToolTests {
 
         when(scriptService.compile(any(), any())).thenReturn(factory);
 
-        PainlessTool.Factory.getInstance().init(scriptService);
+        PainlessScriptTool.Factory.getInstance().init(scriptService);
     }
 
     @Test
     public void testRun() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         when(templateScript.execute()).thenReturn("hello");
         tool.run(Map.of(), actionListener);
 
@@ -70,7 +70,7 @@ public class PainlessToolTests {
     @Test
     public void testRun_with_exception() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         when(templateScript.execute()).thenThrow(new RuntimeException("error"));
         tool.run(Map.of(), actionListener);
 
@@ -85,8 +85,8 @@ public class PainlessToolTests {
     @Test
     public void testFactory_create() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
-        assertEquals(PainlessTool.TYPE, tool.getType());
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
+        assertEquals(PainlessScriptTool.TYPE, tool.getType());
         assertEquals("PainlessTool", tool.getName());
         assertEquals("Use this tool to execute painless script", tool.getDescription());
     }
@@ -94,14 +94,14 @@ public class PainlessToolTests {
     // test factory create with exception
     @Test(expected = IllegalArgumentException.class)
     public void testFactory_create_with_exception() {
-        PainlessTool.Factory.getInstance().create(Map.of());
+        PainlessScriptTool.Factory.getInstance().create(Map.of());
     }
 
     // test flattenMap
     @Test
     public void testFlattenMap_without_prefix() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         Map<String, Object> map = Map.of("a", Map.of("b", "c"), "k", "v");
         Map<String, Object> resultMap = new HashMap<>();
         tool.flattenMap(map, resultMap, "");
@@ -112,7 +112,7 @@ public class PainlessToolTests {
     @Test
     public void testFlattenMap_with_prefix() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         Map<String, Object> map = Map.of("a", Map.of("b", "c"), "k", "v");
         Map<String, Object> resultMap = new HashMap<>();
         tool.flattenMap(map, resultMap, "prefix");
@@ -123,7 +123,7 @@ public class PainlessToolTests {
     @Test
     public void testFlattenMap_with_depth_3() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         Map<String, Object> map = Map.of("a", Map.of("b", Map.of("c", "d"), "k", "v"));
         Gson gson = new Gson();
         System.out.println(StringEscapeUtils.escapeJson(gson.toJson(map)));
@@ -136,7 +136,7 @@ public class PainlessToolTests {
     @Test
     public void testGetFlattenedParameters() {
         String script = "return 'Hello World';";
-        PainlessTool tool = PainlessTool.Factory.getInstance().create(Map.of("script", script));
+        PainlessScriptTool tool = PainlessScriptTool.Factory.getInstance().create(Map.of("script", script));
         Map<String, String> map = Map.of("k", "{\\\"a\\\":{\\\"k\\\":\\\"v\\\",\\\"b\\\":{\\\"c\\\":\\\"d\\\"}}}");
         Map<String, Object> resultMap = tool.getFlattenedParameters(map);
         assertEquals(
