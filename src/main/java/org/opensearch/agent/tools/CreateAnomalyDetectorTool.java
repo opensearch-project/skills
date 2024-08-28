@@ -31,6 +31,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
@@ -44,7 +45,6 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 
 import com.google.common.collect.ImmutableMap;
 
-import joptsimple.internal.Strings;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
