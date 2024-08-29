@@ -18,7 +18,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.text.StringSubstitutor;
-import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.get.GetIndexRequest;
 import org.opensearch.action.support.IndicesOptions;
@@ -27,6 +26,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.core.common.logging.LoggerMessageFormat;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -275,7 +275,7 @@ public class CreateAlertTool implements Tool {
         @Override
         public CreateAlertTool create(Map<String, Object> params) {
             String modelId = (String) params.get(MODEL_ID);
-            if (Strings.isBlank(modelId)) {
+            if (org.apache.commons.lang3.StringUtils.isBlank(modelId)) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
             String modelType = (String) params.getOrDefault("model_type", ModelType.CLAUDE.toString());
