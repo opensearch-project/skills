@@ -2,8 +2,7 @@
 
 Compatible with OpenSearch 2.17.0
 
-### Dependencies
-
+### Maintenance
 update dependency org.apache.logging.log4j:log4j-slf4j-impl to v2.23.1 ([#256](https://github.com/opensearch-project/skills/pull/256))
 update dependency com.google.guava:guava to v33.2.1-jre ([#258](https://github.com/opensearch-project/skills/pull/258))
 Upgrade apache common lang version to 3.16 ([#371](https://github.com/opensearch-project/skills/pull/371))
