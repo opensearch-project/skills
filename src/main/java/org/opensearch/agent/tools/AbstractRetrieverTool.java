@@ -68,7 +68,7 @@ public abstract class AbstractRetrieverTool implements Tool {
 
     protected abstract String getQueryBody(String queryText);
 
-    private static Map<String, Object> processResponse(SearchHit hit) {
+    protected static Map<String, Object> processResponse(SearchHit hit) {
         Map<String, Object> docContent = new HashMap<>();
         docContent.put("_index", hit.getIndex());
         docContent.put("_id", hit.getId());
@@ -77,7 +77,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         return docContent;
     }
 
-    private <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
+    protected <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String question = parameters.get(INPUT_FIELD);
         if (StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
