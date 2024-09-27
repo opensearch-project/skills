@@ -159,6 +159,14 @@ public class LogPatternTool extends AbstractRetrieverTool {
         client.search(searchRequest, actionListener);
     }
 
+    /**
+     * Extract a pattern from the value of a field by removing chars in the pattern. This function
+     * imitates the same logic of Observability log pattern feature here:
+     * <a href="https://github.com/opensearch-project/sql/blob/4303a2ab755d53903094dd94a5100572677a27a1/core/src/main/java/org/opensearch/sql/expression/parse/PatternsExpression.java#L53">parseValue</a>
+     * @param rawString string value of the field to generate a pattern
+     * @param pattern @Nullable the specified pattern to remove, use DEFAULT_IGNORED_CHARS if null
+     * @return the generated pattern value
+     */
     @VisibleForTesting
     static String extractPattern(String rawString, Pattern pattern) {
         if (pattern != null)
@@ -173,6 +181,13 @@ public class LogPatternTool extends AbstractRetrieverTool {
         return new String(chars, 0, pos);
     }
 
+    /**
+     * Find the longest field in the sample log source. This function imitates the same logic of
+     * Observability log pattern feature here:
+     * <a href="https://github.com/opensearch-project/dashboards-observability/blob/279463ad0c8e00780bf57f85e6d2bf30e8c7c93d/public/components/event_analytics/hooks/use_fetch_patterns.ts#L137C2-L164C6">setDefaultPatternsField</a>
+     * @param sampleLogSource sample log source map
+     * @return the longest field name
+     */
     @VisibleForTesting
     static String findLongestField(Map<String, Object> sampleLogSource) {
         String longestField = null;
