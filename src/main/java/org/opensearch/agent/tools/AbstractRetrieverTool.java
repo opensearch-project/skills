@@ -68,7 +68,7 @@ public abstract class AbstractRetrieverTool implements Tool {
 
     protected abstract String getQueryBody(String queryText);
 
-    protected static Map<String, Object> processResponse(SearchHit hit) {
+    private static Map<String, Object> processResponse(SearchHit hit) {
         Map<String, Object> docContent = new HashMap<>();
         docContent.put("_index", hit.getIndex());
         docContent.put("_id", hit.getId());

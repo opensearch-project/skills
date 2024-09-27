@@ -16,10 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.logging.LoggerMessageFormat;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHit;
@@ -56,7 +58,6 @@ public class LogPatternTool extends AbstractRetrieverTool {
     public static String DEFAULT_DESCRIPTION = "Log Pattern Tool";
     public static final String TOP_N_PATTERN = "top_n_pattern";
     public static final String SAMPLE_LOG_SIZE = "sample_log_size";
-    public static final String DSL_FIELD = "dsl";
     public static final String PATTERN_FIELD = "pattern_field";
     public static final String PATTERN = "pattern";
     public static final int LOG_PATTERN_DEFAULT_DOC_SIZE = 1000;
@@ -81,9 +82,11 @@ public class LogPatternTool extends AbstractRetrieverTool {
         String patternStr
     ) {
         super(client, xContentRegistry, null, null, docSize);
+        checkPositive(topNPattern, TOP_N_PATTERN);
+        checkPositive(sampleLogSize, SAMPLE_LOG_SIZE);
         this.topNPattern = topNPattern;
         this.sampleLogSize = sampleLogSize;
-        if (pattern != null)
+        if (patternStr != null)
             this.pattern = Pattern.compile(patternStr);
     }
 
@@ -94,15 +97,11 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        // LogPatternTool needs to pass index and input as parameter in runtime. See [[${validate}]]
         super.index = parameters.get(INDEX_FIELD);
-        if (parameters.containsKey(DOC_SIZE_FIELD))
-            super.docSize = Integer.parseInt(parameters.get(DOC_SIZE_FIELD));
-        if (parameters.containsKey(TOP_N_PATTERN))
-            topNPattern = Integer.parseInt(parameters.get(TOP_N_PATTERN));
-        if (parameters.containsKey(SAMPLE_LOG_SIZE))
-            sampleLogSize = Integer.parseInt(parameters.get(SAMPLE_LOG_SIZE));
-        if (parameters.containsKey(PATTERN))
-            this.pattern = Pattern.compile((parameters.get(PATTERN)));
+        int topNPattern = parameters.containsKey(TOP_N_PATTERN) ? getPositiveInteger(parameters, TOP_N_PATTERN) : this.topNPattern;
+        int sampleLogSize = parameters.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(parameters, SAMPLE_LOG_SIZE) : this.sampleLogSize;
+        Pattern pattern = parameters.containsKey(PATTERN) ? Pattern.compile(parameters.get(PATTERN)) : this.pattern;
 
         SearchRequest searchRequest;
         try {
@@ -113,7 +112,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
             return;
         }
 
-        ActionListener actionListener = ActionListener.<SearchResponse>wrap(r -> {
+        ActionListener<SearchResponse> actionListener = ActionListener.wrap(r -> {
             SearchHit[] hits = r.getHits().getHits();
 
             if (hits != null && hits.length > 0) {
@@ -126,8 +125,8 @@ public class LogPatternTool extends AbstractRetrieverTool {
                 Map<String, List<Map<String, Object>>> patternGroups = new HashMap<>();
                 for (SearchHit hit : hits) {
                     Map<String, Object> source = hit.getSourceAsMap();
-                    String pattern = extractPattern((String) source.getOrDefault(patternField, ""), this.pattern);
-                    List<Map<String, Object>> group = patternGroups.computeIfAbsent(pattern, k -> new ArrayList<>());
+                    String patternValue = extractPattern((String) source.getOrDefault(patternField, ""), pattern);
+                    List<Map<String, Object>> group = patternGroups.computeIfAbsent(patternValue, k -> new ArrayList<>());
                     group.add(source);
                 }
                 List<Map<String, Object>> sortedEntries = patternGroups
@@ -161,7 +160,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
     }
 
     @VisibleForTesting
-    public static String extractPattern(String rawString, Pattern pattern) {
+    static String extractPattern(String rawString, Pattern pattern) {
         if (pattern != null)
             return pattern.matcher(rawString).replaceAll("");
         char[] chars = rawString.toCharArray();
@@ -175,13 +174,13 @@ public class LogPatternTool extends AbstractRetrieverTool {
     }
 
     @VisibleForTesting
-    public static String findLongestField(Map<String, Object> sampleLogSource) {
+    static String findLongestField(Map<String, Object> sampleLogSource) {
         String longestField = null;
         int maxLength = 0;
 
         for (Map.Entry<String, Object> entry : sampleLogSource.entrySet()) {
             Object value = entry.getValue();
-            if (value instanceof String) { // 确保值是字符串类型
+            if (value instanceof String) {
                 String stringValue = (String) value;
                 int length = stringValue.length();
                 if (length > maxLength) {
@@ -196,6 +195,37 @@ public class LogPatternTool extends AbstractRetrieverTool {
     @Override
     public String getType() {
         return TYPE;
+    }
+
+    @Override
+    public boolean validate(Map<String, String> parameters) {
+        return super.validate(parameters) && parameters.containsKey(INDEX_FIELD) && !StringUtils.isBlank(parameters.get(INDEX_FIELD));
+    }
+
+    private static int getPositiveInteger(Map<String, ?> params, String paramName) {
+        int value = getInteger(params, paramName);
+        checkPositive(value, paramName);
+        return value;
+    }
+
+    private static int getInteger(Map<String, ?> params, String paramName) {
+        int value;
+        try {
+            value = Integer.parseInt((String) params.get(paramName));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                LoggerMessageFormat.format("Invalid value {} for parameter {}, it should be a number", params.get(paramName), paramName)
+            );
+        }
+        return value;
+    }
+
+    private static void checkPositive(int value, String paramName) {
+        if (value < 0) {
+            throw new IllegalArgumentException(
+                LoggerMessageFormat.format("Invalid value {} for parameter {}, it should be positive", value, paramName)
+            );
+        }
     }
 
     public static class Factory extends AbstractRetrieverTool.Factory<LogPatternTool> {
@@ -216,15 +246,9 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
         @Override
         public LogPatternTool create(Map<String, Object> params) {
-            int docSize = params.containsKey(DOC_SIZE_FIELD)
-                ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD))
-                : LOG_PATTERN_DEFAULT_DOC_SIZE;
-            int topNPattern = params.containsKey(TOP_N_PATTERN)
-                ? Integer.parseInt((String) params.get(TOP_N_PATTERN))
-                : DEFAULT_TOP_N_PATTERN;
-            int sampleLogSize = params.containsKey(SAMPLE_LOG_SIZE)
-                ? Integer.parseInt((String) params.get(SAMPLE_LOG_SIZE))
-                : DEFAULT_SAMPLE_LOG_SIZE;
+            int docSize = params.containsKey(DOC_SIZE_FIELD) ? getInteger(params, DOC_SIZE_FIELD) : LOG_PATTERN_DEFAULT_DOC_SIZE;
+            int topNPattern = params.containsKey(TOP_N_PATTERN) ? getInteger(params, TOP_N_PATTERN) : DEFAULT_TOP_N_PATTERN;
+            int sampleLogSize = params.containsKey(SAMPLE_LOG_SIZE) ? getInteger(params, SAMPLE_LOG_SIZE) : DEFAULT_SAMPLE_LOG_SIZE;
             String patternStr = params.containsKey(PATTERN) ? (String) params.get(PATTERN) : null;
             return LogPatternTool
                 .builder()

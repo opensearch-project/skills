@@ -10,6 +10,7 @@ import static org.junit.Assert.assertNull;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -51,5 +52,7 @@ public class LogPatternToolTests {
     @Test
     public void testExtractPattern() {
         assertEquals("././", LogPatternTool.extractPattern("123.abc/.AB/", null));
+        assertEquals("123.c/.AB/", LogPatternTool.extractPattern("123.abc/.AB/", Pattern.compile("ab")));
+        assertEquals(".abc/.AB/", LogPatternTool.extractPattern("123.abc/.AB/", Pattern.compile("[0-9]")));
     }
 }
