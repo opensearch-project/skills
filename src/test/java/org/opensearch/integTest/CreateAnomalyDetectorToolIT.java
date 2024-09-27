@@ -340,6 +340,9 @@ public class CreateAnomalyDetectorToolIT extends ToolIntegrationTest {
                     )
             );
         registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", modelId);
+        if (randomBoolean()) {
+            registerAgentRequestBody = registerAgentRequestBody.replace("<CUSTOM_PROMPT>", "custom prompt");
+        }
         return createAgent(registerAgentRequestBody);
     }
 }
