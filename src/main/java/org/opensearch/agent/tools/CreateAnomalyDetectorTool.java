@@ -143,14 +143,18 @@ public class CreateAnomalyDetectorTool implements Tool {
      * @param client the OpenSearch transport client
      * @param modelId the model ID of LLM
      */
-    public CreateAnomalyDetectorTool(Client client, String modelId, String modelType) {
+    public CreateAnomalyDetectorTool(Client client, String modelId, String modelType, String contextPrompt) {
         this.client = client;
         this.modelId = modelId;
         if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
             throw new IllegalArgumentException("Unsupported model_type: " + modelType);
         }
         this.modelType = ModelType.from(modelType);
-        this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
+        if (contextPrompt.isEmpty()) {
+            this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
+        } else {
+            this.contextPrompt = contextPrompt;
+        }
     }
 
     /**
@@ -432,7 +436,8 @@ public class CreateAnomalyDetectorTool implements Tool {
             if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
                 throw new IllegalArgumentException("Unsupported model_type: " + modelType);
             }
-            return new CreateAnomalyDetectorTool(client, modelId, modelType);
+            String prompt = (String) map.getOrDefault("prompt", "");
+            return new CreateAnomalyDetectorTool(client, modelId, modelType, prompt);
         }
 
         @Override
