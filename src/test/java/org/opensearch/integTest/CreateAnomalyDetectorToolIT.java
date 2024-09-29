@@ -343,7 +343,20 @@ public class CreateAnomalyDetectorToolIT extends ToolIntegrationTest {
         registerAgentRequestBody = registerAgentRequestBody
             .replace(
                 "<CUSTOM_PROMPT>",
-                "Please give me some suggestion about creating an anomaly detector for the index ${indexInfo.indexName}"
+                "Here is an example of the create anomaly detector API: POST _plugins/_anomaly_detection/detectors, "
+                    + " {\\\"time_field\\\":\\\"timestamp\\\",\\\"indices\\\":[\\\"server_log*\\\"],\\\"feature_attributes\\\":"
+                    + "[{\\\"feature_name\\\":\\\"test\\\",\\\"feature_enabled\\\":true,"
+                    + "\\\"aggregation_query\\\":{\\\"test\\\":{\\\"sum\\\":{\\\"field\\\":\\\"value\\\"}}}}],\\\"category_field\\\":[\\\"ip\\\"]},"
+                    + " and here are the mapping info containing all the fields in the index ${indexInfo.indexName}: ${indexInfo.indexMapping}, "
+                    + "and the optional aggregation methods are count, avg, min, max and sum. Please give me some suggestion about creating an anomaly detector "
+                    + "for the index ${indexInfo.indexName}, "
+                    + "you need to give the key information: the top 3 suitable aggregation fields which are numeric types and "
+                    + "the suitable aggregation method for each field, "
+                    + "if there are no numeric type fields, both the aggregation field and method are empty string, "
+                    + " and also give the category field if there exists a keyword type field like ip, address, host, city, country or region,"
+                    + " if not exist, the category field is empty. Show me a format of keyed and pipe-delimited list "
+                    + "wrapped in a curly bracket just like {category_field=the category field if exists|aggregation_field=comma-delimited"
+                    + " list of all the aggregation field names|aggregation_method=comma-delimited list of all the aggregation methods}. "
             );
 
         return createAgent(registerAgentRequestBody);
