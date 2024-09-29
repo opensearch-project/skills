@@ -55,7 +55,7 @@ import lombok.extern.log4j.Log4j2;
 public class LogPatternTool extends AbstractRetrieverTool {
     public static final String TYPE = "LogPatternTool";
 
-    public static String DEFAULT_DESCRIPTION = "Log Pattern Tool";
+    public static final String DEFAULT_DESCRIPTION = "Log Pattern Tool";
     public static final String TOP_N_PATTERN = "top_n_pattern";
     public static final String SAMPLE_LOG_SIZE = "sample_log_size";
     public static final String PATTERN_FIELD = "pattern_field";
@@ -119,6 +119,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
                     : findLongestField(hits[0].getSourceAsMap());
                 if (patternField == null) {
                     listener.onResponse((T) "Pattern field is not set and this index doesn't contain any string field");
+                    return;
                 }
                 Map<String, List<Map<String, Object>>> patternGroups = new HashMap<>();
                 for (SearchHit hit : hits) {
@@ -235,7 +236,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
     }
 
     private static void checkPositive(int value, String paramName) {
-        if (value < 0) {
+        if (value <= 0) {
             throw new IllegalArgumentException(
                 LoggerMessageFormat.format("Invalid value {} for parameter {}, it should be positive", value, paramName)
             );
