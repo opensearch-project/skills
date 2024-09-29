@@ -243,6 +243,23 @@ public class CreateAnomalyDetectorToolTests {
         }));
     }
 
+    @Test
+    public void testToolWithCustomPrompt() {
+        CreateAnomalyDetectorTool tool = CreateAnomalyDetectorTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "custom prompt"));
+        assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("CLAUDE", tool.getModelType().toString());
+        assertEquals("custom prompt", tool.getContextPrompt());
+
+        tool
+            .run(
+                ImmutableMap.of("index", mockedIndexName),
+                ActionListener.<String>wrap(response -> assertEquals(mockedResult, response), log::info)
+            );
+    }
+
     private void createMappings() {
         indexMappings = new HashMap<>();
         indexMappings
