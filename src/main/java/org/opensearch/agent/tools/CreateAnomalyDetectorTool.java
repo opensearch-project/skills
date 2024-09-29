@@ -152,7 +152,7 @@ public class CreateAnomalyDetectorTool implements Tool {
         this.modelType = ModelType.from(modelType);
         if (contextPrompt.isEmpty()) {
             this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
-        }else {
+        } else {
             this.contextPrompt = contextPrompt;
         }
     }
@@ -225,7 +225,6 @@ public class CreateAnomalyDetectorTool implements Tool {
 
             // construct the prompt
             String prompt = constructPrompt(filteredMapping, indexName);
-            System.out.println(prompt);
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
                 .parameters(Collections.singletonMap("prompt", prompt))
