@@ -97,8 +97,6 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        // LogPatternTool needs to pass index and input as parameter in runtime. See [[${validate}]]
-        super.index = parameters.get(INDEX_FIELD);
         int topNPattern = parameters.containsKey(TOP_N_PATTERN) ? getPositiveInteger(parameters, TOP_N_PATTERN) : this.topNPattern;
         int sampleLogSize = parameters.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(parameters, SAMPLE_LOG_SIZE) : this.sampleLogSize;
         Pattern pattern = parameters.containsKey(PATTERN) ? Pattern.compile(parameters.get(PATTERN)) : this.pattern;
@@ -214,6 +212,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
     @Override
     public boolean validate(Map<String, String> parameters) {
+        // LogPatternTool needs to pass index and input as parameter in runtime.
         return super.validate(parameters) && parameters.containsKey(INDEX_FIELD) && !StringUtils.isBlank(parameters.get(INDEX_FIELD));
     }
 

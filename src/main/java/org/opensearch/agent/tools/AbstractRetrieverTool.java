@@ -89,8 +89,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         searchSourceBuilder.parseXContent(queryParser);
         searchSourceBuilder.fetchSource(sourceFields, null);
         searchSourceBuilder.size(docSize);
-        SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(index);
-        return searchRequest;
+        return new SearchRequest().source(searchSourceBuilder).indices(parameters.getOrDefault(INDEX_FIELD, index));
     }
 
     @Override
