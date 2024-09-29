@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
@@ -144,7 +145,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
                                 entry.getValue().subList(0, Math.min(entry.getValue().size(), sampleLogSize))
                             )
                     )
-                    .toList();
+                    .collect(Collectors.toList());
 
                 listener
                     .onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(sortedEntries)));
