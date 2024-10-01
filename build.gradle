@@ -11,7 +11,7 @@ import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "2.16.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "2.17.2-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         version_tokens = opensearch_version.tokenize('-')
@@ -43,12 +43,12 @@ buildscript {
 plugins {
     id 'java-library'
     id 'com.diffplug.spotless' version '6.25.0'
-    id "io.freefair.lombok" version "8.6"
+    id "io.freefair.lombok" version "8.10"
     id "de.undercouch.download" version "5.6.0"
 }
 
 lombok {
-    version = "1.18.30"
+    version = "1.18.34"
 }
 
 repositories {
@@ -87,7 +87,7 @@ configurations {
     all {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
-            force "com.google.guava:guava:33.0.0-jre" // CVE for 31.1
+            force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
         }
     }
@@ -115,10 +115,10 @@ task addJarsToClasspath(type: Copy) {
 dependencies {
     // 3P dependencies
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
-    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.22.0"
+    compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
     compileOnly group: 'org.json', name: 'json', version: '20240205'
-    compileOnly("com.google.guava:guava:33.0.0-jre")
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
+    compileOnly("com.google.guava:guava:33.2.1-jre")
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.11.0'
 
     // Plugin dependencies
