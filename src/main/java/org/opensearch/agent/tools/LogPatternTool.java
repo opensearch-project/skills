@@ -122,11 +122,23 @@ public class LogPatternTool extends AbstractRetrieverTool {
                     throw new IllegalArgumentException("Pattern field is not set and this index doesn't contain any string field");
                 } else if (!firstLogSource.containsKey(patternField)) {
                     throw new IllegalArgumentException(
-                        LoggerMessageFormat.format(null, "Invalid parameter pattern_field: index {} does not have a field named {}", parameters.getOrDefault(INDEX_FIELD, index), patternField)
+                        LoggerMessageFormat
+                            .format(
+                                null,
+                                "Invalid parameter pattern_field: index {} does not have a field named {}",
+                                parameters.getOrDefault(INDEX_FIELD, index),
+                                patternField
+                            )
                     );
                 } else if (!(firstLogSource.get(patternField) instanceof String)) {
                     throw new IllegalArgumentException(
-                        LoggerMessageFormat.format(null, "Invalid parameter pattern_field: pattern field {} in index {} is not type of String", patternField, parameters.getOrDefault(INDEX_FIELD, index))
+                        LoggerMessageFormat
+                            .format(
+                                null,
+                                "Invalid parameter pattern_field: pattern field {} in index {} is not type of String",
+                                patternField,
+                                parameters.getOrDefault(INDEX_FIELD, index)
+                            )
                     );
                 }
                 Map<String, List<Map<String, Object>>> patternGroups = new HashMap<>();
