@@ -186,7 +186,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 throw new IllegalArgumentException("No mapping found for the index: " + indexName);
             }
 
-            // when the index name is wildcard pattern, data stream, or alias, we fetch the mappings of the first index
+            // when the index name is a wildcard pattern, a data stream, or an alias, we fetch the mappings of the first index
             String firstIndexName = (String) mappings.keySet().toArray()[0];
             MappingMetadata mappingMetadata = mappings.get(firstIndexName);
 
