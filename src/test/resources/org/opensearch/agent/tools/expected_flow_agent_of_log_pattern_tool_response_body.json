@@ -1,0 +1,45 @@
+[
+  {
+    "pattern": "._ *  /",
+    "sample logs": [
+      {
+        "field1": "123",
+        "field3": 12345,
+        "field2": "12.abc_AB * De /"
+      },
+      {
+        "field1": "123",
+        "field3": 12345,
+        "field2": "45.ab_AB * De /"
+      }
+    ],
+    "total count": 2
+  },
+  {
+    "pattern": ".- *  /",
+    "sample logs": [
+      {
+        "field1": "123",
+        "field3": 12345,
+        "field2": "123.abc-AB * De /"
+      },
+      {
+        "field1": "123",
+        "field3": 12345,
+        "field2": "45.abc-AB * De /"
+      }
+    ],
+    "total count": 2
+  },
+  {
+    "pattern": ". *  /",
+    "sample logs": [
+      {
+        "field1": "123",
+        "field3": 12345,
+        "field2": ".abAB * De /"
+      }
+    ],
+    "total count": 1
+  }
+]
