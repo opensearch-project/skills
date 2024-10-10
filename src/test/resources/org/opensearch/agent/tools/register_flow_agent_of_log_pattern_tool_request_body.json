@@ -1,0 +1,12 @@
+{
+  "name": "Test_log_pattern_tool_flow_agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "LogPatternTool",
+      "parameters": {
+        "doc_size": 100
+      }
+    }
+  ]
+}
