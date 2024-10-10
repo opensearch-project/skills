@@ -186,13 +186,9 @@ public class CreateAnomalyDetectorTool implements Tool {
                 throw new IllegalArgumentException("No mapping found for the index: " + indexName);
             }
 
-            MappingMetadata mappingMetadata;
-            // when the index name is wildcard pattern, we fetch the mappings of the first index
-            if (indexName.contains("*")) {
-                mappingMetadata = mappings.get((String) mappings.keySet().toArray()[0]);
-            } else {
-                mappingMetadata = mappings.get(indexName);
-            }
+            // when the index name is wildcard pattern, data stream, or alias, we fetch the mappings of the first index
+            String firstIndexName = (String) mappings.keySet().toArray()[0];
+            MappingMetadata mappingMetadata = mappings.get(firstIndexName);
 
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             if (Objects.isNull(mappingSource)) {
@@ -224,7 +220,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
             // construct the prompt
-            String prompt = constructPrompt(filteredMapping, indexName);
+            String prompt = constructPrompt(filteredMapping, firstIndexName);
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
                 .parameters(Collections.singletonMap("prompt", prompt))
@@ -278,7 +274,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 Map<String, String> result = ImmutableMap
                     .of(
                         OUTPUT_KEY_INDEX,
-                        indexName,
+                        firstIndexName,
                         OUTPUT_KEY_CATEGORY_FIELD,
                         categoryField,
                         OUTPUT_KEY_AGGREGATION_FIELD,
