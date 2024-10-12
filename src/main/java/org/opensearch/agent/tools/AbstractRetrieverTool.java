@@ -77,7 +77,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         return docContent;
     }
 
-    protected <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
+    private <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String question = parameters.get(INPUT_FIELD);
         if (StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("[" + INPUT_FIELD + "] is null or empty, can not process it.");
@@ -89,7 +89,8 @@ public abstract class AbstractRetrieverTool implements Tool {
         searchSourceBuilder.parseXContent(queryParser);
         searchSourceBuilder.fetchSource(sourceFields, null);
         searchSourceBuilder.size(docSize);
-        return new SearchRequest().source(searchSourceBuilder).indices(parameters.getOrDefault(INDEX_FIELD, index));
+        SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(index);
+        return searchRequest;
     }
 
     @Override
