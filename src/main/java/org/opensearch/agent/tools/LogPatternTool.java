@@ -115,12 +115,32 @@ public class LogPatternTool extends AbstractRetrieverTool {
             SearchHit[] hits = r.getHits().getHits();
 
             if (hits != null && hits.length > 0) {
+                Map<String, Object> firstLogSource = hits[0].getSourceAsMap();
                 String patternField = parameters.containsKey(PATTERN_FIELD)
                     ? parameters.get(PATTERN_FIELD)
-                    : findLongestField(hits[0].getSourceAsMap());
+                    : findLongestField(firstLogSource);
                 if (patternField == null) {
-                    listener.onResponse((T) "Pattern field is not set and this index doesn't contain any string field");
-                    return;
+                    throw new IllegalArgumentException("Pattern field is not set and this index doesn't contain any string field");
+                } else if (!firstLogSource.containsKey(patternField)) {
+                    throw new IllegalArgumentException(
+                        LoggerMessageFormat
+                            .format(
+                                null,
+                                "Invalid parameter pattern_field: index {} does not have a field named {}",
+                                parameters.getOrDefault(INDEX_FIELD, index),
+                                patternField
+                            )
+                    );
+                } else if (!(firstLogSource.get(patternField) instanceof String)) {
+                    throw new IllegalArgumentException(
+                        LoggerMessageFormat
+                            .format(
+                                null,
+                                "Invalid parameter pattern_field: pattern field {} in index {} is not type of String",
+                                patternField,
+                                parameters.getOrDefault(INDEX_FIELD, index)
+                            )
+                    );
                 }
                 Map<String, List<Map<String, Object>>> patternGroups = new HashMap<>();
                 for (SearchHit hit : hits) {
@@ -262,9 +282,9 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
         @Override
         public LogPatternTool create(Map<String, Object> params) {
-            int docSize = params.containsKey(DOC_SIZE_FIELD) ? getInteger(params, DOC_SIZE_FIELD) : LOG_PATTERN_DEFAULT_DOC_SIZE;
-            int topNPattern = params.containsKey(TOP_N_PATTERN) ? getInteger(params, TOP_N_PATTERN) : DEFAULT_TOP_N_PATTERN;
-            int sampleLogSize = params.containsKey(SAMPLE_LOG_SIZE) ? getInteger(params, SAMPLE_LOG_SIZE) : DEFAULT_SAMPLE_LOG_SIZE;
+            int docSize = params.containsKey(DOC_SIZE_FIELD) ? getPositiveInteger(params, DOC_SIZE_FIELD) : LOG_PATTERN_DEFAULT_DOC_SIZE;
+            int topNPattern = params.containsKey(TOP_N_PATTERN) ? getPositiveInteger(params, TOP_N_PATTERN) : DEFAULT_TOP_N_PATTERN;
+            int sampleLogSize = params.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(params, SAMPLE_LOG_SIZE) : DEFAULT_SAMPLE_LOG_SIZE;
             String patternStr = params.containsKey(PATTERN) ? (String) params.get(PATTERN) : null;
             return LogPatternTool
                 .builder()
