@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
@@ -49,6 +50,7 @@ import com.google.gson.Gson;
 
 import lombok.SneakyThrows;
 
+@Log4j2
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     public static final Gson gson = new Gson();
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
@@ -90,9 +92,10 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     private Map<String, Object> parseResponseToMap(Response response) {
-        Map<String, Object> responseInMap = XContentHelper
-            .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
-        return responseInMap;
+        String responseBody = EntityUtils.toString(response.getEntity());
+        log.info("raw response is: {}", responseBody);
+        return XContentHelper
+            .convertToMap(XContentType.JSON.xContent(), responseBody, false);
     }
 
     @SneakyThrows
