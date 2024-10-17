@@ -16,7 +16,6 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
@@ -49,6 +48,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
 
 import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
@@ -94,8 +94,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     private Map<String, Object> parseResponseToMap(Response response) {
         String responseBody = EntityUtils.toString(response.getEntity());
         log.info("raw response is: {}", responseBody);
-        return XContentHelper
-            .convertToMap(XContentType.JSON.xContent(), responseBody, false);
+        return XContentHelper.convertToMap(XContentType.JSON.xContent(), responseBody, false);
     }
 
     @SneakyThrows
