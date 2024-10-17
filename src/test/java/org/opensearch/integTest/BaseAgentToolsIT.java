@@ -48,7 +48,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
 
 import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 
+@Log4j2
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     public static final Gson gson = new Gson();
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
@@ -90,9 +92,9 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     private Map<String, Object> parseResponseToMap(Response response) {
-        Map<String, Object> responseInMap = XContentHelper
-            .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
-        return responseInMap;
+        String responseBody = EntityUtils.toString(response.getEntity());
+        log.info("raw response is: {}", responseBody);
+        return XContentHelper.convertToMap(XContentType.JSON.xContent(), responseBody, false);
     }
 
     @SneakyThrows
