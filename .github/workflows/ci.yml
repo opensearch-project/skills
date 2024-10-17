@@ -14,7 +14,7 @@ jobs:
       ci-image-version-linux: ${{ steps.step-ci-image-version-linux.outputs.ci-image-version-linux }}
     steps:
       - name: Install crane
-        uses: iarekylew00t/crane-installer@v1
+        uses: iarekylew00t/crane-installer@v3
         with:
           crane-release: v0.15.2
       - name: Checkout opensearch-build repository
