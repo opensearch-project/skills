@@ -172,6 +172,22 @@ public class CreateAlertToolTests {
     }
 
     @Test
+    public void testToolWithCustomPrompt() {
+        CreateAlertTool tool = CreateAlertTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "custom prompt"));
+        assertEquals(CreateAlertTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("custom prompt", tool.getToolPrompt());
+
+        tool
+            .run(
+                ImmutableMap.of("indices", mockedIndexName),
+                ActionListener.<String>wrap(response -> assertEquals(jsonResponse, response), log::info)
+            );
+    }
+
+    @Test
     public void testTool() {
         // test json response
         initMLTensors(jsonResponse);
