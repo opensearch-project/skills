@@ -5,9 +5,36 @@
 
 package org.opensearch.agent.tools.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 
+import org.opensearch.ml.common.utils.StringUtils;
+
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class ToolHelper {
+    /**
+     * Load prompt from the resource file of the invoking class
+     * @param source class which calls this function
+     * @param fileName the resource file name of prompt
+     * @return the LLM request prompt template.
+     */
+    public static Map<String, String> loadDefaultPromptDictFromFile(Class<?> source, String fileName) {
+        try (InputStream searchResponseIns = source.getResourceAsStream(fileName)) {
+            if (searchResponseIns != null) {
+                String defaultPromptContent = new String(searchResponseIns.readAllBytes(), StandardCharsets.UTF_8);
+                return StringUtils.gson.fromJson(defaultPromptContent, Map.class);
+            }
+        } catch (IOException e) {
+            log.error("Failed to load default prompt dict from file: {}", fileName, e);
+        }
+        return new HashMap<>();
+    }
+
     /**
      * Flatten all the fields in the mappings, insert the field to fieldType mapping to a map
      * @param mappingSource the mappings of an index
