@@ -431,8 +431,8 @@ public class CreateAnomalyDetectorTool implements Tool {
             String modelType = (String) map.getOrDefault("model_type", ModelType.CLAUDE.toString());
             if (modelType.isEmpty()) {
                 modelType = ModelType.CLAUDE.toString();
-            }
-            if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
+            } else if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType)
+                && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
                 throw new IllegalArgumentException("Unsupported model_type: " + modelType);
             }
             String prompt = (String) map.getOrDefault("prompt", "");
