@@ -429,6 +429,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 throw new IllegalArgumentException("model_id cannot be empty.");
             }
             String modelType = (String) map.getOrDefault("model_type", ModelType.CLAUDE.toString());
+            // if model type is empty, use the default value
             if (modelType.isEmpty()) {
                 modelType = ModelType.CLAUDE.toString();
             } else if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType)
