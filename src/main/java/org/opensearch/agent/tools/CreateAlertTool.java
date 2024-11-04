@@ -11,6 +11,7 @@ import static org.opensearch.ml.common.utils.StringUtils.isJson;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -72,9 +73,27 @@ public class CreateAlertTool implements Tool {
     private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
     private static final Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(CreateAlertTool.class, PROMPT_FILE_PATH);
 
+    public enum ModelType {
+        CLAUDE,
+        OPENAI;
+
+        public static ModelType from(String value) {
+            if (value.isEmpty()) {
+                return ModelType.CLAUDE;
+            }
+            try {
+                return ModelType.valueOf(value.toUpperCase(Locale.ROOT));
+            } catch (Exception e) {
+                log.error("Wrong Model type, should be CLAUDE or OPENAI");
+                return ModelType.CLAUDE;
+            }
+        }
+    }
+
     public CreateAlertTool(Client client, String modelId, String modelType, String prompt) {
         this.client = client;
         this.modelId = modelId;
+        modelType = String.valueOf(ModelType.from(modelType));
         if (prompt.isEmpty()) {
             if (!promptDict.containsKey(modelType)) {
                 throw new IllegalArgumentException(
