@@ -31,6 +31,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.Strings;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
@@ -44,7 +45,6 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 
 import com.google.common.collect.ImmutableMap;
 
-import joptsimple.internal.Strings;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -143,14 +143,18 @@ public class CreateAnomalyDetectorTool implements Tool {
      * @param client the OpenSearch transport client
      * @param modelId the model ID of LLM
      */
-    public CreateAnomalyDetectorTool(Client client, String modelId, String modelType) {
+    public CreateAnomalyDetectorTool(Client client, String modelId, String modelType, String contextPrompt) {
         this.client = client;
         this.modelId = modelId;
         if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
             throw new IllegalArgumentException("Unsupported model_type: " + modelType);
         }
         this.modelType = ModelType.from(modelType);
-        this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
+        if (contextPrompt.isEmpty()) {
+            this.contextPrompt = DEFAULT_PROMPT_DICT.getOrDefault(this.modelType.toString(), "");
+        } else {
+            this.contextPrompt = contextPrompt;
+        }
     }
 
     /**
@@ -182,13 +186,9 @@ public class CreateAnomalyDetectorTool implements Tool {
                 throw new IllegalArgumentException("No mapping found for the index: " + indexName);
             }
 
-            MappingMetadata mappingMetadata;
-            // when the index name is wildcard pattern, we fetch the mappings of the first index
-            if (indexName.contains("*")) {
-                mappingMetadata = mappings.get((String) mappings.keySet().toArray()[0]);
-            } else {
-                mappingMetadata = mappings.get(indexName);
-            }
+            // when the index name is a wildcard pattern, a data stream, or an alias, we fetch the mappings of the first index
+            String firstIndexName = (String) mappings.keySet().toArray()[0];
+            MappingMetadata mappingMetadata = mappings.get(firstIndexName);
 
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             if (Objects.isNull(mappingSource)) {
@@ -220,7 +220,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
             // construct the prompt
-            String prompt = constructPrompt(filteredMapping, indexName);
+            String prompt = constructPrompt(filteredMapping, firstIndexName);
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
                 .parameters(Collections.singletonMap("prompt", prompt))
@@ -274,7 +274,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 Map<String, String> result = ImmutableMap
                     .of(
                         OUTPUT_KEY_INDEX,
-                        indexName,
+                        firstIndexName,
                         OUTPUT_KEY_CATEGORY_FIELD,
                         categoryField,
                         OUTPUT_KEY_AGGREGATION_FIELD,
@@ -432,7 +432,8 @@ public class CreateAnomalyDetectorTool implements Tool {
             if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
                 throw new IllegalArgumentException("Unsupported model_type: " + modelType);
             }
-            return new CreateAnomalyDetectorTool(client, modelId, modelType);
+            String prompt = (String) map.getOrDefault("prompt", "");
+            return new CreateAnomalyDetectorTool(client, modelId, modelType, prompt);
         }
 
         @Override

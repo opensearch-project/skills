@@ -5,7 +5,8 @@
     {
       "type": "CreateAnomalyDetectorTool",
       "parameters": {
-        "model_id": "<MODEL_ID>"
+        "model_id": "<MODEL_ID>",
+        "prompt": "<CUSTOM_PROMPT>"
       }
     }
   ]

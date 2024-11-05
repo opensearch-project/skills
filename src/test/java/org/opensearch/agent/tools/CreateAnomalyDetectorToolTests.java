@@ -71,7 +71,7 @@ public class CreateAnomalyDetectorToolTests {
         "{\"index\":\"http_logs\",\"categoryField\":\"\",\"aggregationField\":\"response,responseLatency\",\"aggregationMethod\":\"count,avg\",\"dateFields\":\"date\"}";
 
     private String mockedResultForIndexPattern =
-        "{\"index\":\"http_logs*\",\"categoryField\":\"\",\"aggregationField\":\"response,responseLatency\",\"aggregationMethod\":\"count,avg\",\"dateFields\":\"date\"}";
+        "{\"index\":\"http_logs\",\"categoryField\":\"\",\"aggregationField\":\"response,responseLatency\",\"aggregationMethod\":\"count,avg\",\"dateFields\":\"date\"}";
 
     @Before
     public void setup() {
@@ -241,6 +241,23 @@ public class CreateAnomalyDetectorToolTests {
         tool.run(ImmutableMap.of("index", mockedIndexName), ActionListener.<String>wrap(result -> {}, e -> {
             assertEquals("predict model failed", e.getMessage());
         }));
+    }
+
+    @Test
+    public void testToolWithCustomPrompt() {
+        CreateAnomalyDetectorTool tool = CreateAnomalyDetectorTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "custom prompt"));
+        assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("CLAUDE", tool.getModelType().toString());
+        assertEquals("custom prompt", tool.getContextPrompt());
+
+        tool
+            .run(
+                ImmutableMap.of("index", mockedIndexName),
+                ActionListener.<String>wrap(response -> assertEquals(mockedResult, response), log::info)
+            );
     }
 
     private void createMappings() {
