@@ -260,6 +260,22 @@ public class CreateAnomalyDetectorToolTests {
             );
     }
 
+    @Test
+    public void testToolWithEmptyModelType() {
+        CreateAnomalyDetectorTool tool = CreateAnomalyDetectorTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "model_type", ""));
+        assertEquals(CreateAnomalyDetectorTool.TYPE, tool.getName());
+        assertEquals("modelId", tool.getModelId());
+        assertEquals("CLAUDE", tool.getModelType().toString());
+
+        tool
+            .run(
+                ImmutableMap.of("index", mockedIndexName),
+                ActionListener.<String>wrap(response -> assertEquals(mockedResult, response), log::info)
+            );
+    }
+
     private void createMappings() {
         indexMappings = new HashMap<>();
         indexMappings
