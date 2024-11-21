@@ -66,6 +66,8 @@ public class CreateAlertTool implements Tool {
     @Getter
     private final String modelId;
     @Getter
+    private final String modelType;
+    @Getter
     private final String toolPrompt;
 
     private static final String MODEL_ID = "model_id";
@@ -93,9 +95,9 @@ public class CreateAlertTool implements Tool {
     public CreateAlertTool(Client client, String modelId, String modelType, String prompt) {
         this.client = client;
         this.modelId = modelId;
-        modelType = String.valueOf(ModelType.from(modelType));
+        this.modelType = String.valueOf(ModelType.from(modelType));
         if (prompt.isEmpty()) {
-            if (!promptDict.containsKey(modelType)) {
+            if (!promptDict.containsKey(this.modelType)) {
                 throw new IllegalArgumentException(
                     LoggerMessageFormat
                         .format(
@@ -106,7 +108,7 @@ public class CreateAlertTool implements Tool {
                         )
                 );
             }
-            this.toolPrompt = promptDict.get(modelType);
+            this.toolPrompt = promptDict.get(this.modelType);
         } else {
             this.toolPrompt = prompt;
         }

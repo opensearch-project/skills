@@ -159,16 +159,18 @@ public class CreateAlertToolTests {
 
     @Test
     public void testTool_WithNonSupportedModelType() {
-        Exception exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> CreateAlertTool.Factory
-                .getInstance()
-                .create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"))
-        );
-        assertEquals(
-            "Failed to find the right prompt for modelType: non_supported_modelType, this tool supports prompts for these models: [CLAUDE,OPENAI]",
-            exception.getMessage()
-        );
+        CreateAlertTool alertTool = CreateAlertTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"));
+        assertEquals("CLAUDE", alertTool.getModelType());
+    }
+
+    @Test
+    public void testTool_WithEmptyModelType() {
+        CreateAlertTool alertTool = CreateAlertTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "model_type", ""));
+        assertEquals("CLAUDE", alertTool.getModelType());
     }
 
     @Test
