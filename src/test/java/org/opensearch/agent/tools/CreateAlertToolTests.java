@@ -159,7 +159,9 @@ public class CreateAlertToolTests {
 
     @Test
     public void testTool_WithNonSupportedModelType() {
-        CreateAlertTool alertTool = CreateAlertTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"));
+        CreateAlertTool alertTool = CreateAlertTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "model_type", "non_supported_modelType"));
         assertEquals("CLAUDE", alertTool.getModelType());
     }
 
