@@ -147,8 +147,8 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240205'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.14.2'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.15.4")
-    testImplementation("net.bytebuddy:byte-buddy-agent:1.15.4")
+    testImplementation("net.bytebuddy:byte-buddy:1.15.10")
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.15.10")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
