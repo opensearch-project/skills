@@ -96,10 +96,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     public void testLogPatternToolWithSpecifiedPatternField() {
         JsonElement expected = gson
-            .fromJson(
-                "[{\"total count\":5,\"sample logs\":[{\"field1\":\"123\",\"field3\":12345,\"field2\":\"123.abc-AB * De /\"},{\"field1\":\"123\",\"field3\":12345,\"field2\":\"45.abc-AB * De /\"}],\"pattern\":\"\"}]",
-                JsonElement.class
-            );
+            .fromJson("[{\"total count\":5,\"sample logs\":[\"123\", \"123\"],\"pattern\":\"<*>\"}]", JsonElement.class);
         JsonElement result = gson
             .fromJson(
                 executeAgent(
@@ -188,6 +185,29 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
         );
         MatcherAssert
             .assertThat(exception.getMessage(), containsString("\"Invalid value -1 for parameter sample_log_size, it should be positive"));
+    }
+
+    @SneakyThrows
+    public void testLogPatternToolWithPPLInput() {
+        JsonElement expected = gson
+            .fromJson(
+                Files.readString(Path.of(this.getClass().getClassLoader().getResource(responseBodyResourceFile).toURI())),
+                JsonElement.class
+            );
+        JsonElement result = gson
+            .fromJson(
+                executeAgent(
+                    agentId,
+                    String
+                        .format(
+                            "{\"parameters\": {\"index\": \"%s\", \"ppl_input\": \"%s\"}}",
+                            TEST_PATTERN_INDEX_NAME,
+                            String.format("source=%s", TEST_PATTERN_INDEX_NAME)
+                        )
+                ),
+                JsonElement.class
+            );
+        assertEquals(expected, result);
     }
 
 }
