@@ -48,12 +48,9 @@ import lombok.extern.log4j.Log4j2;
 /**
  * This tool supports generating log patterns on the input dsl and index. It's implemented by
  * several steps:
- * 1. Retrival [[${DOC_SIZE_FIELD}]] logs from index
- * 2. Extract patterns for each retrieved log
- *  2.1 Find Pattern Field: If users provide parameter [[${PATTERN_FIELD}]], use it as the pattern
+ * 1. Retrival [[${DOC_SIZE_FIELD}]] logs from index by either dsl or ppl query
+ * 2. Extract patterns for each retrieved log: If users provide parameter [[${PATTERN_FIELD}]], use it as the pattern
  *      field; Otherwise, find the string field with the longest length on the first log.
- *  2.2 Extract Pattern: If users provide parameter [[${PATTERN}]], compile it as a pattern;
- *      Otherwise, use [[${DEFAULT_IGNORED_CHARS}]]. It will remove all chars matching the pattern.
  * 3. Group logs by their extracted patterns.
  * 4. Find top N patterns with the largest sample log size.
  * 5. For each found top N patterns, return [[${SAMPLE_LOG_SIZE}]] sample logs.
