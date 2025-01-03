@@ -8,6 +8,7 @@ package org.opensearch.agent.tools;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.security.AccessController;
+import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +16,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -27,6 +28,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.logging.LoggerMessageFormat;
+import org.opensearch.core.common.util.CollectionUtils;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.search.SearchHit;
@@ -36,8 +38,6 @@ import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.gson.reflect.TypeToken;
 
 import lombok.Builder;
@@ -49,7 +49,7 @@ import lombok.extern.log4j.Log4j2;
  * This tool supports generating log patterns on the input dsl and index. It's implemented by
  * several steps:
  * 1. Retrival [[${DOC_SIZE_FIELD}]] logs from index by either dsl or ppl query
- * 2. Extract patterns for each retrieved log: If users provide parameter [[${PATTERN_FIELD}]], use it as the pattern
+ * 2. Extract patterns for input logs: If users provide parameter [[${PATTERN_FIELD}]], use it as the pattern
  *      field; Otherwise, find the string field with the longest length on the first log.
  * 3. Group logs by their extracted patterns.
  * 4. Find top N patterns with the largest sample log size.
@@ -95,9 +95,9 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
-        String question = parameters.get(INPUT_FIELD);
+        String dsl = parameters.get(INPUT_FIELD);
         String ppl = parameters.get(PPL_FIELD);
-        if (!StringUtils.isBlank(question)) {
+        if (!StringUtils.isBlank(dsl)) {
             SearchRequest searchRequest;
             try {
                 searchRequest = buildSearchRequest(parameters);
@@ -110,24 +110,15 @@ public class LogPatternTool extends AbstractRetrieverTool {
             ActionListener<SearchResponse> actionListener = ActionListener.wrap(r -> {
                 SearchHit[] hits = r.getHits().getHits();
 
-                if (hits != null && hits.length > 0) {
+                if (!CollectionUtils.isEmpty(hits)) {
                     Map<String, Object> firstLogSource = hits[0].getSourceAsMap();
-                    String patternField = parameters.containsKey(PATTERN_FIELD)
-                        ? parameters.get(PATTERN_FIELD)
-                        : findLongestField(firstLogSource);
-                    validatePatternFieldAndFirstLogSource(parameters, patternField, firstLogSource);
 
-                    List<String> logMessages = Arrays.stream(hits).map(hit -> {
+                    Function<String, List<String>> logMessagesProvider = (String patternField) -> Arrays.stream(hits).map(hit -> {
                         Map<String, Object> source = hit.getSourceAsMap();
                         return (String) source.getOrDefault(patternField, "");
                     }).toList();
 
-                    List<Map<String, Object>> sortedEntries = getTopNLogPatterns(parameters, logMessages);
-
-                    listener
-                        .onResponse(
-                            (T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(sortedEntries))
-                        );
+                    onResponseSortedLogPatterns(parameters, listener, firstLogSource, logMessagesProvider);
                 } else {
                     listener.onResponse((T) "Can not get any match from search result.");
                 }
@@ -138,8 +129,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
             client.search(searchRequest, actionListener);
         } else if (!StringUtils.isBlank(ppl)) {
             String prunedPPL = removePPLAggregations(ppl);
-            JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", prunedPPL));
-            PPLQueryRequest pplQueryRequest = new PPLQueryRequest(prunedPPL, jsonContent, null, "jdbc");
+            PPLQueryRequest pplQueryRequest = new PPLQueryRequest(prunedPPL, null, null, "jdbc");
             TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
 
             ActionListener<TransportPPLQueryResponse> actionListener = ActionListener.wrap(r -> {
@@ -157,27 +147,15 @@ public class LogPatternTool extends AbstractRetrieverTool {
                         .filter(i -> schema.get(i) != null && !StringUtils.isBlank(schema.get(i).get(PPL_SCHEMA_NAME)))
                         .forEach(i -> firstLogSource.put(schema.get(i).get(PPL_SCHEMA_NAME), firstDataRow.get(i)));
 
-                    String patternField = parameters.containsKey(PATTERN_FIELD)
-                        ? parameters.get(PATTERN_FIELD)
-                        : findLongestField(firstLogSource);
-                    validatePatternFieldAndFirstLogSource(parameters, patternField, firstLogSource);
-
-                    List<String> logMessages = new ArrayList<>();
-                    Optional<Integer> fieldIndex = IntStream
+                    Function<String, List<String>> logMessagesProvider = (String patternField) -> IntStream
                         .range(0, schema.size())
                         .boxed()
                         .filter(i -> schema.get(i) != null && patternField.equals(schema.get(i).get(PPL_SCHEMA_NAME)))
-                        .findFirst();
-                    if (fieldIndex.isPresent()) {
-                        logMessages = dataRows.stream().map(dataRow -> (String) dataRow.get(fieldIndex.get())).toList();
-                    }
+                        .findFirst()
+                        .map(fieldIndex -> dataRows.stream().map(dataRow -> (String) dataRow.get(fieldIndex)).toList())
+                        .orElseGet(ArrayList::new);
 
-                    List<Map<String, Object>> sortedEntries = getTopNLogPatterns(parameters, logMessages);
-
-                    listener
-                        .onResponse(
-                            (T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(sortedEntries))
-                        );
+                    onResponseSortedLogPatterns(parameters, listener, firstLogSource, logMessagesProvider);
                 } else {
                     listener.onResponse((T) "Can not get any data row from ppl response.");
                 }
@@ -190,62 +168,6 @@ public class LogPatternTool extends AbstractRetrieverTool {
             Exception e = new IllegalArgumentException("Both DSL and PPL input is null or empty, can not process it.");
             log.error("Failed to find searchable query.", e);
             listener.onFailure(e);
-        }
-    }
-
-    List<Map<String, Object>> getTopNLogPatterns(Map<String, String> parameters, List<String> logMessages) {
-        int topNPattern = parameters.containsKey(TOP_N_PATTERN) ? getPositiveInteger(parameters, TOP_N_PATTERN) : this.topNPattern;
-        int sampleLogSize = parameters.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(parameters, SAMPLE_LOG_SIZE) : this.sampleLogSize;
-
-        Map<String, List<String>> logPatternMap = logParser.parseAllLogPatterns(logMessages, ImmutableList.of());
-
-        return logPatternMap
-            .entrySet()
-            .stream()
-            .sorted(Comparator.comparingInt(entry -> -entry.getValue().size()))
-            .limit(topNPattern)
-            .map(
-                entry -> Map
-                    .of(
-                        "total count",
-                        entry.getValue().size(),
-                        "pattern",
-                        entry.getKey(),
-                        "sample logs",
-                        entry
-                            .getValue()
-                            .subList(0, Math.min(entry.getValue().size(), sampleLogSize))
-                            .stream()
-                            .map(logId -> logMessages.get(Integer.parseInt(logId)))
-                            .toList()
-                    )
-            )
-            .toList();
-    }
-
-    void validatePatternFieldAndFirstLogSource(Map<String, String> parameters, String patternField, Map<String, Object> firstLogSource) {
-        if (patternField == null) {
-            throw new IllegalArgumentException("Pattern field is not set and this index doesn't contain any string field");
-        } else if (!firstLogSource.containsKey(patternField)) {
-            throw new IllegalArgumentException(
-                LoggerMessageFormat
-                    .format(
-                        null,
-                        "Invalid parameter pattern_field: index {} does not have a field named {}",
-                        parameters.getOrDefault(INDEX_FIELD, index),
-                        patternField
-                    )
-            );
-        } else if (!(firstLogSource.get(patternField) instanceof String)) {
-            throw new IllegalArgumentException(
-                LoggerMessageFormat
-                    .format(
-                        null,
-                        "Invalid parameter pattern_field: pattern field {} in index {} is not type of String",
-                        patternField,
-                        parameters.getOrDefault(INDEX_FIELD, index)
-                    )
-            );
         }
     }
 
@@ -289,6 +211,80 @@ public class LogPatternTool extends AbstractRetrieverTool {
             && !StringUtils.isBlank(parameters.get(INDEX_FIELD));
     }
 
+    private <T> void onResponseSortedLogPatterns(
+        Map<String, String> parameters,
+        ActionListener<T> listener,
+        Map<String, Object> firstLogSource,
+        Function<String, List<String>> logMessagesProvider
+    ) throws PrivilegedActionException {
+        String patternField = parameters.getOrDefault(PATTERN_FIELD, findLongestField(firstLogSource));
+        validatePatternFieldAndFirstLogSource(parameters, patternField, firstLogSource);
+        List<String> logMessages = logMessagesProvider.apply(patternField);
+        List<Map<String, Object>> sortedEntries = getTopNLogPatterns(parameters, logMessages);
+
+        listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(sortedEntries)));
+    }
+
+    private List<Map<String, Object>> getTopNLogPatterns(Map<String, String> parameters, List<String> logMessages) {
+        int topNPattern = parameters.containsKey(TOP_N_PATTERN) ? getPositiveInteger(parameters, TOP_N_PATTERN) : this.topNPattern;
+        int sampleLogSize = parameters.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(parameters, SAMPLE_LOG_SIZE) : this.sampleLogSize;
+
+        Map<String, List<String>> logPatternMap = logParser.parseAllLogPatterns(logMessages, List.of());
+
+        return logPatternMap
+            .entrySet()
+            .stream()
+            .sorted(Comparator.comparingInt(entry -> -entry.getValue().size()))
+            .limit(topNPattern)
+            .map(
+                entry -> Map
+                    .of(
+                        "total count",
+                        entry.getValue().size(),
+                        "pattern",
+                        entry.getKey(),
+                        "sample logs",
+                        entry
+                            .getValue()
+                            .subList(0, Math.min(entry.getValue().size(), sampleLogSize))
+                            .stream()
+                            .map(logId -> logMessages.get(Integer.parseInt(logId)))
+                            .toList()
+                    )
+            )
+            .toList();
+    }
+
+    private void validatePatternFieldAndFirstLogSource(
+        Map<String, String> parameters,
+        String patternField,
+        Map<String, Object> firstLogSource
+    ) {
+        if (patternField == null) {
+            throw new IllegalArgumentException("Pattern field is not set and this index doesn't contain any string field");
+        } else if (!firstLogSource.containsKey(patternField)) {
+            throw new IllegalArgumentException(
+                LoggerMessageFormat
+                    .format(
+                        null,
+                        "Invalid parameter pattern_field: index {} does not have a field named {}",
+                        parameters.getOrDefault(INDEX_FIELD, index),
+                        patternField
+                    )
+            );
+        } else if (!(firstLogSource.get(patternField) instanceof String)) {
+            throw new IllegalArgumentException(
+                LoggerMessageFormat
+                    .format(
+                        null,
+                        "Invalid parameter pattern_field: pattern field {} in index {} is not type of String",
+                        patternField,
+                        parameters.getOrDefault(INDEX_FIELD, index)
+                    )
+            );
+        }
+    }
+
     private String removeDSLAggregations(String dsl) {
         JSONObject dslObj = new JSONObject(dsl);
         // DSL request is a json blob. Aggregations usually have keys 'aggs' or 'aggregations'
@@ -301,16 +297,12 @@ public class LogPatternTool extends AbstractRetrieverTool {
         String normPPL = ppl.replaceAll("\\s+", " ");
         /*
          * Remove all following query starting with stats as they rely on aggregation results.
-         * We don't convert ppl string to upper or lower case because some enum parameters of functions are case-sensitive.
+         * We don't convert ppl string to lower case because some enum parameters of functions are case-sensitive.
          * i.e. TIMESTAMPADD(DAY, -1, '2025-01-01 00:00:00') is different from TIMESTAMPADD(day, -1, '2025-01-01 00:00:00')
          * The latter one is not parsed well by PPLService.
          */
-        int idx = Math
-            .min(
-                !normPPL.contains("| stats") ? Integer.MAX_VALUE : normPPL.indexOf("| stats"),
-                !normPPL.contains("| STATS") ? Integer.MAX_VALUE : normPPL.indexOf("| STATS")
-            );
-        return idx != Integer.MAX_VALUE ? normPPL.substring(0, idx).trim() : ppl;
+        int idx = normPPL.toUpperCase().indexOf("| STATS");
+        return idx != -1 ? normPPL.substring(0, idx).trim() : ppl;
     }
 
     private static int getPositiveInteger(Map<String, ?> params, String paramName) {
