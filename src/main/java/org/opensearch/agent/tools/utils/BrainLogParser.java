@@ -108,13 +108,13 @@ public class BrainLogParser {
         Map<Pattern, String> filterPatternVariableMap,
         List<String> delimiters
     ) {
+        if (thresholdPercentage < 0.0f || thresholdPercentage > 1.0f) {
+            throw new IllegalArgumentException("Threshold percentage must be between 0.0 and 1.0");
+        }
         this.tokenFreqMap = new HashMap<>();
         this.groupTokenSetMap = new HashMap<>();
         this.logIdGroupCandidateMap = new HashMap<>();
         this.variableCountThreshold = variableCountThreshold;
-        if (thresholdPercentage < 0.0f || thresholdPercentage > 1.0f) {
-            throw new IllegalArgumentException("Threshold percentage must be between 0.0 and 1.0");
-        }
         this.thresholdPercentage = thresholdPercentage;
         this.filterPatternVariableMap = filterPatternVariableMap;
         this.delimiters = delimiters;
@@ -190,10 +190,15 @@ public class BrainLogParser {
     public void calculateGroupTokenFreq(List<List<String>> preprocessedLogs) {
         for (List<String> tokens : preprocessedLogs) {
             Map<Long, Integer> wordOccurrences = this.getWordOccurrences(tokens);
-            List<Map.Entry<Long, Integer>> sortedOccurrences = this.getSortedWordCombinations(wordOccurrences);
-            Map.Entry<Long, Integer> candidate = this.findCandidate(sortedOccurrences);
-            String groupCandidateStr = String.format(Locale.ROOT, "%d,%d", candidate.getKey(), candidate.getValue());
-            this.logIdGroupCandidateMap.put(tokens.get(tokens.size() - 1), groupCandidateStr);
+            List<WordCombination> sortedWordCombinations = wordOccurrences
+                .entrySet()
+                .stream()
+                .map(entry -> new WordCombination(entry.getKey(), entry.getValue()))
+                .sorted()
+                .toList();
+            WordCombination candidate = this.findCandidate(sortedWordCombinations);
+            String groupCandidateStr = String.format(Locale.ROOT, "%d,%d", candidate.wordFreq(), candidate.sameFreqCount());
+            this.logIdGroupCandidateMap.put(tokens.getLast(), groupCandidateStr);
             this.updateGroupTokenFreqMap(tokens, groupCandidateStr);
         }
     }
@@ -204,7 +209,7 @@ public class BrainLogParser {
      * @return parsed log pattern that is a list of string
      */
     public List<String> parseLogPattern(List<String> tokens) {
-        String logId = tokens.get(tokens.size() - 1);
+        String logId = tokens.getLast();
         String groupCandidateStr = this.logIdGroupCandidateMap.get(logId);
         String[] groupCandidate = groupCandidateStr.split(",");
         Long repFreq = Long.parseLong(groupCandidate[0]); // representative frequency of the group
@@ -253,7 +258,7 @@ public class BrainLogParser {
         Map<String, List<String>> logPatternMap = new HashMap<>();
         for (int i = 0; i < processedMessages.size(); i++) {
             List<String> processedMessage = processedMessages.get(i);
-            String logId = logIds.isEmpty() ? String.valueOf(i) : processedMessage.get(processedMessage.size() - 1);
+            String logId = logIds.isEmpty() ? String.valueOf(i) : processedMessage.getLast();
             List<String> logPattern = this.parseLogPattern(processedMessages.get(i));
             String patternKey = String.join(" ", logPattern);
             logPatternMap.computeIfAbsent(patternKey, k -> new ArrayList<>()).add(logId);
@@ -295,35 +300,19 @@ public class BrainLogParser {
         return occurrences;
     }
 
-    private List<Map.Entry<Long, Integer>> getSortedWordCombinations(Map<Long, Integer> occurrences) {
-        List<Map.Entry<Long, Integer>> sortedOccurrences = new ArrayList<>(occurrences.entrySet());
-        sortedOccurrences.sort((entry1, entry2) -> {
-            // Sort by length of the word combination in descending order
-            int wordCombinationLengthComparison = entry2.getValue().compareTo(entry1.getValue());
-            if (wordCombinationLengthComparison != 0) {
-                return wordCombinationLengthComparison;
-            } else {
-                // If the length of word combinations are the same, sort frequency in descending order
-                return entry2.getKey().compareTo(entry1.getKey());
-            }
-        });
-
-        return sortedOccurrences;
-    }
-
-    private Map.Entry<Long, Integer> findCandidate(List<Map.Entry<Long, Integer>> sortedWordCombinations) {
+    private WordCombination findCandidate(List<WordCombination> sortedWordCombinations) {
         if (sortedWordCombinations.isEmpty()) {
             throw new IllegalArgumentException("Sorted word combinations must be non empty");
         }
-        OptionalLong maxFreqOptional = sortedWordCombinations.stream().mapToLong(Map.Entry::getKey).max();
+        OptionalLong maxFreqOptional = sortedWordCombinations.stream().mapToLong(WordCombination::wordFreq).max();
         long maxFreq = maxFreqOptional.getAsLong();
         float threshold = maxFreq * this.thresholdPercentage;
-        for (Map.Entry<Long, Integer> entry : sortedWordCombinations) {
-            if (entry.getKey() > threshold) {
-                return entry;
+        for (WordCombination wordCombination : sortedWordCombinations) {
+            if (wordCombination.wordFreq() > threshold) {
+                return wordCombination;
             }
         }
-        return sortedWordCombinations.get(0);
+        return sortedWordCombinations.getFirst();
     }
 
     private void updateGroupTokenFreqMap(List<String> tokens, String groupCandidateStr) {
@@ -331,6 +320,21 @@ public class BrainLogParser {
         for (int i = 0; i < tokensLen; i++) {
             String groupTokenFreqKey = String.format(Locale.ROOT, GROUP_TOKEN_SET_KEY_FORMAT, tokensLen, groupCandidateStr, i);
             this.groupTokenSetMap.computeIfAbsent(groupTokenFreqKey, k -> new HashSet<>()).add(tokens.get(i));
+        }
+    }
+
+    private record WordCombination(Long wordFreq, Integer sameFreqCount) implements Comparable<WordCombination> {
+
+        @Override
+        public int compareTo(WordCombination other) {
+            // Compare by same frequency count in descending order
+            int wordFreqComparison = other.sameFreqCount.compareTo(this.sameFreqCount);
+            if (wordFreqComparison != 0) {
+                return wordFreqComparison;
+            }
+
+            // If sameFreqCount are the same, compare by wordFreq in descending order
+            return other.wordFreq.compareTo(this.wordFreq);
         }
     }
 }

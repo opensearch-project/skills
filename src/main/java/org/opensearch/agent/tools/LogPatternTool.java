@@ -139,8 +139,8 @@ public class LogPatternTool extends AbstractRetrieverTool {
                 List<Map<String, String>> schema = (List<Map<String, String>>) pplResult.getOrDefault("schema", new ArrayList<>());
                 List<List<Object>> dataRows = (List<List<Object>>) pplResult.getOrDefault("datarows", new ArrayList<>());
                 List<Object> firstDataRow = dataRows.isEmpty() ? new ArrayList<>() : dataRows.getFirst();
-                Map<String, Object> firstLogSource = new HashMap<>();
                 if (!firstDataRow.isEmpty()) {
+                    Map<String, Object> firstLogSource = new HashMap<>();
                     IntStream
                         .range(0, schema.size())
                         .boxed()
@@ -297,7 +297,8 @@ public class LogPatternTool extends AbstractRetrieverTool {
         String normPPL = ppl.replaceAll("\\s+", " ");
         /*
          * Remove all following query starting with stats as they rely on aggregation results.
-         * We don't convert ppl string to lower case because some enum parameters of functions are case-sensitive.
+         * We don't convert ppl string to lower case or upper case and directly use converted ppl
+         * because some enum parameters of functions are case-sensitive.
          * i.e. TIMESTAMPADD(DAY, -1, '2025-01-01 00:00:00') is different from TIMESTAMPADD(day, -1, '2025-01-01 00:00:00')
          * The latter one is not parsed well by PPLService.
          */
