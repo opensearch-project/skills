@@ -12,7 +12,9 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.spark.sql.catalyst.parser.DataTypeParser;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
@@ -34,6 +37,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.common.blobstore.transfer.stream.OffsetRangeIndexInputStream;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.query.MatchAllQueryBuilder;
@@ -48,6 +52,8 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.search.SearchHit;
+import org.apache.spark.sql.types.*;
+import org.apache.spark.unused.UnusedStubClass;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
@@ -397,55 +403,67 @@ public class PPLTool implements Tool {
         }
     }
 
-    private void extractLeafValues(String prefix, Map<String, Object> values, Map<String, Object> fieldToValue, Set<String> objectFields, Map<String, String> fieldToType) throws PrivilegedActionException {
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            if (fieldToType.containsKey(prefix + "." + key)){
-                fieldToValue.put(prefix + "." + key, AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(value)));
-            } else if (objectFields.contains(prefix + "." + key)) {
-                extractLeafValues(prefix + "." + key, values, fieldToValue, objectFields, fieldToType);
+    private void extractS3FieldToType(String prefix, Map<String, Object> structMap, Map<String, String> fieldToType){
+        String type = (String) structMap.get("type");
+
+        if (StringUtils.equals(type, "array")) {
+            extractS3FieldToType(prefix, (Map<String, Object>) structMap.get("elementType"), fieldToType);
+            return ;
+        }
+        if (!StringUtils.equals(type, "struct")) {
+            fieldToType.put(prefix, type);
+            return ;
+        }
+        List<Map<String, Object>> fields = (List<Map<String, Object>>) structMap.get("fields");
+        for (Map<String, Object> field : fields) {
+            Object currentType = field.get("type");
+            if (currentType instanceof String) {
+                fieldToType.put(prefix + "." + field.get("name"), (String) currentType);
+            } else if (currentType instanceof Map<?,?>) {
+                extractS3FieldToType(prefix + "." + field.get("name"), (Map<String, Object>) currentType, fieldToType);
             }
         }
+
+    }
+
+    private  void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) {
+        StructType structType = (StructType) DataType.fromDDL(schema);
+        Map<String, Object> map = gson.fromJson(structType.json(), Map.class);
+        extractS3FieldToType(prefix, map, fieldToType);
+
     }
 
     private String constructTableInfoByPPLResult(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException{
-        List<Object> schemaResults = (List<Object>) schema.get("datarows");
-        Set<String> objectFields = new HashSet<>();
-        Map<String, String> fieldToType = new HashMap<>();
-        for (Object fieldAttribute: schemaResults) {
-            List<Object> fieldAttributes = (List<Object>) fieldAttribute;
-            String fieldName = fieldAttributes.get(0).toString();
-            String fieldType = fieldAttributes.get(1).toString();
-            System.out.println(fieldType);
-            if (Objects.equals(fieldType, "object")) {
-                objectFields.add(fieldName);
-            } else {
-                fieldToType.put(fieldName, fieldType);
+        Map<String, String> fieldsToType = new HashMap<>();
+        Map<String, Object> fieldsToSample = new HashMap<>();
+        for (Map.Entry<String, Object> entry : schema.entrySet()){
+            String key = entry.getKey();
+            String value = entry.getValue().toString();
+            if (ALLOWED_FIELDS_TYPE.contains(value)) {
+                fieldsToType.put(key, value);
+                fieldsToSample.put(key, samples.getOrDefault(key, null));
+            }
+            else if (value.toLowerCase(Locale.ROOT).contains("struct")){
+                extractS3Types((String) schema.get(key), key, fieldsToType);
             }
         }
-        Map<String, Object> fieldToSample = new HashMap<>();
-        List<Object> sampleNames = (List<Object>) samples.get("schema");
-        List<Object> sampleValues = (List<Object>) ((List<Object>) samples.get("datarows")).get(0);
-        for (int i=0; i<sampleNames.size(); i++) {
-            String name = ((Map<String, String>)sampleNames.get(i)).get("name");
-            Object value = sampleValues.get(i);
-            if (fieldToType.containsKey(name)) {
-                fieldToSample.put(name, AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(value)));
-            } else if (objectFields.contains(name) && value!=null) {
-                extractLeafValues(name, (Map<String, Object>) value, fieldToSample, objectFields, fieldToType);
-            }
-        }
+        log.info(fieldsToType);
+        log.info(fieldsToSample);
+        List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
+        Collections.sort(sortedKeys);
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
-        for (String key : fieldToType.keySet()) {
-            String line;
-            if (fieldToSample.containsKey(key)) {
-                line = "- " + key + ": " + fieldToType.get(key) + " (" + fieldToSample.getOrDefault(key, "") + ")"; }
-            else {
-                line =  "- " + key + ": " + fieldToType.get(key) ;
+        for (String key : sortedKeys) {
+            String line = "";
+            if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
+                line = "- " + key + ": " + fieldsToType.get(key);
+
+            }
+            if (samples.containsKey(key)) {
+                line += " (" + fieldsToSample.get(key) + ")";
             }
             tableInfoJoiner.add(line);
         }
+        log.info(tableInfoJoiner.toString());
         return tableInfoJoiner.toString();
 
 
@@ -587,6 +605,7 @@ public class PPLTool implements Tool {
                 ppl = ppl + " | head " + this.head;
             }
         }
+
         return ppl;
     }
 
