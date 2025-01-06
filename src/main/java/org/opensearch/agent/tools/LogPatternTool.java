@@ -229,7 +229,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
         int topNPattern = parameters.containsKey(TOP_N_PATTERN) ? getPositiveInteger(parameters, TOP_N_PATTERN) : this.topNPattern;
         int sampleLogSize = parameters.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(parameters, SAMPLE_LOG_SIZE) : this.sampleLogSize;
 
-        Map<String, List<String>> logPatternMap = logParser.parseAllLogPatterns(logMessages, List.of());
+        Map<String, List<String>> logPatternMap = logParser.parseAllLogPatterns(logMessages);
 
         return logPatternMap
             .entrySet()

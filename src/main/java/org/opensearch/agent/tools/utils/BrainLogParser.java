@@ -161,15 +161,13 @@ public class BrainLogParser {
      * Preprocess all lines of log messages with logId list. Empty logId list is allowed as the index within
      * the list will be logId by default
      * @param logMessages list of log messages
-     * @param logIds list of logIds corresponded to log message
      * @return list of token lists
      */
-    public List<List<String>> preprocessAllLogs(List<String> logMessages, List<String> logIds) {
+    public List<List<String>> preprocessAllLogs(List<String> logMessages) {
         List<List<String>> preprocessedLogs = new ArrayList<>();
-        int size = logIds.isEmpty() ? logMessages.size() : Math.min(logMessages.size(), logIds.size());
 
-        for (int i = 0; i < size; i++) {
-            String logId = logIds.isEmpty() ? String.valueOf(i) : logIds.get(i);
+        for (int i = 0; i < logMessages.size(); i++) {
+            String logId = String.valueOf(i);
             List<String> tokens = this.preprocess(logMessages.get(i), logId);
             preprocessedLogs.add(tokens);
             this.processTokenHistogram(tokens);
@@ -247,19 +245,17 @@ public class BrainLogParser {
     /**
      * Parse all lines of log messages to generate the log pattern map.
      * @param logMessages all lines of log messages
-     * @param logIds corresponding logIds for all lines of log messages
      * @return log pattern map with log pattern string as key, grouped logIds as value
      */
-    public Map<String, List<String>> parseAllLogPatterns(List<String> logMessages, List<String> logIds) {
-        List<List<String>> processedMessages = this.preprocessAllLogs(logMessages, logIds);
+    public Map<String, List<String>> parseAllLogPatterns(List<String> logMessages) {
+        List<List<String>> processedMessages = this.preprocessAllLogs(logMessages);
 
         this.calculateGroupTokenFreq(processedMessages);
 
         Map<String, List<String>> logPatternMap = new HashMap<>();
-        for (int i = 0; i < processedMessages.size(); i++) {
-            List<String> processedMessage = processedMessages.get(i);
-            String logId = logIds.isEmpty() ? String.valueOf(i) : processedMessage.getLast();
-            List<String> logPattern = this.parseLogPattern(processedMessages.get(i));
+        for (List<String> processedMessage : processedMessages) {
+            String logId = processedMessage.getLast();
+            List<String> logPattern = this.parseLogPattern(processedMessage);
             String patternKey = String.join(" ", logPattern);
             logPatternMap.computeIfAbsent(patternKey, k -> new ArrayList<>()).add(logId);
         }

@@ -85,13 +85,12 @@ public class BrainLogParserTests extends OpenSearchTestCase {
 
     public void testPreprocessAllLogs() {
         List<String> logMessages = Arrays.asList("127.0.0.1 - 1234 something", "192.168.0.1 - 5678 something_else");
-        List<String> logIds = Arrays.asList("log1", "log2");
 
-        List<List<String>> result = parser.preprocessAllLogs(logMessages, logIds);
+        List<List<String>> result = parser.preprocessAllLogs(logMessages);
 
         assertEquals(2, result.size());
-        assertEquals(Arrays.asList("<*IP*>", "-", "<*>", "something", "log1"), result.get(0));
-        assertEquals(Arrays.asList("<*IP*>", "-", "<*>", "something_else", "log2"), result.get(1));
+        assertEquals(Arrays.asList("<*IP*>", "-", "<*>", "something", "0"), result.get(0));
+        assertEquals(Arrays.asList("<*IP*>", "-", "<*>", "something_else", "1"), result.get(1));
     }
 
     public void testProcessTokenHistogram() {
@@ -111,9 +110,9 @@ public class BrainLogParserTests extends OpenSearchTestCase {
     public void testCalculateGroupTokenFreq() {
         List<String> logMessages = Arrays
             .asList("127.0.0.1 - 1234 something", "192.168.0.1:5678 something_else", "0.0.0.0:42 something_else");
-        List<String> logIds = Arrays.asList("log1", "log2", "log3");
+        List<String> logIds = Arrays.asList("0", "1", "2");
 
-        List<List<String>> preprocessedLogs = parser.preprocessAllLogs(logMessages, logIds);
+        List<List<String>> preprocessedLogs = parser.preprocessAllLogs(logMessages);
         parser.calculateGroupTokenFreq(preprocessedLogs);
 
         for (String logId : logIds) {
@@ -122,7 +121,7 @@ public class BrainLogParserTests extends OpenSearchTestCase {
         }
         assertTrue(parser.getGroupTokenSetMap().containsValue(Set.of("something")));
         assertTrue(parser.getGroupTokenSetMap().containsValue(Set.of("something_else")));
-        String sampleGroupTokenKey = String.format(Locale.ROOT, "%d-%s-%d", 4, parser.getLogIdGroupCandidateMap().get("log1"), 3);
+        String sampleGroupTokenKey = String.format(Locale.ROOT, "%d-%s-%d", 4, parser.getLogIdGroupCandidateMap().get("0"), 3);
         assertTrue(parser.getGroupTokenSetMap().get(sampleGroupTokenKey).contains("something"));
     }
 
@@ -134,7 +133,7 @@ public class BrainLogParserTests extends OpenSearchTestCase {
     }
 
     public void testParseLogPattern() {
-        List<List<String>> preprocessedLogs = parser.preprocessAllLogs(TEST_HDFS_LOGS, List.of());
+        List<List<String>> preprocessedLogs = parser.preprocessAllLogs(TEST_HDFS_LOGS);
         parser.calculateGroupTokenFreq(preprocessedLogs);
 
         List<String> expectedLogPattern = Arrays
@@ -156,7 +155,7 @@ public class BrainLogParserTests extends OpenSearchTestCase {
     }
 
     public void testParseAllLogPatterns() {
-        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(TEST_HDFS_LOGS, List.of());
+        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(TEST_HDFS_LOGS);
 
         Map<String, Integer> expectedResult = Map
             .of(
@@ -188,7 +187,7 @@ public class BrainLogParserTests extends OpenSearchTestCase {
             );
 
         Map<String, List<String>> expectedResult = Map.of("Verification succeeded <*> blk_<*>", Arrays.asList("0", "1", "2", "3"));
-        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(logMessages, List.of());
+        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(logMessages);
         assertEquals(expectedResult, logPatternMap);
         /*
          * 'a', 'b', 'c' and 'd' token is on the 3rd position in the group 2,3, their frequency is lower than
@@ -212,7 +211,7 @@ public class BrainLogParserTests extends OpenSearchTestCase {
 
         Map<String, List<String>> expectedResult = Map
             .of("<*> succeeded for blk_<*>", Arrays.asList("0", "1", "2"), "Verification", Arrays.asList("3", "4"));
-        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(logMessages, List.of());
+        Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(logMessages);
         assertEquals(expectedResult, logPatternMap);
         /*
          * 'Verification' and 'Test' token is on the 1st position in the group 3,3, 'Verification' frequency is higher than
