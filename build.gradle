@@ -25,7 +25,7 @@ buildscript {
             opensearch_build += "-SNAPSHOT"
         }
         opensearch_no_snapshot = opensearch_build.replace("-SNAPSHOT","")
-    
+
         kotlin_version = System.getProperty("kotlin.version", "1.8.21")
     }
 
@@ -46,6 +46,7 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0'
     id "io.freefair.lombok" version "8.10.2"
     id "de.undercouch.download" version "5.6.0"
+    //id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 lombok {
@@ -92,6 +93,8 @@ configurations {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
+            exclude group: 'org.apache.logging.log4j', module: 'log4j-core'
+            exclude group: 'org.apache.logging.log4j', module: 'log4j-slf4j-impl'
         }
     }
 }
@@ -115,14 +118,62 @@ task addJarsToClasspath(type: Copy) {
     into("$buildDir/classes")
 }
 
+/*
+shadowJar {
+    // Include only Spark dependencies
+    dependencies {
+        include(dependency('org.apache.spark:spark-core_2.10'))
+        include(dependency('org.apache.spark:spark-sql-api_2.13'))
+        include(dependency("org.apache.spark:spark-common-utils_2.13:3.5.4"))
+        //include(dependency("org.apache.spark:spark-streaming_2.13:3.5.4"))
+        //include(dependency("org.apache.spark:spark-unsafe_2.13:3.5.4"))
+        //include(dependency("org.apache.spark:spark-launcher_2.13:3.5.4"))
+        //include(dependency("org.apache.spark:spark-network-common_2.13:3.5.4"))
+
+    }
+
+    // Exclude your project's classes and all other transitive dependencies
+    exclude('org/opensearch/**') // Exclude OpenSearch-related classes
+    exclude('META-INF/**') // Exclude metadata files
+    exclude('org/apache/spark/unused/UnusedStubClass.class') // Exclude specific class causing conflicts
+
+    // Prevent inclusion of other dependencies
+    configurations = [project.configurations.runtimeClasspath]
+
+    // Set archive name and destination
+    archiveBaseName.set('spark-only-shadow')
+    destinationDirectory.set(file("$buildDir/libs"))
+}
+*/
+
+
+
 dependencies {
     // 3P dependencies
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
     compileOnly group: 'org.json', name: 'json', version: '20240303'
     compileOnly("com.google.guava:guava:33.2.1-jre")
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
+
+    //implementation 'org.apache.spark:spark-sql-api_2.13:3.5.4'
+    //implementation 'org.apache.spark:spark-core_2.10:1.6.2'
+    //implementation("org.apache.spark:spark-unsafe_2.13:3.5.4")
+    //implementation group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
+    //implementation("org.apache.spark:spark-launcher_2.13:3.5.4")
+    //implementation("org.apache.spark:spark-network-common_2.13:3.5.4")
+
+    compileOnly group: 'org.apache.spark', name: 'spark-streaming_2.13', version: '3.5.4'
+
+    implementation 'org.scala-lang:scala-library:2.13.15'
+    implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
+    implementation("org.json4s:json4s-ast_2.13:3.7.0-M11")
+    implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
+    implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
+    implementation("com.thoughtworks.paranamer:paranamer:2.8")
+    implementation files("/Users/xinyual/toolRepo/skills/build/libs/spark-only-shadow-3.0.0.0-SNAPSHOT.jar")
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"

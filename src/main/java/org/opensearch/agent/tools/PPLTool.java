@@ -53,7 +53,7 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.search.SearchHit;
 import org.apache.spark.sql.types.*;
-import org.apache.spark.unused.UnusedStubClass;
+import org.apache.spark.sql.catalyst.parser.AbstractParser;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
@@ -108,6 +108,8 @@ public class PPLTool implements Tool {
 
     private static Set<String> ALLOWED_FIELDS_TYPE;
 
+    private static Map<String, String> ALLOWED_FIELD_TYPE_FOR_S3;
+
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
                                                // https://github.com/opensearch-project/sql/blob/2.x/docs/user/ppl/general/datatypes.rst#data-types-mapping
@@ -130,6 +132,12 @@ public class PPLTool implements Tool {
         ALLOWED_FIELDS_TYPE.add("object");
         ALLOWED_FIELDS_TYPE.add("nested");
         ALLOWED_FIELDS_TYPE.add("geo_point");
+
+        ALLOWED_FIELD_TYPE_FOR_S3 = new HashMap<>();
+        ALLOWED_FIELD_TYPE_FOR_S3.put("string", "text");
+        ALLOWED_FIELD_TYPE_FOR_S3.put("timestamp", "date");
+        ALLOWED_FIELD_TYPE_FOR_S3.put("int", "integer");
+        ALLOWED_FIELD_TYPE_FOR_S3.put("double", "double");
 
         DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
     }
@@ -257,9 +265,10 @@ public class PPLTool implements Tool {
                 );
         if (parameters.containsKey("schema") && parameters.containsKey("samples") && Objects.equals(parameters.getOrDefault("type", ""), "s3")) {
             Map<String, Object> schema = gson.fromJson(parameters.get("schema"), Map.class);
-            Map<String, Object> samples = gson.fromJson(parameters.get("samples"), Map.class);
+            //Map<String, Object> samples = gson.fromJson(parameters.get("samples"), Map.class);
+            List<Object> samples = gson.fromJson(parameters.get("samples"), List.class);
             try {
-                String tableInfo = constructTableInfoByPPLResult(schema, samples);
+                String tableInfo = constructTableInfoByPPLResult(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
                 actionsAfterTableinfo.onResponse(tableInfo);
             } catch (Exception e) {
                 log.info("fail to get table info for s3");
@@ -418,7 +427,11 @@ public class PPLTool implements Tool {
         for (Map<String, Object> field : fields) {
             Object currentType = field.get("type");
             if (currentType instanceof String) {
-                fieldToType.put(prefix + "." + field.get("name"), (String) currentType);
+                if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(currentType)){
+                    currentType = ALLOWED_FIELD_TYPE_FOR_S3.get(currentType);
+                }
+                if (ALLOWED_FIELDS_TYPE.contains(currentType)) {
+                fieldToType.put(prefix + "." + field.get("name"), (String) currentType); }
             } else if (currentType instanceof Map<?,?>) {
                 extractS3FieldToType(prefix + "." + field.get("name"), (Map<String, Object>) currentType, fieldToType);
             }
@@ -426,27 +439,34 @@ public class PPLTool implements Tool {
 
     }
 
-    private  void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) {
-        StructType structType = (StructType) DataType.fromDDL(schema);
+    private  void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) throws PrivilegedActionException {
+        System.out.println(schema);
+        DataType structType = AccessController.doPrivileged((PrivilegedExceptionAction<DataType>) () -> DataType.fromDDL(schema));
+        System.out.println(structType);
         Map<String, Object> map = gson.fromJson(structType.json(), Map.class);
         extractS3FieldToType(prefix, map, fieldToType);
-
     }
 
     private String constructTableInfoByPPLResult(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException{
         Map<String, String> fieldsToType = new HashMap<>();
-        Map<String, Object> fieldsToSample = new HashMap<>();
         for (Map.Entry<String, Object> entry : schema.entrySet()){
             String key = entry.getKey();
             String value = entry.getValue().toString();
+            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(value)){
+                value = ALLOWED_FIELD_TYPE_FOR_S3.get(value);
+            }
             if (ALLOWED_FIELDS_TYPE.contains(value)) {
                 fieldsToType.put(key, value);
-                fieldsToSample.put(key, samples.getOrDefault(key, null));
             }
-            else if (value.toLowerCase(Locale.ROOT).contains("struct")){
+            else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
                 extractS3Types((String) schema.get(key), key, fieldsToType);
             }
         }
+        Map<String, String> fieldsToSample = new HashMap<>();
+        for (String key : fieldsToType.keySet()) {
+            fieldsToSample.put(key, "");
+        }
+        extractSamples(samples, fieldsToSample, "");
         log.info(fieldsToType);
         log.info(fieldsToSample);
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
@@ -456,9 +476,11 @@ public class PPLTool implements Tool {
             String line = "";
             if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
                 line = "- " + key + ": " + fieldsToType.get(key);
-
             }
-            if (samples.containsKey(key)) {
+            //log.info(key);
+            //log.info(fieldsToSample.containsKey(key));
+
+            if (fieldsToSample.containsKey(key)) {
                 line += " (" + fieldsToSample.get(key) + ")";
             }
             tableInfoJoiner.add(line);
@@ -526,14 +548,19 @@ public class PPLTool implements Tool {
         for (Map.Entry<String, Object> entry : sampleSource.entrySet()) {
             String p = entry.getKey();
             Object v = entry.getValue();
+            while (v instanceof List<?>){
+                v = ((List<?>) v).get(0);
+            }
 
             String fullKey = prefix + p;
             if (fieldsToSample.containsKey(fullKey)) {
-                fieldsToSample.put(fullKey, AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(v)));
+                Object finalV = v;
+                fieldsToSample.put(fullKey, AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(finalV)));
             } else {
                 if (v instanceof Map) {
                     extractSamples((Map<String, Object>) v, fieldsToSample, fullKey);
                 }
+
             }
         }
     }
@@ -615,6 +642,16 @@ public class PPLTool implements Tool {
             indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
         }
         return indexName.trim();
+    }
+
+    private Map<String, Object> transferS3SchemaFormat(Map<String, Object> originalSchema) {
+        Map<String, Object> newSchema = new HashMap<>();
+        for (Map.Entry<String, Object> entry : originalSchema.entrySet()) {
+            String key = entry.getKey();
+            Map<String, Object> value = (Map<String, Object>) entry.getValue();
+            newSchema.put(key, value.get("data_type"));
+        }
+        return newSchema;
     }
 
     @SuppressWarnings("unchecked")
