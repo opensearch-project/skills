@@ -66,7 +66,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
     public static final String TOP_N_PATTERN = "top_n_pattern";
     public static final String SAMPLE_LOG_SIZE = "sample_log_size";
     public static final String PATTERN_FIELD = "pattern_field";
-    public static final String PPL_FIELD = "ppl_input";
+    public static final String PPL_FIELD = "ppl";
     public static final int LOG_PATTERN_DEFAULT_DOC_SIZE = 1000;
     public static final int DEFAULT_TOP_N_PATTERN = 3;
     public static final int DEFAULT_SAMPLE_LOG_SIZE = 20;
@@ -204,11 +204,11 @@ public class LogPatternTool extends AbstractRetrieverTool {
 
     @Override
     public boolean validate(Map<String, String> parameters) {
-        // LogPatternTool needs to pass index and either dsl input or ppl as parameter in runtime.
+        // LogPatternTool needs to pass dsl input with index or ppl as parameter in runtime.
         return parameters != null
             && !parameters.isEmpty()
-            && (!StringUtils.isBlank(parameters.get(INPUT_FIELD)) || !StringUtils.isBlank(parameters.get(PPL_FIELD)))
-            && !StringUtils.isBlank(parameters.get(INDEX_FIELD));
+            && ((!StringUtils.isBlank(parameters.get(INPUT_FIELD)) && !StringUtils.isBlank(parameters.get(INDEX_FIELD)))
+                || !StringUtils.isBlank(parameters.get(PPL_FIELD)));
     }
 
     private <T> void onResponseSortedLogPatterns(

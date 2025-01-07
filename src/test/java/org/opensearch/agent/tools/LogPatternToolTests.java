@@ -386,7 +386,7 @@ public class LogPatternToolTests {
             );
         tool
             .run(
-                ImmutableMap.of("index", "index_name", "ppl_input", "source"),
+                ImmutableMap.of(INDEX_FIELD, "index_name", PPL_FIELD, "source"),
                 ActionListener
                     .<String>wrap(
                         response -> assertEquals(expected, gson.fromJson(response, JsonElement.class)),
@@ -412,7 +412,7 @@ public class LogPatternToolTests {
 
         tool
             .run(
-                ImmutableMap.of("index", "index_name", "ppl_input", "source"),
+                ImmutableMap.of(INDEX_FIELD, "index_name", PPL_FIELD, "source"),
                 ActionListener
                     .<String>wrap(
                         response -> assertEquals("Can not get any data row from ppl response.", response),
@@ -434,7 +434,7 @@ public class LogPatternToolTests {
         LogPatternTool tool = LogPatternTool.Factory.getInstance().create(params);
         tool
             .run(
-                ImmutableMap.of("index", "index_name", "ppl_input", "source"),
+                ImmutableMap.of(INDEX_FIELD, "index_name", PPL_FIELD, "source"),
                 ActionListener.<String>wrap(response -> fail(), e -> assertEquals(pplFailureMessage, e.getMessage()))
             );
     }

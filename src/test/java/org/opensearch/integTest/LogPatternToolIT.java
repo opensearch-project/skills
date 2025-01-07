@@ -200,7 +200,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
                     agentId,
                     String
                         .format(
-                            "{\"parameters\": {\"index\": \"%s\", \"ppl_input\": \"%s\"}}",
+                            "{\"parameters\": {\"index\": \"%s\", \"ppl\": \"%s\"}}",
                             TEST_PATTERN_INDEX_NAME,
                             String.format("source=%s", TEST_PATTERN_INDEX_NAME)
                         )
