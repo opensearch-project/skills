@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.containsString;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 import org.hamcrest.MatcherAssert;
 import org.junit.After;
@@ -86,7 +87,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
             .fromJson(
                 executeAgent(
                     agentId,
-                    String.format("{\"parameters\": {\"index\": \"%s\", \"input\": \"%s\"}}", TEST_PATTERN_INDEX_NAME, "{}")
+                    String.format(Locale.ROOT, "{\"parameters\": {\"index\": \"%s\", \"input\": \"%s\"}}", TEST_PATTERN_INDEX_NAME, "{}")
                 ),
                 JsonElement.class
             );
@@ -202,7 +203,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
                         .format(
                             "{\"parameters\": {\"index\": \"%s\", \"ppl\": \"%s\"}}",
                             TEST_PATTERN_INDEX_NAME,
-                            String.format("source=%s", TEST_PATTERN_INDEX_NAME)
+                            String.format(Locale.ROOT, "source=%s", TEST_PATTERN_INDEX_NAME)
                         )
                 ),
                 JsonElement.class

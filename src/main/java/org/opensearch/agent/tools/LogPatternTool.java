@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -302,7 +303,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
          * i.e. TIMESTAMPADD(DAY, -1, '2025-01-01 00:00:00') is different from TIMESTAMPADD(day, -1, '2025-01-01 00:00:00')
          * The latter one is not parsed well by PPLService.
          */
-        int idx = normPPL.toUpperCase().indexOf("| STATS");
+        int idx = normPPL.toUpperCase(Locale.ROOT).indexOf("| STATS");
         return idx != -1 ? normPPL.substring(0, idx).trim() : ppl;
     }
 
