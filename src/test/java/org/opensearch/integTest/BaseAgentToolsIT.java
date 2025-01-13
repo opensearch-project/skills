@@ -49,6 +49,7 @@ import com.google.gson.Gson;
 
 import lombok.SneakyThrows;
 
+
 public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     public static final Gson gson = new Gson();
     private static final int MAX_TASK_RESULT_QUERY_TIME_IN_SECOND = 60 * 5;
@@ -90,8 +91,10 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     private Map<String, Object> parseResponseToMap(Response response) {
+        String responseBody= EntityUtils.toString(response.getEntity());
+        logger.info("responseBody: {}", responseBody);
         Map<String, Object> responseInMap = XContentHelper
-            .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
+            .convertToMap(XContentType.JSON.xContent(), responseBody, false);
         return responseInMap;
     }
 
