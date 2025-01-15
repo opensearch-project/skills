@@ -158,12 +158,8 @@ dependencies {
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
 
-    //implementation 'org.apache.spark:spark-sql-api_2.13:3.5.4'
-    //implementation 'org.apache.spark:spark-core_2.10:1.6.2'
-    //implementation("org.apache.spark:spark-unsafe_2.13:3.5.4")
-    //implementation group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
-    //implementation("org.apache.spark:spark-launcher_2.13:3.5.4")
-    //implementation("org.apache.spark:spark-network-common_2.13:3.5.4")
+    implementation 'org.apache.spark:spark-sql-api_2.13:3.5.4'
+    implementation 'org.apache.spark:spark-core_2.13:3.5.4'
 
     compileOnly group: 'org.apache.spark', name: 'spark-streaming_2.13', version: '3.5.4'
 
@@ -173,7 +169,6 @@ dependencies {
     implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
-    implementation files("/Users/xinyual/toolRepo/skills/build/libs/spark-only-shadow-3.0.0.0-SNAPSHOT.jar")
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
@@ -343,6 +338,81 @@ allprojects {
     }
 }
 
+
+tasks.register("postAssembleAdjustments") {
+    // This task should run after assemble finishes
+    dependsOn("assemble")
+
+    doLast {
+        // Path to the ZIP built by the assemble task
+        def originalZip = file("$buildDir/distributions/opensearch-skills-${opensearch_build}.zip")
+
+        if (!originalZip.exists()) {
+            throw new GradleException("Expected ZIP not found: $originalZip")
+        }
+
+        // 1. Create a temp directory
+        def tempDir = file("$buildDir/tmp/postAssemble")
+        delete(tempDir)  // Clean out any old data
+        tempDir.mkdirs()
+
+        // 2. Unzip the original bundle
+        copy {
+            from zipTree(originalZip)
+            into tempDir
+        }
+
+        // 3. Let's say you have A.jar and B.jar at the root of that unzipped folder:
+        def jarA = file("$tempDir/spark-sql-api_2.13-3.5.4.jar")
+        def jarB = file("$tempDir/spark-core_2.13-3.5.4.jar")
+
+        // 3a. Extract jar A to manipulate it
+        def jarAContents = file("$buildDir/tmp/JarAContents")
+        delete(jarAContents)
+        jarAContents.mkdirs()
+        copy {
+            from zipTree(jarA)
+            into jarAContents
+        }
+        // Remove the unwanted directory from jar A
+        delete file("${jarAContents}/org/apache/spark/unused")
+
+        // Re-compress jar A
+        ant.zip(destfile: jarA, baseDir: jarAContents)
+
+        // 3b. Repeat for jar B
+        def jarBContents = file("$buildDir/tmp/JarBContents")
+        delete(jarBContents)
+        jarBContents.mkdirs()
+        copy {
+            from zipTree(jarB)
+            into jarBContents
+        }
+        // Remove the unwanted directory from jar B
+        delete file("${jarBContents}/org/apache/spark/unused")
+        //delete file("${jarBContents}/org/apache/spark/SparkDriverExecutionException.class")
+        //delete file("${jarBContents}/org/apache/spark/SparkException.class")
+        //delete file("${jarBContents}/org/apache/spark/SparkUserAppException.class")
+        //delete file("${jarBContents}/org/apache/spark/SparkUserAppException\$.class")
+        //delete file("${jarBContents}/org/apache/spark/SparkUserAppException*class")
+
+
+        // Re-compress jar B
+        ant.zip(destfile: jarB, baseDir: jarBContents)
+
+        // 4. Now rebuild the final ZIP
+        def fixedZip = file("$buildDir/distributions/opensearch-skills-${opensearch_build}.zip")
+        delete(fixedZip)
+        ant.zip(destfile: fixedZip, basedir: tempDir)
+
+        println "Created final adjusted ZIP: $fixedZip"
+
+        delete(tempDir, jarAContents, jarBContents)
+
+    }
+}
+
+assemble.finalizedBy("postAssembleAdjustments")
 publishing {
     publications {
         pluginZip(MavenPublication) { publication ->
