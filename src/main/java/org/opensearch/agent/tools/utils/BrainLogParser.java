@@ -153,7 +153,7 @@ public class BrainLogParser {
         // Ignore last element since it's designed to be appended logId
         for (int i = 0; i < tokens.size() - 1; i++) {
             String tokenKey = String.format(Locale.ROOT, POSITIONED_TOKEN_KEY_FORMAT, i, tokens.get(i));
-            tokenFreqMap.put(tokenKey, tokenFreqMap.getOrDefault(tokenKey, 0L) + 1);
+            tokenFreqMap.compute(tokenKey, (k, v) -> v == null ? 1 : v + 1);
         }
     }
 
@@ -291,7 +291,7 @@ public class BrainLogParser {
         for (int i = 0; i < tokens.size() - 1; i++) {
             String tokenKey = String.format(Locale.ROOT, POSITIONED_TOKEN_KEY_FORMAT, i, tokens.get(i));
             Long tokenFreq = tokenFreqMap.get(tokenKey);
-            occurrences.put(tokenFreq, occurrences.getOrDefault(tokenFreq, 0) + 1);
+            occurrences.compute(tokenFreq, (k, v) -> v == null ? 1 : v + 1);
         }
         return occurrences;
     }
