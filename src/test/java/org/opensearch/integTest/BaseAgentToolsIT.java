@@ -342,8 +342,6 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     @SneakyThrows
     public String executeAgent(String agentId, String requestBody) {
         Response response = makeRequest(client(), "POST", "/_plugins/_ml/agents/" + agentId + "/_execute", null, requestBody, null);
-        String responseBody = EntityUtils.toString(response.getEntity());
-        logger.info("responseBody for agent execution: {}, agentId: {}", responseBody, agentId);
         return parseStringResponseFromExecuteAgentResponse(response);
     }
 
