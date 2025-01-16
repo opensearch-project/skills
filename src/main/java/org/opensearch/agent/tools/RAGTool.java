@@ -7,7 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.apache.commons.lang3.StringEscapeUtils.escapeJson;
 import static org.opensearch.agent.tools.AbstractRetrieverTool.*;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
+import static org.opensearch.ml.common.CommonValue.TENANT_ID;
 import static org.opensearch.ml.common.utils.StringUtils.toJson;
 
 import java.util.HashMap;
@@ -94,6 +94,7 @@ public class RAGTool implements Tool {
     }
 
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        final String tenantId = parameters.get(TENANT_ID);
         String input = null;
 
         if (!this.validate(parameters)) {
@@ -144,7 +145,7 @@ public class RAGTool implements Tool {
 
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build();
             MLInput mlInput = MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build();
-            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput, null, null);
+            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput, null, tenantId);
 
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(resp -> {
                 ModelTensorOutput modelTensorOutput = (ModelTensorOutput) resp.getOutput();
