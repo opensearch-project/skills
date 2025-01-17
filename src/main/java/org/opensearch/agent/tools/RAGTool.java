@@ -113,6 +113,7 @@ public class RAGTool implements Tool {
             T queryToolOutput;
             if (!this.enableContentGeneration) {
                 listener.onResponse(r);
+                return;
             }
             if (r.equals("Can not get any match from search result.")) {
                 queryToolOutput = (T) "";
