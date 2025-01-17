@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -178,15 +179,34 @@ public class PPLToolTests {
     @Test
     public void testTool_ForSparkInput() {
         PPLTool tool = PPLTool.Factory
-                .getInstance()
-                .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
         assertEquals(PPLTool.TYPE, tool.getName());
-
-        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
-            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
-            assertEquals("ppl result", returnResults.get("executionResult"));
-            assertEquals("source=demo| head 1", returnResults.get("ppl"));
-        }, e -> { log.info(e); }));
+        List<Object> samples = List
+            .of(
+                Map
+                    .of(
+                        "httpMethod",
+                        "POST",
+                        "httpRequest",
+                        Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133")))
+                    )
+            );
+        Map<String, Object> schema = Map
+            .of(
+                "httpRequest",
+                Map.of("col_name", "httpRequest", "data_type", "struct<headers:array<struct<name:string,value:string>>,httpMethod:string>")
+            );
+        tool
+            .run(
+                ImmutableMap
+                    .of("index", "demo", "question", "demo", "sample", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                ActionListener.<String>wrap(executePPLResult -> {
+                    Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                    assertEquals("ppl result", returnResults.get("executionResult"));
+                    assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                }, e -> { log.info(e); })
+            );
 
     }
 

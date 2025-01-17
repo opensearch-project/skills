@@ -12,9 +12,7 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,10 +24,10 @@ import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.spark.sql.catalyst.parser.DataTypeParser;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
+import org.apache.spark.sql.types.*;
 import org.json.JSONObject;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
@@ -37,7 +35,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
-import org.opensearch.common.blobstore.transfer.stream.OffsetRangeIndexInputStream;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.query.MatchAllQueryBuilder;
@@ -52,8 +49,6 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.search.SearchHit;
-import org.apache.spark.sql.types.*;
-import org.apache.spark.sql.catalyst.parser.AbstractParser;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
@@ -185,7 +180,7 @@ public class PPLTool implements Tool {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener)  {
+    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         extractFromChatParameters(parameters);
         String indexName = getIndexNameFromParameters(parameters);
         if (StringUtils.isBlank(indexName)) {
@@ -205,67 +200,67 @@ public class PPLTool implements Tool {
         }
         ActionListener<String> actionsAfterTableinfo = ActionListener.wrap(tableInfo -> {
             log.info(tableInfo);
-                    String prompt = constructPrompt(tableInfo, question.strip(), indexName);
-                    RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
-                            .builder()
-                            .parameters(Collections.singletonMap("prompt", prompt))
-                            .build();
-                    ActionRequest request = new MLPredictionTaskRequest(
-                            modelId,
-                            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
-                            null
-                    );
-                    client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
-                        ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
-                        ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
-                        ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
-                        Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
-                        if (dataAsMap.get("response") == null) {
-                            listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
-                            return;
-                        }
-                        String ppl = parseOutput(dataAsMap.get("response"), indexName);
-                        if (!this.execute) {
-                            Map<String, String> ret = ImmutableMap.of("ppl", ppl);
-                            listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
-                            return;
-                        }
-                        JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
-                        PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
-                        TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
-                        client
-                                .execute(
-                                        PPLQueryAction.INSTANCE,
-                                        transportPPLQueryRequest,
-                                        getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
-                                            String results = transportPPLQueryResponse.getResult();
-                                            Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
-                                            listener
-                                                    .onResponse(
-                                                            (T) AccessController
-                                                                    .doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(returnResults))
-                                                    );
-                                        }, e -> {
-                                            String pplError = "execute ppl:" + ppl + ", get error: " + e.getMessage();
-                                            Exception exception = new Exception(pplError);
-                                            listener.onFailure(exception);
-                                        }))
-                                );
-                        // Execute output here
-                    }, e -> {
-                        log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
-                        listener.onFailure(e);
-                    }));
-        },
-                e -> {
-                    log.info("fail to get table info");
-                    listener.onFailure(e);
+            String prompt = constructPrompt(tableInfo, question.strip(), indexName);
+            RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
+                .builder()
+                .parameters(Collections.singletonMap("prompt", prompt))
+                .build();
+            ActionRequest request = new MLPredictionTaskRequest(
+                modelId,
+                MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
+                null
+            );
+            client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
+                ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
+                ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
+                ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
+                Map<String, String> dataAsMap = (Map<String, String>) modelTensor.getDataAsMap();
+                if (dataAsMap.get("response") == null) {
+                    listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
+                    return;
                 }
+                String ppl = parseOutput(dataAsMap.get("response"), indexName);
+                if (!this.execute) {
+                    Map<String, String> ret = ImmutableMap.of("ppl", ppl);
+                    listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
+                    return;
+                }
+                JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
+                PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
+                TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
+                client
+                    .execute(
+                        PPLQueryAction.INSTANCE,
+                        transportPPLQueryRequest,
+                        getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
+                            String results = transportPPLQueryResponse.getResult();
+                            Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
+                            listener
+                                .onResponse(
+                                    (T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(returnResults))
+                                );
+                        }, e -> {
+                            String pplError = "execute ppl:" + ppl + ", get error: " + e.getMessage();
+                            Exception exception = new Exception(pplError);
+                            listener.onFailure(exception);
+                        }))
+                    );
+                // Execute output here
+            }, e -> {
+                log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
+                listener.onFailure(e);
+            }));
+        }, e -> {
+            log.info("fail to get table info");
+            listener.onFailure(e);
+        }
 
-                );
-        if (parameters.containsKey("schema") && parameters.containsKey("samples") && Objects.equals(parameters.getOrDefault("type", ""), "s3")) {
+        );
+        if (parameters.containsKey("schema")
+            && parameters.containsKey("samples")
+            && Objects.equals(parameters.getOrDefault("type", ""), "s3")) {
             Map<String, Object> schema = gson.fromJson(parameters.get("schema"), Map.class);
-            //Map<String, Object> samples = gson.fromJson(parameters.get("samples"), Map.class);
+            // Map<String, Object> samples = gson.fromJson(parameters.get("samples"), Map.class);
             List<Object> samples = gson.fromJson(parameters.get("samples"), List.class);
             try {
                 String tableInfo = constructTableInfoByPPLResult(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
@@ -412,53 +407,51 @@ public class PPLTool implements Tool {
         }
     }
 
-    private void extractS3FieldToType(String prefix, Map<String, Object> structMap, Map<String, String> fieldToType){
+    private void extractS3FieldToType(String prefix, Map<String, Object> structMap, Map<String, String> fieldToType) {
         String type = (String) structMap.get("type");
 
         if (StringUtils.equals(type, "array")) {
             extractS3FieldToType(prefix, (Map<String, Object>) structMap.get("elementType"), fieldToType);
-            return ;
+            return;
         }
         if (!StringUtils.equals(type, "struct")) {
             fieldToType.put(prefix, type);
-            return ;
+            return;
         }
         List<Map<String, Object>> fields = (List<Map<String, Object>>) structMap.get("fields");
         for (Map<String, Object> field : fields) {
             Object currentType = field.get("type");
             if (currentType instanceof String) {
-                if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(currentType)){
+                if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(currentType)) {
                     currentType = ALLOWED_FIELD_TYPE_FOR_S3.get(currentType);
                 }
                 if (ALLOWED_FIELDS_TYPE.contains(currentType)) {
-                fieldToType.put(prefix + "." + field.get("name"), (String) currentType); }
-            } else if (currentType instanceof Map<?,?>) {
+                    fieldToType.put(prefix + "." + field.get("name"), (String) currentType);
+                }
+            } else if (currentType instanceof Map<?, ?>) {
                 extractS3FieldToType(prefix + "." + field.get("name"), (Map<String, Object>) currentType, fieldToType);
             }
         }
 
     }
 
-    private  void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) throws PrivilegedActionException {
-        System.out.println(schema);
+    private void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) throws PrivilegedActionException {
         DataType structType = AccessController.doPrivileged((PrivilegedExceptionAction<DataType>) () -> DataType.fromDDL(schema));
-        System.out.println(structType);
         Map<String, Object> map = gson.fromJson(structType.json(), Map.class);
         extractS3FieldToType(prefix, map, fieldToType);
     }
 
-    private String constructTableInfoByPPLResult(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException{
+    private String constructTableInfoByPPLResult(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
-        for (Map.Entry<String, Object> entry : schema.entrySet()){
+        for (Map.Entry<String, Object> entry : schema.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue().toString();
-            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(value)){
+            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(value)) {
                 value = ALLOWED_FIELD_TYPE_FOR_S3.get(value);
             }
             if (ALLOWED_FIELDS_TYPE.contains(value)) {
                 fieldsToType.put(key, value);
-            }
-            else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
+            } else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
                 extractS3Types((String) schema.get(key), key, fieldsToType);
             }
         }
@@ -467,8 +460,8 @@ public class PPLTool implements Tool {
             fieldsToSample.put(key, "");
         }
         extractSamples(samples, fieldsToSample, "");
-        log.info(fieldsToType);
-        log.info(fieldsToSample);
+        // log.info(fieldsToType);
+        // log.info(fieldsToSample);
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
@@ -477,8 +470,8 @@ public class PPLTool implements Tool {
             if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
                 line = "- " + key + ": " + fieldsToType.get(key);
             }
-            //log.info(key);
-            //log.info(fieldsToSample.containsKey(key));
+            // log.info(key);
+            // log.info(fieldsToSample.containsKey(key));
 
             if (fieldsToSample.containsKey(key)) {
                 line += " (" + fieldsToSample.get(key) + ")";
@@ -487,7 +480,6 @@ public class PPLTool implements Tool {
         }
         log.info(tableInfoJoiner.toString());
         return tableInfoJoiner.toString();
-
 
     }
 
@@ -548,7 +540,7 @@ public class PPLTool implements Tool {
         for (Map.Entry<String, Object> entry : sampleSource.entrySet()) {
             String p = entry.getKey();
             Object v = entry.getValue();
-            while (v instanceof List<?>){
+            while (v instanceof List<?>) {
                 v = ((List<?>) v).get(0);
             }
 

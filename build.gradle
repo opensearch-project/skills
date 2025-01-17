@@ -160,6 +160,7 @@ dependencies {
 
     implementation 'org.apache.spark:spark-sql-api_2.13:3.5.4'
     implementation 'org.apache.spark:spark-core_2.13:3.5.4'
+    implementation group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
 
     compileOnly group: 'org.apache.spark', name: 'spark-streaming_2.13', version: '3.5.4'
 
@@ -365,6 +366,7 @@ tasks.register("postAssembleAdjustments") {
         // 3. Let's say you have A.jar and B.jar at the root of that unzipped folder:
         def jarA = file("$tempDir/spark-sql-api_2.13-3.5.4.jar")
         def jarB = file("$tempDir/spark-core_2.13-3.5.4.jar")
+        def jarC = file("$tempDir/spark-common-utils_2.13-3.5.4.jar")
 
         // 3a. Extract jar A to manipulate it
         def jarAContents = file("$buildDir/tmp/JarAContents")
@@ -400,6 +402,26 @@ tasks.register("postAssembleAdjustments") {
         // Re-compress jar B
         ant.zip(destfile: jarB, baseDir: jarBContents)
 
+        def jarCContents = file("$buildDir/tmp/JarBContents")
+        delete(jarCContents)
+        jarCContents.mkdirs()
+        copy {
+            from zipTree(jarC)
+            into jarCContents
+        }
+        // Remove the unwanted directory from jar B
+        delete file("${jarCContents}/org/apache/spark/unused")
+        delete file("${jarCContents}/org/apache/spark/SparkDriverExecutionException.class")
+        delete file("${jarCContents}/org/apache/spark/SparkException.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException\$.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException*class")
+        //delete file("${jarCContents}/org/apache/spark/java/function/MapGroupsFunction*class")
+
+
+        // Re-compress jar C
+        ant.zip(destfile: jarC, baseDir: jarCContents)
+
         // 4. Now rebuild the final ZIP
         def fixedZip = file("$buildDir/distributions/opensearch-skills-${opensearch_build}.zip")
         delete(fixedZip)
@@ -407,7 +429,7 @@ tasks.register("postAssembleAdjustments") {
 
         println "Created final adjusted ZIP: $fixedZip"
 
-        delete(tempDir, jarAContents, jarBContents)
+        //delete(tempDir, jarAContents, jarBContents)
 
     }
 }
