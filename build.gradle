@@ -93,8 +93,6 @@ configurations {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
-            exclude group: 'org.apache.logging.log4j', module: 'log4j-core'
-            exclude group: 'org.apache.logging.log4j', module: 'log4j-slf4j-impl'
         }
     }
 }
@@ -162,7 +160,7 @@ dependencies {
     implementation 'org.apache.spark:spark-core_2.13:3.5.4'
     implementation group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
 
-    compileOnly group: 'org.apache.spark', name: 'spark-streaming_2.13', version: '3.5.4'
+    //compileOnly group: 'org.apache.spark', name: 'spark-streaming_2.13', version: '3.5.4'
 
     implementation 'org.scala-lang:scala-library:2.13.15'
     implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
@@ -342,7 +340,7 @@ allprojects {
 
 tasks.register("postAssembleAdjustments") {
     // This task should run after assemble finishes
-    dependsOn("assemble")
+    dependsOn("bundlePlugin")
 
     doLast {
         // Path to the ZIP built by the assemble task
@@ -434,7 +432,7 @@ tasks.register("postAssembleAdjustments") {
     }
 }
 
-assemble.finalizedBy("postAssembleAdjustments")
+bundlePlugin.finalizedBy("postAssembleAdjustments")
 publishing {
     publications {
         pluginZip(MavenPublication) { publication ->
@@ -482,7 +480,6 @@ task integTest(type: RestIntegTestTask) {
 tasks.named("check").configure { dependsOn(integTest) }
 
 integTest {
-
     dependsOn "bundlePlugin"
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
