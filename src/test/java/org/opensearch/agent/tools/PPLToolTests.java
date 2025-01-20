@@ -200,7 +200,7 @@ public class PPLToolTests {
         tool
             .run(
                 ImmutableMap
-                    .of("index", "demo", "question", "demo", "sample", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                    .of("index", "demo", "question", "demo", "samples", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
                 ActionListener.<String>wrap(executePPLResult -> {
                     Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
                     assertEquals("ppl result", returnResults.get("executionResult"));
