@@ -199,7 +199,6 @@ public class PPLTool implements Tool {
             );
         }
         ActionListener<String> actionsAfterTableinfo = ActionListener.wrap(tableInfo -> {
-            log.info(tableInfo);
             String prompt = constructPrompt(tableInfo, question.strip(), indexName);
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
@@ -460,8 +459,6 @@ public class PPLTool implements Tool {
             fieldsToSample.put(key, "");
         }
         extractSamples(samples, fieldsToSample, "");
-        // log.info(fieldsToType);
-        // log.info(fieldsToSample);
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
@@ -470,15 +467,11 @@ public class PPLTool implements Tool {
             if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
                 line = "- " + key + ": " + fieldsToType.get(key);
             }
-            // log.info(key);
-            // log.info(fieldsToSample.containsKey(key));
-
             if (fieldsToSample.containsKey(key)) {
                 line += " (" + fieldsToSample.get(key) + ")";
             }
             tableInfoJoiner.add(line);
         }
-        log.info(tableInfoJoiner.toString());
         return tableInfoJoiner.toString();
 
     }
