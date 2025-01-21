@@ -439,10 +439,10 @@ public class PPLTool implements Tool {
 
     private void extractS3Types(String schema, String prefix, Map<String, String> fieldToType) throws PrivilegedActionException {
         try {
-        DataType structType = AccessController.doPrivileged((PrivilegedExceptionAction<DataType>) () -> DataType.fromDDL(schema));
-        Map<String, Object> map = gson.fromJson(structType.json(), Map.class);
-        extractS3FieldToType(prefix, map, fieldToType);}
-        catch (Exception e) {
+            DataType structType = AccessController.doPrivileged((PrivilegedExceptionAction<DataType>) () -> DataType.fromDDL(schema));
+            Map<String, Object> map = gson.fromJson(structType.json(), Map.class);
+            extractS3FieldToType(prefix, map, fieldToType);
+        } catch (Exception e) {
             throw new IllegalArgumentException("Unable to extract field types from schema " + schema, e);
         }
     }
