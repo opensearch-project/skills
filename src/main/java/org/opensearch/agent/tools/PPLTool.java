@@ -258,7 +258,6 @@ public class PPLTool implements Tool {
             && parameters.containsKey("samples")
             && Objects.equals(parameters.getOrDefault("type", ""), "s3")) {
             Map<String, Object> schema = gson.fromJson(parameters.get("schema"), Map.class);
-            // Map<String, Object> samples = gson.fromJson(parameters.get("samples"), Map.class);
             List<Object> samples = gson.fromJson(parameters.get("samples"), List.class);
             try {
                 String tableInfo = constructTableInfoByPPLResult(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
