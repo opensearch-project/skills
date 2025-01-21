@@ -412,7 +412,12 @@ public class PPLTool implements Tool {
             return;
         }
         if (!StringUtils.equals(type, "struct")) {
-            fieldToType.put(prefix, type);
+            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(type)) {
+                type = ALLOWED_FIELD_TYPE_FOR_S3.get(type);
+            }
+            if (ALLOWED_FIELDS_TYPE.contains(type)) {
+                fieldToType.put(prefix, type);
+            }
             return;
         }
         List<Map<String, Object>> fields = (List<Map<String, Object>>) structMap.get("fields");
