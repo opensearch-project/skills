@@ -143,11 +143,13 @@ dependencies {
     spark 'org.apache.spark:spark-core_2.13:3.5.4'
     spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
 
-    implementation 'org.scala-lang:scala-library:2.13.15'
+    implementation 'org.scala-lang:scala-library:2.13.8'
     implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
     implementation("org.json4s:json4s-ast_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
+    implementation 'com.fasterxml.jackson.module:jackson-module-scala_3:2.18.2'
+    implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
 
     // Plugin dependencies
@@ -234,7 +236,6 @@ task addSparkJar(type: Copy) {
         // Remove the unwanted directory from jar C
         delete file("${jarCContents}/org/apache/spark/unused")
         delete file("${jarCContents}/org/apache/spark/SparkDriverExecutionException.class")
-        delete file("${jarCContents}/org/apache/spark/SparkException.class")
         delete file("${jarCContents}/org/apache/spark/SparkUserAppException.class")
         delete file("${jarCContents}/org/apache/spark/SparkUserAppException\$.class")
         delete file("${jarCContents}/org/apache/spark/SparkUserAppException*class")
