@@ -404,7 +404,7 @@ public class PPLTool implements Tool {
         }
     }
 
-    private void addSparkType(Map<String, String> fieldToType, String targetKey, String targetType){
+    private void addSparkType(Map<String, String> fieldToType, String targetKey, String targetType) {
         if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(targetType)) {
             targetType = ALLOWED_FIELD_TYPE_FOR_S3.get(targetType);
         }
