@@ -404,32 +404,33 @@ public class PPLTool implements Tool {
         }
     }
 
+    private void addSparkType(Map<String, String> fieldToType, String targetKey, String targetType){
+        if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(targetType)) {
+            targetType = ALLOWED_FIELD_TYPE_FOR_S3.get(targetType);
+        }
+        if (ALLOWED_FIELDS_TYPE.contains(targetType)) {
+            fieldToType.put(targetKey, targetType);
+        }
+    }
+
     private void extractS3FieldToType(String prefix, Map<String, Object> structMap, Map<String, String> fieldToType) {
         String type = (String) structMap.get("type");
-
         if (StringUtils.equals(type, "array")) {
+            if (structMap.get("elementType") instanceof String) {
+                addSparkType(fieldToType, prefix, type);
+            }
             extractS3FieldToType(prefix, (Map<String, Object>) structMap.get("elementType"), fieldToType);
             return;
         }
         if (!StringUtils.equals(type, "struct")) {
-            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(type)) {
-                type = ALLOWED_FIELD_TYPE_FOR_S3.get(type);
-            }
-            if (ALLOWED_FIELDS_TYPE.contains(type)) {
-                fieldToType.put(prefix, type);
-            }
+            addSparkType(fieldToType, prefix, type);
             return;
         }
         List<Map<String, Object>> fields = (List<Map<String, Object>>) structMap.get("fields");
         for (Map<String, Object> field : fields) {
             Object currentType = field.get("type");
             if (currentType instanceof String) {
-                if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(currentType)) {
-                    currentType = ALLOWED_FIELD_TYPE_FOR_S3.get(currentType);
-                }
-                if (ALLOWED_FIELDS_TYPE.contains(currentType)) {
-                    fieldToType.put(prefix + "." + field.get("name"), (String) currentType);
-                }
+                addSparkType(fieldToType, prefix + "." + field.get("name"), (String) currentType);
             } else if (currentType instanceof Map<?, ?>) {
                 extractS3FieldToType(prefix + "." + field.get("name"), (Map<String, Object>) currentType, fieldToType);
             }
@@ -458,7 +459,7 @@ public class PPLTool implements Tool {
             if (ALLOWED_FIELDS_TYPE.contains(value)) {
                 fieldsToType.put(key, value);
             } else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
-                extractS3Types((String) schema.get(key), key, fieldsToType);
+                extractS3Types(value, key, fieldsToType);
             }
         }
         Map<String, String> fieldsToSample = new HashMap<>();

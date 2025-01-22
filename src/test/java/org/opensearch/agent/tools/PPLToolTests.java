@@ -221,7 +221,7 @@ public class PPLToolTests {
         assertEquals(PPLTool.TYPE, tool.getName());
         List<Object> samples = List.of(Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133"))));
         Map<String, Object> schema = Map
-            .of("headers", Map.of("col_name", "headers", "data_type", "sarray<struct<name:string,value:string>>"));
+            .of("headers", Map.of("col_name", "headers", "data_type", "array<struct<name:string,value:string>>"));
         tool
             .run(
                 ImmutableMap
@@ -234,6 +234,30 @@ public class PPLToolTests {
             );
 
     }
+
+    @Test
+    public void testTool_ForSparkInputWithArrayString() {
+        PPLTool tool = PPLTool.Factory
+                .getInstance()
+                .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        List<Object> samples = List.of(Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133"))));
+        Map<String, Object> schema = Map
+                .of("headers", Map.of("col_name", "headers", "data_type", "array<string>"));
+        tool
+                .run(
+                        ImmutableMap
+                                .of("index", "demo", "question", "demo", "samples", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                        ActionListener.<String>wrap(executePPLResult -> {
+                            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                            assertEquals("ppl result", returnResults.get("executionResult"));
+                            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                        }, e -> { log.info(e); })
+                );
+
+    }
+
+
 
     @Test
     public void testTool_ForSparkInputWithStructInput() {
