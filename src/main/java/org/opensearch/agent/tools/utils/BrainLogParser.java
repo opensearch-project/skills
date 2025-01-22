@@ -33,11 +33,11 @@ public class BrainLogParser {
         // Simple ISO date and time
         DEFAULT_FILTER_PATTERN_VARIABLE_MAP
             .put(Pattern.compile("(\\d{4}-\\d{2}-\\d{2})[T ]?(\\d{2}:\\d{2}:\\d{2})(\\.\\d{3})?(Z|([+-]\\d{2}:?\\d{2}))?"), "<*DATETIME*>");
-        // Hex Decimal, letters followed by digits, float numbers
+        // Hex Decimal, letters followed by digits, float numbers, 4 or more digits in case of leaving 3 digit response code alone
         DEFAULT_FILTER_PATTERN_VARIABLE_MAP
-            .put(Pattern.compile("((0x|0X)[0-9a-fA-F]+)|[a-zA-Z]+\\d+|([+-]?(\\d+(\\.\\d*)?|\\.\\d+))"), VARIABLE_DENOTER);
+            .put(Pattern.compile("((0x|0X)[0-9a-fA-F]+)|[a-zA-Z]+\\d+|([+-]?(?!\\d{3}$)\\d{4,}(\\.\\d*)?|\\.\\d+)"), VARIABLE_DENOTER);
         // generic number surrounded by non-alphanumeric
-        DEFAULT_FILTER_PATTERN_VARIABLE_MAP.put(Pattern.compile("(?<=[^A-Za-z0-9])(-?\\+?\\d+)(?=[^A-Za-z0-9])|[0-9]+$"), VARIABLE_DENOTER);
+        DEFAULT_FILTER_PATTERN_VARIABLE_MAP.put(Pattern.compile("(?<=[^A-Za-z0-9])(-?\\+?\\d+)(?=[^A-Za-z0-9])"), VARIABLE_DENOTER);
     }
     private static final List<String> DEFAULT_DELIMITERS = List.of(",", "+");
     // counting frequency will be grouped by composite of position and token string
@@ -45,12 +45,12 @@ public class BrainLogParser {
     // Token set will be grouped by composite of tokens length per log message, word combination candidate and token position.
     private static final String GROUP_TOKEN_SET_KEY_FORMAT = "%d-%s-%d";
     // By default, algorithm treats more than 2 different tokens in the group per position as variable token
-    private static final int DEFAULT_VARIABLE_COUNT_THRESHOLD = 2;
+    private static final int DEFAULT_VARIABLE_COUNT_THRESHOLD = 5;
     /*
      * By default, algorithm treats the longest word combinations as the group root, no matter what its frequency is.
      * Otherwise, the longest word combination will be selected when frequency >= highest frequency of log * threshold percentage
      */
-    private static final float DEFAULT_FREQUENCY_THRESHOLD_PERCENTAGE = 0.0f;
+    private static final float DEFAULT_FREQUENCY_THRESHOLD_PERCENTAGE = 0.3f;
 
     private final Map<String, Long> tokenFreqMap;
     private final Map<String, Set<String>> groupTokenSetMap;

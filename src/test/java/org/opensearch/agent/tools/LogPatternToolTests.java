@@ -232,7 +232,7 @@ public class LogPatternToolTests {
         mockDSLInvocation();
         LogPatternTool tool = LogPatternTool.Factory.getInstance().create(params);
         JsonElement expected = gson
-            .fromJson("[{\"pattern\":\"<*>\",\"total count\":5,\"sample logs\":[\"123\",\"123\"]}]", JsonElement.class);
+            .fromJson("[{\"pattern\":\"123\",\"total count\":5,\"sample logs\":[\"123\",\"123\"]}]", JsonElement.class);
         tool
             .run(
                 ImmutableMap.of("index", "index_name", "input", "{}", "pattern_field", "field1", "sample_log_size", "2"),

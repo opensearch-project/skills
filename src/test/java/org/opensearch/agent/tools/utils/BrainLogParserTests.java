@@ -165,8 +165,10 @@ public class BrainLogParserTests extends OpenSearchTestCase {
                 2,
                 "BLOCK* NameSystem.addStoredBlock: blockMap updated: <*IP*> is added to blk_<*> size <*>",
                 8,
-                "BLOCK* NameSystem.allocateBlock: <*> blk_<*>",
-                8
+                "BLOCK* NameSystem.allocateBlock: /user/root/sortrand/_temporary/_task_<*>_<*>_r_<*>_<*>/part<*> blk_<*>",
+                6,
+                "BLOCK* NameSystem.allocateBlock: /user/root/randtxt/_temporary/_task_<*>_<*>_m_<*>_<*>/part<*> blk_<*>",
+                2
             );
         Map<String, Integer> logPatternByCountMap = logPatternMap
             .entrySet()
@@ -210,7 +212,14 @@ public class BrainLogParserTests extends OpenSearchTestCase {
             );
 
         Map<String, List<String>> expectedResult = Map
-            .of("<*> succeeded for blk_<*>", Arrays.asList("0", "1", "2"), "Verification", Arrays.asList("3", "4"));
+            .of(
+                "<*> succeeded for blk_<*>",
+                Arrays.asList("0", "1"),
+                "Test succeeded for blk_<*>",
+                Arrays.asList("2"),
+                "Verification",
+                Arrays.asList("3", "4")
+            );
         Map<String, List<String>> logPatternMap = parser.parseAllLogPatterns(logMessages);
         assertEquals(expectedResult, logPatternMap);
         /*

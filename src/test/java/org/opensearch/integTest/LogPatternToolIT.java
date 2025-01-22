@@ -97,7 +97,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     public void testLogPatternToolWithSpecifiedPatternField() {
         JsonElement expected = gson
-            .fromJson("[{\"total count\":5,\"sample logs\":[\"123\", \"123\"],\"pattern\":\"<*>\"}]", JsonElement.class);
+            .fromJson("[{\"total count\":5,\"sample logs\":[\"123\", \"123\"],\"pattern\":\"123\"}]", JsonElement.class);
         JsonElement result = gson
             .fromJson(
                 executeAgent(
