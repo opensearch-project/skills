@@ -249,7 +249,7 @@ public class PPLTool implements Tool {
                 listener.onFailure(e);
             }));
         }, e -> {
-            log.info("fail to get table info");
+            log.info("fail to get index schema");
             listener.onFailure(e);
         }
 
