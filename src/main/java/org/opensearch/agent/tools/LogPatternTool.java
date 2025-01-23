@@ -68,10 +68,13 @@ public class LogPatternTool extends AbstractRetrieverTool {
     public static final String SAMPLE_LOG_SIZE = "sample_log_size";
     public static final String PATTERN_FIELD = "pattern_field";
     public static final String PPL_FIELD = "ppl";
+    public static final String VARIABLE_COUNT_THRESHOLD = "variable_count_threshold";
     public static final int LOG_PATTERN_DEFAULT_DOC_SIZE = 1000;
     public static final int DEFAULT_TOP_N_PATTERN = 3;
     public static final int DEFAULT_SAMPLE_LOG_SIZE = 20;
+    public static final int DEFAULT_VARIABLE_COUNT_THRESHOLD = 5;
 
+    private static final float DEFAULT_THRESHOLD_PERCENTAGE = 0.3f;
     private static final String PPL_SCHEMA_NAME = "name";
 
     private String name = TYPE;
@@ -80,13 +83,21 @@ public class LogPatternTool extends AbstractRetrieverTool {
     private BrainLogParser logParser;
 
     @Builder
-    public LogPatternTool(Client client, NamedXContentRegistry xContentRegistry, int docSize, int topNPattern, int sampleLogSize) {
+    public LogPatternTool(
+        Client client,
+        NamedXContentRegistry xContentRegistry,
+        int docSize,
+        int topNPattern,
+        int sampleLogSize,
+        int variableCountThreshold
+    ) {
         super(client, xContentRegistry, null, null, docSize);
         checkPositive(topNPattern, TOP_N_PATTERN);
         checkPositive(sampleLogSize, SAMPLE_LOG_SIZE);
+        checkPositive(variableCountThreshold, VARIABLE_COUNT_THRESHOLD);
         this.topNPattern = topNPattern;
         this.sampleLogSize = sampleLogSize;
-        this.logParser = new BrainLogParser();
+        this.logParser = new BrainLogParser(variableCountThreshold, DEFAULT_THRESHOLD_PERCENTAGE);
     }
 
     @Override
@@ -354,6 +365,9 @@ public class LogPatternTool extends AbstractRetrieverTool {
             int docSize = params.containsKey(DOC_SIZE_FIELD) ? getPositiveInteger(params, DOC_SIZE_FIELD) : LOG_PATTERN_DEFAULT_DOC_SIZE;
             int topNPattern = params.containsKey(TOP_N_PATTERN) ? getPositiveInteger(params, TOP_N_PATTERN) : DEFAULT_TOP_N_PATTERN;
             int sampleLogSize = params.containsKey(SAMPLE_LOG_SIZE) ? getPositiveInteger(params, SAMPLE_LOG_SIZE) : DEFAULT_SAMPLE_LOG_SIZE;
+            int variableCountThreshold = params.containsKey(VARIABLE_COUNT_THRESHOLD)
+                ? getPositiveInteger(params, VARIABLE_COUNT_THRESHOLD)
+                : DEFAULT_VARIABLE_COUNT_THRESHOLD;
             return LogPatternTool
                 .builder()
                 .client(client)
@@ -361,6 +375,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
                 .docSize(docSize)
                 .topNPattern(topNPattern)
                 .sampleLogSize(sampleLogSize)
+                .variableCountThreshold(variableCountThreshold)
                 .build();
         }
 
