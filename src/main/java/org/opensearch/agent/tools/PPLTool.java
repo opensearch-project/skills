@@ -239,7 +239,7 @@ public class PPLTool implements Tool {
                                 );
                         }, e -> {
                             String pplError = "execute ppl:" + ppl + ", get error: " + e.getMessage();
-                            Exception exception = new Exception(pplError);
+                            Exception exception = new Exception(pplError, e);
                             listener.onFailure(exception);
                         }))
                     );
