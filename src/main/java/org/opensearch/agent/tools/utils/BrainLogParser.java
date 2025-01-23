@@ -37,7 +37,7 @@ public class BrainLogParser {
         DEFAULT_FILTER_PATTERN_VARIABLE_MAP
             .put(Pattern.compile("((0x|0X)[0-9a-fA-F]+)|[a-zA-Z]+\\d+|([+-]?(?!\\d{3}$)\\d{4,}(\\.\\d*)?|\\.\\d+)"), VARIABLE_DENOTER);
         // generic number surrounded by non-alphanumeric
-        DEFAULT_FILTER_PATTERN_VARIABLE_MAP.put(Pattern.compile("(?<=[^A-Za-z0-9])(-?\\+?\\d+)(?=[^A-Za-z0-9])"), VARIABLE_DENOTER);
+        DEFAULT_FILTER_PATTERN_VARIABLE_MAP.put(Pattern.compile("(?<=[^A-Za-z0-9 ])(-?\\+?\\d+)(?=[^A-Za-z0-9])"), VARIABLE_DENOTER);
     }
     private static final List<String> DEFAULT_DELIMITERS = List.of(",", "+");
     // counting frequency will be grouped by composite of position and token string
