@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
@@ -165,7 +165,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
                         .boxed()
                         .filter(i -> schema.get(i) != null && patternField.equals(schema.get(i).get(PPL_SCHEMA_NAME)))
                         .findFirst()
-                        .map(fieldIndex -> dataRows.stream().map(dataRow -> (String) dataRow.get(fieldIndex)).toList())
+                        .map(fieldIndex -> dataRows.stream().map(dataRow -> (String) dataRow.get(fieldIndex)).collect(Collectors.toList()))
                         .orElseGet(ArrayList::new);
 
                     onResponseSortedLogPatterns(parameters, listener, firstLogSource, logMessagesProvider);
@@ -262,10 +262,10 @@ public class LogPatternTool extends AbstractRetrieverTool {
                             .subList(0, Math.min(entry.getValue().size(), sampleLogSize))
                             .stream()
                             .map(logId -> logMessages.get(Integer.parseInt(logId)))
-                            .toList()
+                            .collect(Collectors.toList())
                     )
             )
-            .toList();
+            .collect(Collectors.toList());
     }
 
     private void validatePatternFieldAndFirstLogSource(

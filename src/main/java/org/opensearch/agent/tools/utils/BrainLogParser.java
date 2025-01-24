@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -193,7 +194,7 @@ public class BrainLogParser {
                 .stream()
                 .map(entry -> new WordCombination(entry.getKey(), entry.getValue()))
                 .sorted()
-                .toList();
+                .collect(Collectors.toList());
             WordCombination candidate = this.findCandidate(sortedWordCombinations);
             String groupCandidateStr = String.format(Locale.ROOT, "%d,%d", candidate.wordFreq(), candidate.sameFreqCount());
             this.logIdGroupCandidateMap.put(tokens.getLast(), groupCandidateStr);
@@ -319,7 +320,22 @@ public class BrainLogParser {
         }
     }
 
-    private record WordCombination(Long wordFreq, Integer sameFreqCount) implements Comparable<WordCombination> {
+    private static final class WordCombination implements Comparable<WordCombination> {
+        private final Long wordFreq;
+        private final Integer sameFreqCount;
+
+        public WordCombination(Long wordFreq, Integer sameFreqCount) {
+            this.wordFreq = wordFreq;
+            this.sameFreqCount = sameFreqCount;
+        }
+
+        public Long wordFreq() {
+            return this.wordFreq;
+        }
+
+        public Integer sameFreqCount() {
+            return this.sameFreqCount;
+        }
 
         @Override
         public int compareTo(WordCombination other) {
@@ -331,6 +347,23 @@ public class BrainLogParser {
 
             // If sameFreqCount are the same, compare by wordFreq in descending order
             return other.wordFreq.compareTo(this.wordFreq);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            WordCombination other = (WordCombination) obj;
+            return Objects.equals(wordFreq, other.wordFreq) && Objects.equals(sameFreqCount, other.sameFreqCount);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(wordFreq, sameFreqCount);
         }
     }
 }
