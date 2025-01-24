@@ -114,7 +114,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
 
     public static class Factory extends AbstractRetrieverTool.Factory<VectorDBTool>
         implements
-            WithModelTool.Factory<NeuralSparseSearchTool> {
+            WithModelTool.Factory<VectorDBTool> {
         private static VectorDBTool.Factory INSTANCE;
 
         public static VectorDBTool.Factory getInstance() {
