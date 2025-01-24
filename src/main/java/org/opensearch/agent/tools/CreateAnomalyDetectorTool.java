@@ -227,8 +227,7 @@ public class CreateAnomalyDetectorTool implements Tool {
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
-                MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
-                null
+                MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
             );
 
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
