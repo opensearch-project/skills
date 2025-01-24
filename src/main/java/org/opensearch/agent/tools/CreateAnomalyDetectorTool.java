@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.io.IOException;
@@ -165,6 +166,7 @@ public class CreateAnomalyDetectorTool implements Tool {
      */
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        final String tenantId = parameters.get(TENANT_ID_FIELD);
         Map<String, String> enrichedParameters = enrichParameters(parameters);
         String indexName = enrichedParameters.get("index");
         if (Strings.isNullOrEmpty(indexName)) {
@@ -228,7 +230,8 @@ public class CreateAnomalyDetectorTool implements Tool {
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
                 MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
-                null
+                null,
+                tenantId
             );
 
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
