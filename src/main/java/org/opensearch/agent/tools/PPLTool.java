@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -170,6 +172,7 @@ public class PPLTool implements Tool {
     @SuppressWarnings("unchecked")
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        final String tenantId = parameters.get(TENANT_ID_FIELD);
         extractFromChatParameters(parameters);
         String indexName = getIndexNameFromParameters(parameters);
         if (StringUtils.isBlank(indexName)) {
@@ -206,7 +209,9 @@ public class PPLTool implements Tool {
                     .build();
                 ActionRequest request = new MLPredictionTaskRequest(
                     modelId,
-                    MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build()
+                    MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
+                    null,
+                    tenantId
                 );
                 client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
                     ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
