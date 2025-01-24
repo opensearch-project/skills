@@ -36,6 +36,7 @@ import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.StringUtils;
@@ -48,7 +49,7 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @ToolAnnotation(CreateAlertTool.TYPE)
-public class CreateAlertTool implements Tool {
+public class CreateAlertTool implements WithModelTool {
     public static final String TYPE = "CreateAlertTool";
 
     private static final String DEFAULT_DESCRIPTION =
@@ -276,7 +277,7 @@ public class CreateAlertTool implements Tool {
         return getIndexRequest;
     }
 
-    public static class Factory implements Tool.Factory<CreateAlertTool> {
+    public static class Factory implements WithModelTool.Factory<CreateAlertTool> {
 
         private Client client;
 
@@ -323,6 +324,11 @@ public class CreateAlertTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(MODEL_ID);
         }
     }
 }

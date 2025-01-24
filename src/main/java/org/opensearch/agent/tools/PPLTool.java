@@ -44,6 +44,7 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.search.SearchHit;
@@ -63,9 +64,11 @@ import lombok.extern.log4j.Log4j2;
 @Setter
 @Getter
 @ToolAnnotation(PPLTool.TYPE)
-public class PPLTool implements Tool {
+public class PPLTool implements WithModelTool {
 
     public static final String TYPE = "PPLTool";
+
+    public static final String MODEL_ID_FIELD = "model_id";
 
     @Setter
     private Client client;
@@ -285,7 +288,7 @@ public class PPLTool implements Tool {
         return parameters != null && !parameters.isEmpty();
     }
 
-    public static class Factory implements Tool.Factory<PPLTool> {
+    public static class Factory implements WithModelTool.Factory<PPLTool> {
         private Client client;
 
         private static Factory INSTANCE;
@@ -312,7 +315,7 @@ public class PPLTool implements Tool {
             validatePPLToolParameters(map);
             return new PPLTool(
                 client,
-                (String) map.get("model_id"),
+                (String) map.get(MODEL_ID_FIELD),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
@@ -336,6 +339,10 @@ public class PPLTool implements Tool {
             return null;
         }
 
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(MODEL_ID_FIELD);
+        }
     }
 
     private SearchRequest buildSearchRequest(String indexName) {

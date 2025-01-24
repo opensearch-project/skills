@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +22,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 
 /**
  * This tool supports neural search with embedding models and knn index.
@@ -29,7 +31,7 @@ import lombok.extern.log4j.Log4j2;
 @Getter
 @Setter
 @ToolAnnotation(VectorDBTool.TYPE)
-public class VectorDBTool extends AbstractRetrieverTool {
+public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool {
     public static final String TYPE = "VectorDBTool";
 
     public static String DEFAULT_DESCRIPTION =
@@ -110,7 +112,7 @@ public class VectorDBTool extends AbstractRetrieverTool {
         return TYPE;
     }
 
-    public static class Factory extends AbstractRetrieverTool.Factory<VectorDBTool> {
+    public static class Factory extends AbstractRetrieverTool.Factory<VectorDBTool>  implements WithModelTool.Factory<NeuralSparseSearchTool>  {
         private static VectorDBTool.Factory INSTANCE;
 
         public static VectorDBTool.Factory getInstance() {
@@ -162,6 +164,11 @@ public class VectorDBTool extends AbstractRetrieverTool {
         @Override
         public String getDefaultDescription() {
             return DEFAULT_DESCRIPTION;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(MODEL_ID_FIELD);
         }
     }
 }

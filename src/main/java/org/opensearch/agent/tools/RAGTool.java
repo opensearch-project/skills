@@ -26,6 +26,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 
@@ -44,7 +45,7 @@ import lombok.extern.log4j.Log4j2;
 @Setter
 @Getter
 @ToolAnnotation(RAGTool.TYPE)
-public class RAGTool implements Tool {
+public class RAGTool implements WithModelTool {
     public static final String TYPE = "RAGTool";
     public static String DEFAULT_DESCRIPTION =
         "Use this tool to retrieve helpful information to optimize the output of the large language model to answer questions.";
@@ -194,7 +195,7 @@ public class RAGTool implements Tool {
     /**
      * Factory class to create RAGTool
      */
-    public static class Factory implements Tool.Factory<RAGTool> {
+    public static class Factory implements WithModelTool.Factory<RAGTool> {
         private Client client;
         private NamedXContentRegistry xContentRegistry;
 
@@ -269,6 +270,11 @@ public class RAGTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(INFERENCE_MODEL_ID_FIELD, EMBEDDING_MODEL_ID_FIELD);
         }
     }
 }

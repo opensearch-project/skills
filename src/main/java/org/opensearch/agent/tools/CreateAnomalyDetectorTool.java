@@ -15,6 +15,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +41,7 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 
@@ -65,9 +67,11 @@ import lombok.extern.log4j.Log4j2;
 @Setter
 @Getter
 @ToolAnnotation(CreateAnomalyDetectorTool.TYPE)
-public class CreateAnomalyDetectorTool implements Tool {
+public class CreateAnomalyDetectorTool implements WithModelTool {
     // the type of this tool
     public static final String TYPE = "CreateAnomalyDetectorTool";
+
+    public static final String MODEL_ID_FIELD = "model_id";
 
     // the default description of this tool
     private static final String DEFAULT_DESCRIPTION =
@@ -392,7 +396,7 @@ public class CreateAnomalyDetectorTool implements Tool {
     /**
      * The tool factory
      */
-    public static class Factory implements Tool.Factory<CreateAnomalyDetectorTool> {
+    public static class Factory implements WithModelTool.Factory<CreateAnomalyDetectorTool> {
         private Client client;
 
         private static CreateAnomalyDetectorTool.Factory INSTANCE;
@@ -453,6 +457,11 @@ public class CreateAnomalyDetectorTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(MODEL_ID_FIELD);
         }
     }
 }

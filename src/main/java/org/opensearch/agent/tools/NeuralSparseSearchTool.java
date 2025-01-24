@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +22,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 
 /**
  * This tool supports neural_sparse search with sparse encoding models and rank_features field.
@@ -29,7 +31,7 @@ import lombok.extern.log4j.Log4j2;
 @Getter
 @Setter
 @ToolAnnotation(NeuralSparseSearchTool.TYPE)
-public class NeuralSparseSearchTool extends AbstractRetrieverTool {
+public class NeuralSparseSearchTool extends AbstractRetrieverTool implements WithModelTool {
     public static final String TYPE = "NeuralSparseSearchTool";
     public static final String MODEL_ID_FIELD = "model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
@@ -101,7 +103,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
         return TYPE;
     }
 
-    public static class Factory extends AbstractRetrieverTool.Factory<NeuralSparseSearchTool> {
+    public static class Factory extends AbstractRetrieverTool.Factory<NeuralSparseSearchTool> implements WithModelTool.Factory<NeuralSparseSearchTool> {
         private static Factory INSTANCE;
 
         public static Factory getInstance() {
@@ -146,6 +148,11 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(MODEL_ID_FIELD);
         }
     }
 }

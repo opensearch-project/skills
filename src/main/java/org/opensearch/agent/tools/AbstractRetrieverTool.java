@@ -23,6 +23,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
