@@ -430,7 +430,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
          */
         @Override
         public CreateAnomalyDetectorTool create(Map<String, Object> map) {
-            String modelId = (String) map.getOrDefault("model_id", "");
+            String modelId = (String) map.getOrDefault(MODEL_ID_FIELD, "");
             if (modelId.isEmpty()) {
                 throw new IllegalArgumentException("model_id cannot be empty.");
             }
