@@ -58,8 +58,7 @@ public class LogPatternToolTests {
 
     public static String responseBodyResourceFile = "org/opensearch/agent/tools/expected_flow_agent_of_log_pattern_tool_response_body.json";
     public static final String TEST_QUERY_TEXT =
-        """
-            {"size":2,"query":{"bool":{"filter":[{"range":{"timestamp":{"from":"1734404246000||-1d","to":"1734404246000","include_lower":true,"include_upper":true,"format":"epoch_millis","boost":1}}},{"range":{"bytes":{"from":0,"to":null,"include_lower":true,"include_upper":true,"boost":1}}}],"adjust_pure_negative":true,"boost":1}}}""";
+        "{\"size\":2,\"query\":{\"bool\":{\"filter\":[{\"range\":{\"timestamp\":{\"from\":\"1734404246000||-1d\",\"to\":\"1734404246000\",\"include_lower\":true,\"include_upper\":true,\"format\":\"epoch_millis\",\"boost\":1}}},{\"range\":{\"bytes\":{\"from\":0,\"to\":null,\"include_lower\":true,\"include_upper\":true,\"boost\":1}}}],\"adjust_pure_negative\":true,\"boost\":1}}}";
     private Map<String, Object> params = new HashMap<>();
     private final Client client = mock(Client.class);
     @Mock
@@ -108,9 +107,7 @@ public class LogPatternToolTests {
 
     private void mockPPLInvocation() throws IOException {
         String pplRawResponse =
-            """
-                {"schema":[{"name":"field1","type":"string"},{"name":"field2","type":"string"},{"name":"field3","type":"long"}],"datarows":[["123","123.abc-AB * De /",12345],["123","45.abc-AB * De /",12345],["123","12.abc_AB * De /",12345],["123","45.ab_AB * De /",12345],["123",".abAB * De /",12345]],"total":5,"size":5}
-                """;
+            "{\"schema\":[{\"name\":\"field1\",\"type\":\"string\"},{\"name\":\"field2\",\"type\":\"string\"},{\"name\":\"field3\",\"type\":\"long\"}],\"datarows\":[[\"123\",\"123.abc-AB * De /\",12345],[\"123\",\"45.abc-AB * De /\",12345],[\"123\",\"12.abc_AB * De /\",12345],[\"123\",\"45.ab_AB * De /\",12345],[\"123\",\".abAB * De /\",12345]],\"total\":5,\"size\":5}";
         doAnswer(invocation -> {
             ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
             listener.onResponse(pplQueryResponse);
@@ -399,9 +396,7 @@ public class LogPatternToolTests {
     @Test
     public void testExecutionWithPPLInputWhenNoDataIsReturned() {
         String emptyDataPPLResponse =
-            """
-                {"schema":[{"name":"field1","type":"string"},{"name":"field2","type":"string"},{"name":"field3","type":"long"}],"datarows":[],"total":0,"size":0}
-                """;
+            "{\"schema\":[{\"name\":\"field1\",\"type\":\"string\"},{\"name\":\"field2\",\"type\":\"string\"},{\"name\":\"field3\",\"type\":\"long\"}],\"datarows\":[],\"total\":0,\"size\":0}";
         doAnswer(invocation -> {
             ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
             listener.onResponse(pplQueryResponse);

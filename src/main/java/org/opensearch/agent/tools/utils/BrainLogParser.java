@@ -197,7 +197,7 @@ public class BrainLogParser {
                 .collect(Collectors.toList());
             WordCombination candidate = this.findCandidate(sortedWordCombinations);
             String groupCandidateStr = String.format(Locale.ROOT, "%d,%d", candidate.wordFreq(), candidate.sameFreqCount());
-            this.logIdGroupCandidateMap.put(tokens.getLast(), groupCandidateStr);
+            this.logIdGroupCandidateMap.put(tokens.get(tokens.size() - 1), groupCandidateStr);
             this.updateGroupTokenFreqMap(tokens, groupCandidateStr);
         }
     }
@@ -208,7 +208,7 @@ public class BrainLogParser {
      * @return parsed log pattern that is a list of string
      */
     public List<String> parseLogPattern(List<String> tokens) {
-        String logId = tokens.getLast();
+        String logId = tokens.get(tokens.size() - 1);
         String groupCandidateStr = this.logIdGroupCandidateMap.get(logId);
         String[] groupCandidate = groupCandidateStr.split(",");
         Long repFreq = Long.parseLong(groupCandidate[0]); // representative frequency of the group
@@ -255,7 +255,7 @@ public class BrainLogParser {
 
         Map<String, List<String>> logPatternMap = new HashMap<>();
         for (List<String> processedMessage : processedMessages) {
-            String logId = processedMessage.getLast();
+            String logId = processedMessage.get(processedMessage.size() - 1);
             List<String> logPattern = this.parseLogPattern(processedMessage);
             String patternKey = String.join(" ", logPattern);
             logPatternMap.computeIfAbsent(patternKey, k -> new ArrayList<>()).add(logId);
@@ -309,7 +309,7 @@ public class BrainLogParser {
                 return wordCombination;
             }
         }
-        return sortedWordCombinations.getFirst();
+        return sortedWordCombinations.get(0);
     }
 
     private void updateGroupTokenFreqMap(List<String> tokens, String groupCandidateStr) {

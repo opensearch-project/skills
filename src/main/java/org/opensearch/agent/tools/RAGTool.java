@@ -145,7 +145,7 @@ public class RAGTool implements Tool {
 
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build();
             MLInput mlInput = MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build();
-            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput, null);
+            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput);
 
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(resp -> {
                 ModelTensorOutput modelTensorOutput = (ModelTensorOutput) resp.getOutput();

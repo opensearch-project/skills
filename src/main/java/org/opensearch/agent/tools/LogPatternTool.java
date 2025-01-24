@@ -151,7 +151,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
                 }.getType());
                 List<Map<String, String>> schema = (List<Map<String, String>>) pplResult.getOrDefault("schema", new ArrayList<>());
                 List<List<Object>> dataRows = (List<List<Object>>) pplResult.getOrDefault("datarows", new ArrayList<>());
-                List<Object> firstDataRow = dataRows.isEmpty() ? new ArrayList<>() : dataRows.getFirst();
+                List<Object> firstDataRow = dataRows.isEmpty() ? new ArrayList<>() : dataRows.get(0);
                 if (!firstDataRow.isEmpty()) {
                     Map<String, Object> firstLogSource = new HashMap<>();
                     IntStream
