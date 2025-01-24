@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.containsString;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 import org.hamcrest.MatcherAssert;
 import org.junit.After;
@@ -86,7 +87,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
             .fromJson(
                 executeAgent(
                     agentId,
-                    String.format("{\"parameters\": {\"index\": \"%s\", \"input\": \"%s\"}}", TEST_PATTERN_INDEX_NAME, "{}")
+                    String.format(Locale.ROOT, "{\"parameters\": {\"index\": \"%s\", \"input\": \"%s\"}}", TEST_PATTERN_INDEX_NAME, "{}")
                 ),
                 JsonElement.class
             );
@@ -96,10 +97,7 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     public void testLogPatternToolWithSpecifiedPatternField() {
         JsonElement expected = gson
-            .fromJson(
-                "[{\"total count\":5,\"sample logs\":[{\"field1\":\"123\",\"field3\":12345,\"field2\":\"123.abc-AB * De /\"},{\"field1\":\"123\",\"field3\":12345,\"field2\":\"45.abc-AB * De /\"}],\"pattern\":\"\"}]",
-                JsonElement.class
-            );
+            .fromJson("[{\"total count\":5,\"sample logs\":[\"123\", \"123\"],\"pattern\":\"123\"}]", JsonElement.class);
         JsonElement result = gson
             .fromJson(
                 executeAgent(
@@ -188,6 +186,29 @@ public class LogPatternToolIT extends BaseAgentToolsIT {
         );
         MatcherAssert
             .assertThat(exception.getMessage(), containsString("\"Invalid value -1 for parameter sample_log_size, it should be positive"));
+    }
+
+    @SneakyThrows
+    public void testLogPatternToolWithPPLInput() {
+        JsonElement expected = gson
+            .fromJson(
+                Files.readString(Path.of(this.getClass().getClassLoader().getResource(responseBodyResourceFile).toURI())),
+                JsonElement.class
+            );
+        JsonElement result = gson
+            .fromJson(
+                executeAgent(
+                    agentId,
+                    String
+                        .format(
+                            "{\"parameters\": {\"index\": \"%s\", \"ppl\": \"%s\"}}",
+                            TEST_PATTERN_INDEX_NAME,
+                            String.format(Locale.ROOT, "source=%s", TEST_PATTERN_INDEX_NAME)
+                        )
+                ),
+                JsonElement.class
+            );
+        assertEquals(expected, result);
     }
 
 }

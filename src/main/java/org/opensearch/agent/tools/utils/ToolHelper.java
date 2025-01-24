@@ -11,7 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.action.ActionResponse;
 import org.opensearch.ml.common.utils.StringUtils;
+import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -74,5 +77,16 @@ public class ToolHelper {
                 }
             }
         }
+    }
+
+    /**
+     * Wrapper to get PPL transport action listener
+     * @param listener input action listener
+     * @return wrapped action listener
+     */
+    public static <T extends ActionResponse> ActionListener<T> getPPLTransportActionListener(
+        ActionListener<TransportPPLQueryResponse> listener
+    ) {
+        return ActionListener.wrap(r -> { listener.onResponse(TransportPPLQueryResponse.fromActionResponse(r)); }, listener::onFailure);
     }
 }
