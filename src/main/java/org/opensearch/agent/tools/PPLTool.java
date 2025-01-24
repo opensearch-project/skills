@@ -35,7 +35,6 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -51,7 +50,6 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
-import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
 
 import com.google.common.collect.ImmutableMap;
@@ -233,7 +231,7 @@ public class PPLTool implements Tool {
                         .execute(
                             PPLQueryAction.INSTANCE,
                             transportPPLQueryRequest,
-                            getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
+                            ToolHelper.getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
                                 String results = transportPPLQueryResponse.getResult();
                                 Map<String, String> returnResults = ImmutableMap.of("ppl", ppl, "executionResult", results);
                                 listener
@@ -442,10 +440,6 @@ public class PPLTool implements Tool {
                 }
             }
         }
-    }
-
-    private <T extends ActionResponse> ActionListener<T> getPPLTransportActionListener(ActionListener<TransportPPLQueryResponse> listener) {
-        return ActionListener.wrap(r -> { listener.onResponse(TransportPPLQueryResponse.fromActionResponse(r)); }, listener::onFailure);
     }
 
     @SuppressWarnings("unchecked")
