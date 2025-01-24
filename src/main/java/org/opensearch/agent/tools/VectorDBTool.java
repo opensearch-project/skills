@@ -17,12 +17,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.opensearch.client.Client;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
-import org.opensearch.ml.common.spi.tools.WithModelTool;
 
 /**
  * This tool supports neural search with embedding models and knn index.
@@ -112,7 +112,9 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
         return TYPE;
     }
 
-    public static class Factory extends AbstractRetrieverTool.Factory<VectorDBTool>  implements WithModelTool.Factory<NeuralSparseSearchTool>  {
+    public static class Factory extends AbstractRetrieverTool.Factory<VectorDBTool>
+        implements
+            WithModelTool.Factory<NeuralSparseSearchTool> {
         private static VectorDBTool.Factory INSTANCE;
 
         public static VectorDBTool.Factory getInstance() {
