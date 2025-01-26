@@ -129,7 +129,8 @@ public class PPLTool implements Tool {
         ALLOWED_FIELDS_TYPE.add("nested");
         ALLOWED_FIELDS_TYPE.add("geo_point");
 
-        // data type is from here https://github.com/opensearch-project/opensearch-spark/blob/main/ppl-spark-integration/src/main/java/org/opensearch/sql/data/type/ExprCoreType.java#L76-L80
+        // data type is from here
+        // https://github.com/opensearch-project/opensearch-spark/blob/main/ppl-spark-integration/src/main/java/org/opensearch/sql/data/type/ExprCoreType.java#L76-L80
         ALLOWED_FIELD_TYPE_FOR_S3 = new HashSet<>();
         ALLOWED_FIELD_TYPE_FOR_S3.add("string");
         ALLOWED_FIELD_TYPE_FOR_S3.add("byte");
@@ -273,7 +274,10 @@ public class PPLTool implements Tool {
             Map<String, Object> schema = gson.fromJson(parameters.get("schema"), Map.class);
             List<Object> samples = gson.fromJson(parameters.get("samples"), List.class);
             try {
-                String tableInfo = constructTableInfoByPPLResultForSpark(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
+                String tableInfo = constructTableInfoByPPLResultForSpark(
+                    transferS3SchemaFormat(schema),
+                    (Map<String, Object>) samples.get(0)
+                );
                 actionsAfterTableinfo.onResponse(tableInfo);
             } catch (Exception e) {
                 log.info("fail to get table info for s3");
@@ -458,7 +462,8 @@ public class PPLTool implements Tool {
         }
     }
 
-    private String constructTableInfoByPPLResultForSpark(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException {
+    private String constructTableInfoByPPLResultForSpark(Map<String, Object> schema, Map<String, Object> samples)
+        throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
         for (Map.Entry<String, Object> entry : schema.entrySet()) {
             String key = entry.getKey();
