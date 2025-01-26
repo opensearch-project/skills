@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.security.AccessController;
@@ -33,7 +34,6 @@ import lombok.extern.log4j.Log4j2;
 @ToolAnnotation(NeuralSparseSearchTool.TYPE)
 public class NeuralSparseSearchTool extends AbstractRetrieverTool implements WithModelTool {
     public static final String TYPE = "NeuralSparseSearchTool";
-    public static final String MODEL_ID_FIELD = "model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String NESTED_PATH_FIELD = "nested_path";
 
@@ -63,7 +63,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool implements Wit
     protected String getQueryBody(String queryText) {
         if (StringUtils.isBlank(embeddingField) || StringUtils.isBlank(modelId)) {
             throw new IllegalArgumentException(
-                "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
+                "Parameter [" + EMBEDDING_FIELD + "] and [" + COMMON_MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
 
@@ -126,7 +126,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool implements Wit
             String index = (String) params.get(INDEX_FIELD);
             String embeddingField = (String) params.get(EMBEDDING_FIELD);
             String[] sourceFields = gson.fromJson((String) params.get(SOURCE_FIELD), String[].class);
-            String modelId = (String) params.get(MODEL_ID_FIELD);
+            String modelId = (String) params.get(COMMON_MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
             String nestedPath = (String) params.get(NESTED_PATH_FIELD);
             return NeuralSparseSearchTool
@@ -154,7 +154,7 @@ public class NeuralSparseSearchTool extends AbstractRetrieverTool implements Wit
 
         @Override
         public List<String> getAllModelKeys() {
-            return List.of(MODEL_ID_FIELD);
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 }

@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 
 import java.io.IOException;
@@ -68,8 +69,6 @@ import lombok.extern.log4j.Log4j2;
 public class PPLTool implements WithModelTool {
 
     public static final String TYPE = "PPLTool";
-
-    public static final String MODEL_ID_FIELD = "model_id";
 
     @Setter
     private Client client;
@@ -318,7 +317,7 @@ public class PPLTool implements WithModelTool {
             validatePPLToolParameters(map);
             return new PPLTool(
                 client,
-                (String) map.get(MODEL_ID_FIELD),
+                (String) map.get(COMMON_MODEL_ID_FIELD),
                 (String) map.getOrDefault("prompt", ""),
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
@@ -344,7 +343,7 @@ public class PPLTool implements WithModelTool {
 
         @Override
         public List<String> getAllModelKeys() {
-            return List.of(MODEL_ID_FIELD);
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 

@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -70,8 +71,6 @@ import lombok.extern.log4j.Log4j2;
 public class CreateAnomalyDetectorTool implements WithModelTool {
     // the type of this tool
     public static final String TYPE = "CreateAnomalyDetectorTool";
-
-    public static final String MODEL_ID_FIELD = "model_id";
 
     // the default description of this tool
     private static final String DEFAULT_DESCRIPTION =
@@ -430,7 +429,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
          */
         @Override
         public CreateAnomalyDetectorTool create(Map<String, Object> map) {
-            String modelId = (String) map.getOrDefault(MODEL_ID_FIELD, "");
+            String modelId = (String) map.getOrDefault(COMMON_MODEL_ID_FIELD, "");
             if (modelId.isEmpty()) {
                 throw new IllegalArgumentException("model_id cannot be empty.");
             }
@@ -463,7 +462,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
 
         @Override
         public List<String> getAllModelKeys() {
-            return List.of(MODEL_ID_FIELD);
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 }

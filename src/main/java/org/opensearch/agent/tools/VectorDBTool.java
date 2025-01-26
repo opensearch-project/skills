@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.security.AccessController;
@@ -36,7 +37,6 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
 
     public static String DEFAULT_DESCRIPTION =
         "Use this tool to performs knn-based dense retrieval. It takes 1 argument named input which is a string query for dense retrieval. The tool returns the dense retrieval results for the query.";
-    public static final String MODEL_ID_FIELD = "model_id";
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String K_FIELD = "k";
     public static final Integer DEFAULT_K = 10;
@@ -71,7 +71,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
     protected String getQueryBody(String queryText) {
         if (StringUtils.isBlank(embeddingField) || StringUtils.isBlank(modelId)) {
             throw new IllegalArgumentException(
-                "Parameter [" + EMBEDDING_FIELD + "] and [" + MODEL_ID_FIELD + "] can not be null or empty."
+                "Parameter [" + EMBEDDING_FIELD + "] and [" + COMMON_MODEL_ID_FIELD + "] can not be null or empty."
             );
         }
 
@@ -133,7 +133,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
             String index = (String) params.get(INDEX_FIELD);
             String embeddingField = (String) params.get(EMBEDDING_FIELD);
             String[] sourceFields = gson.fromJson((String) params.get(SOURCE_FIELD), String[].class);
-            String modelId = (String) params.get(MODEL_ID_FIELD);
+            String modelId = (String) params.get(COMMON_MODEL_ID_FIELD);
             Integer docSize = params.containsKey(DOC_SIZE_FIELD) ? Integer.parseInt((String) params.get(DOC_SIZE_FIELD)) : DEFAULT_DOC_SIZE;
             Integer k = params.containsKey(K_FIELD) ? Integer.parseInt((String) params.get(K_FIELD)) : DEFAULT_K;
             String nestedPath = (String) params.get(NESTED_PATH_FIELD);
@@ -168,7 +168,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
 
         @Override
         public List<String> getAllModelKeys() {
-            return List.of(MODEL_ID_FIELD);
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 }

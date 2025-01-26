@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import static org.opensearch.action.support.clustermanager.ClusterManagerNodeRequest.DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
 import java.util.Arrays;
@@ -70,7 +71,6 @@ public class CreateAlertTool implements WithModelTool {
     @Getter
     private final String toolPrompt;
 
-    private static final String MODEL_ID = "model_id";
     private static final String PROMPT_FILE_PATH = "CreateAlertDefaultPrompt.json";
     private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
     private static final Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(CreateAlertTool.class, PROMPT_FILE_PATH);
@@ -301,7 +301,7 @@ public class CreateAlertTool implements WithModelTool {
 
         @Override
         public CreateAlertTool create(Map<String, Object> params) {
-            String modelId = (String) params.get(MODEL_ID);
+            String modelId = (String) params.get(COMMON_MODEL_ID_FIELD);
             if (org.apache.commons.lang3.StringUtils.isBlank(modelId)) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
@@ -327,7 +327,7 @@ public class CreateAlertTool implements WithModelTool {
 
         @Override
         public List<String> getAllModelKeys() {
-            return List.of(MODEL_ID);
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 }
