@@ -129,6 +129,7 @@ dependencies {
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
 
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
+    compileOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
     compileOnly group: 'org.json', name: 'json', version: '20240205'
     compileOnly("com.google.guava:guava:33.2.1-jre")
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
