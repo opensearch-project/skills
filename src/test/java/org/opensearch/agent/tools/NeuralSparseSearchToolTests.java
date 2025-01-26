@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.HashMap;
@@ -31,7 +32,7 @@ public class NeuralSparseSearchToolTests {
         params.put(NeuralSparseSearchTool.INDEX_FIELD, AbstractRetrieverToolTests.TEST_INDEX);
         params.put(NeuralSparseSearchTool.EMBEDDING_FIELD, TEST_EMBEDDING_FIELD);
         params.put(NeuralSparseSearchTool.SOURCE_FIELD, gson.toJson(AbstractRetrieverToolTests.TEST_SOURCE_FIELDS));
-        params.put(NeuralSparseSearchTool.MODEL_ID_FIELD, TEST_MODEL_ID);
+        params.put(COMMON_MODEL_ID_FIELD, TEST_MODEL_ID);
         params.put(NeuralSparseSearchTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
     }
 
@@ -91,7 +92,7 @@ public class NeuralSparseSearchToolTests {
     @SneakyThrows
     public void testGetQueryBodyWithIllegalParams() {
         Map<String, Object> illegalParams1 = new HashMap<>(params);
-        illegalParams1.remove(NeuralSparseSearchTool.MODEL_ID_FIELD);
+        illegalParams1.remove(COMMON_MODEL_ID_FIELD);
         NeuralSparseSearchTool tool1 = NeuralSparseSearchTool.Factory.getInstance().create(illegalParams1);
         Exception exception1 = assertThrows(
             IllegalArgumentException.class,
@@ -124,7 +125,7 @@ public class NeuralSparseSearchToolTests {
 
         assertThrows(
             ClassCastException.class,
-            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(NeuralSparseSearchTool.MODEL_ID_FIELD, 123))
+            () -> NeuralSparseSearchTool.Factory.getInstance().create(Map.of(COMMON_MODEL_ID_FIELD, 123))
         );
 
         assertThrows(
