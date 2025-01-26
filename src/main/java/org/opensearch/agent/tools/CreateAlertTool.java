@@ -6,6 +6,7 @@
 package org.opensearch.agent.tools;
 
 import static org.opensearch.action.support.clustermanager.ClusterManagerNodeRequest.DEFAULT_CLUSTER_MANAGER_NODE_TIMEOUT;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.isJson;
 
 import java.util.Arrays;
@@ -34,8 +35,8 @@ import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
-import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.StringUtils;
@@ -48,7 +49,7 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @ToolAnnotation(CreateAlertTool.TYPE)
-public class CreateAlertTool implements Tool {
+public class CreateAlertTool implements WithModelTool {
     public static final String TYPE = "CreateAlertTool";
 
     private static final String DEFAULT_DESCRIPTION =
@@ -70,7 +71,6 @@ public class CreateAlertTool implements Tool {
     @Getter
     private final String toolPrompt;
 
-    private static final String MODEL_ID = "model_id";
     private static final String PROMPT_FILE_PATH = "CreateAlertDefaultPrompt.json";
     private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
     private static final Map<String, String> promptDict = ToolHelper.loadDefaultPromptDictFromFile(CreateAlertTool.class, PROMPT_FILE_PATH);
@@ -276,7 +276,7 @@ public class CreateAlertTool implements Tool {
         return getIndexRequest;
     }
 
-    public static class Factory implements Tool.Factory<CreateAlertTool> {
+    public static class Factory implements WithModelTool.Factory<CreateAlertTool> {
 
         private Client client;
 
@@ -301,7 +301,7 @@ public class CreateAlertTool implements Tool {
 
         @Override
         public CreateAlertTool create(Map<String, Object> params) {
-            String modelId = (String) params.get(MODEL_ID);
+            String modelId = (String) params.get(COMMON_MODEL_ID_FIELD);
             if (org.apache.commons.lang3.StringUtils.isBlank(modelId)) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
@@ -323,6 +323,11 @@ public class CreateAlertTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(COMMON_MODEL_ID_FIELD);
         }
     }
 }
