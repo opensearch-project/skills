@@ -104,7 +104,7 @@ public class PPLTool implements Tool {
 
     private static Set<String> ALLOWED_FIELDS_TYPE;
 
-    private static Map<String, String> ALLOWED_FIELD_TYPE_FOR_S3;
+    private static Set<String> ALLOWED_FIELD_TYPE_FOR_S3;
 
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
@@ -129,11 +129,20 @@ public class PPLTool implements Tool {
         ALLOWED_FIELDS_TYPE.add("nested");
         ALLOWED_FIELDS_TYPE.add("geo_point");
 
-        ALLOWED_FIELD_TYPE_FOR_S3 = new HashMap<>();
-        ALLOWED_FIELD_TYPE_FOR_S3.put("string", "text");
-        ALLOWED_FIELD_TYPE_FOR_S3.put("timestamp", "date");
-        ALLOWED_FIELD_TYPE_FOR_S3.put("int", "integer");
-        ALLOWED_FIELD_TYPE_FOR_S3.put("double", "double");
+        // data type is from here https://github.com/opensearch-project/opensearch-spark/blob/main/ppl-spark-integration/src/main/java/org/opensearch/sql/data/type/ExprCoreType.java#L76-L80
+        ALLOWED_FIELD_TYPE_FOR_S3 = new HashSet<>();
+        ALLOWED_FIELD_TYPE_FOR_S3.add("string");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("byte");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("short");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("integer");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("long");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("float");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("double");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("boolean");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("date");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("timestamp");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("time");
+        ALLOWED_FIELD_TYPE_FOR_S3.add("interval");
 
         DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
     }
@@ -264,7 +273,7 @@ public class PPLTool implements Tool {
             Map<String, Object> schema = gson.fromJson(parameters.get("schema"), Map.class);
             List<Object> samples = gson.fromJson(parameters.get("samples"), List.class);
             try {
-                String tableInfo = constructTableInfoByPPLResult(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
+                String tableInfo = constructTableInfoByPPLResultForSpark(transferS3SchemaFormat(schema), (Map<String, Object>) samples.get(0));
                 actionsAfterTableinfo.onResponse(tableInfo);
             } catch (Exception e) {
                 log.info("fail to get table info for s3");
@@ -409,10 +418,7 @@ public class PPLTool implements Tool {
     }
 
     private void addSparkType(Map<String, String> fieldToType, String targetKey, String targetType) {
-        if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(targetType)) {
-            targetType = ALLOWED_FIELD_TYPE_FOR_S3.get(targetType);
-        }
-        if (ALLOWED_FIELDS_TYPE.contains(targetType)) {
+        if (ALLOWED_FIELD_TYPE_FOR_S3.contains(targetType)) {
             fieldToType.put(targetKey, targetType);
         }
     }
@@ -452,15 +458,12 @@ public class PPLTool implements Tool {
         }
     }
 
-    private String constructTableInfoByPPLResult(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException {
+    private String constructTableInfoByPPLResultForSpark(Map<String, Object> schema, Map<String, Object> samples) throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
         for (Map.Entry<String, Object> entry : schema.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue().toString();
-            if (ALLOWED_FIELD_TYPE_FOR_S3.containsKey(value)) {
-                value = ALLOWED_FIELD_TYPE_FOR_S3.get(value);
-            }
-            if (ALLOWED_FIELDS_TYPE.contains(value)) {
+            if (ALLOWED_FIELD_TYPE_FOR_S3.contains(value)) {
                 fieldsToType.put(key, value);
             } else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
                 extractS3Types(value, key, fieldsToType);
