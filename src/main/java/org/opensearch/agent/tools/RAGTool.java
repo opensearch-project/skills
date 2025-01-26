@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.apache.commons.lang3.StringEscapeUtils.escapeJson;
 import static org.opensearch.agent.tools.AbstractRetrieverTool.*;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.toJson;
@@ -231,7 +232,7 @@ public class RAGTool implements WithModelTool {
             String inferenceModelId = enableContentGeneration ? (String) params.get(INFERENCE_MODEL_ID_FIELD) : "";
             switch (queryType) {
                 case "neural_sparse":
-                    params.put(NeuralSparseSearchTool.MODEL_ID_FIELD, embeddingModelId);
+                    params.put(COMMON_MODEL_ID_FIELD, embeddingModelId);
                     NeuralSparseSearchTool neuralSparseSearchTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
                     return RAGTool
                         .builder()
@@ -242,7 +243,7 @@ public class RAGTool implements WithModelTool {
                         .queryTool(neuralSparseSearchTool)
                         .build();
                 case "neural":
-                    params.put(VectorDBTool.MODEL_ID_FIELD, embeddingModelId);
+                    params.put(COMMON_MODEL_ID_FIELD, embeddingModelId);
                     VectorDBTool vectorDBTool = VectorDBTool.Factory.getInstance().create(params);
                     return RAGTool
                         .builder()
