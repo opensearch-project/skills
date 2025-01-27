@@ -80,9 +80,13 @@ apply plugin: 'opensearch.pluginzip'
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 def jsJarDirectory = "$buildDir/dependencies/opensearch-job-scheduler"
 def adJarDirectory = "$buildDir/dependencies/opensearch-anomaly-detection"
+def sparkDir = "$buildDir/dependencies/spark"
 
 configurations {
     zipArchive
+    spark {
+        transitive = false
+    }
     secureIntegTestPluginArchive
     all {
         resolutionStrategy {
@@ -110,12 +114,22 @@ task addJarsToClasspath(type: Copy) {
         include "opensearch-anomaly-detection-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
+
+    // spark jar
+    from(fileTree(dir: sparkDir)) {
+        include("*.jar")
+    }
+    into("$buildDir/classes")
 }
+
+
 
 dependencies {
     // 3P dependencies
     compileOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
+    compileOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
     compileOnly group: 'org.json', name: 'json', version: '20240205'
     compileOnly("com.google.guava:guava:33.2.1-jre")
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
@@ -123,11 +137,25 @@ dependencies {
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
 
+    spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
+    spark 'org.apache.spark:spark-core_2.13:3.5.4'
+    spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
+
+    implementation 'org.scala-lang:scala-library:2.13.8'
+    implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
+    implementation("org.json4s:json4s-ast_2.13:3.7.0-M11")
+    implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
+    implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
+    implementation 'com.fasterxml.jackson.module:jackson-module-scala_3:2.18.2'
+    implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
+    implementation("com.thoughtworks.paranamer:paranamer:2.8")
+
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
+    implementation fileTree(dir: sparkDir, include: ["spark*.jar"])
     compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
@@ -158,6 +186,64 @@ dependencies {
     testImplementation "commons-validator:commons-validator:1.8.0"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.2'
 }
+task addSparkJar(type: Copy) {
+    mustRunAfter()
+    from(configurations.spark)
+    into sparkDir
+
+    doLast {
+        def jarA = file("$sparkDir/spark-sql-api_2.13-3.5.4.jar")
+        def jarB = file("$sparkDir/spark-core_2.13-3.5.4.jar")
+        def jarC = file("$sparkDir/spark-common-utils_2.13-3.5.4.jar")
+
+        // 3a. Extract jar A to manipulate it
+        def jarAContents = file("$buildDir/tmp/JarAContents")
+        delete(jarAContents)
+        jarAContents.mkdirs()
+        copy {
+            from zipTree(jarA)
+            into jarAContents
+        }
+        // Remove the unwanted directory from jar A
+        delete file("${jarAContents}/org/apache/spark/unused")
+
+        // Re-compress jar A
+        ant.zip(destfile: jarA, baseDir: jarAContents)
+
+        // 3b. Repeat for jar B
+        def jarBContents = file("$buildDir/tmp/JarBContents")
+        delete(jarBContents)
+        jarBContents.mkdirs()
+        copy {
+            from zipTree(jarB)
+            into jarBContents
+        }
+        // Remove the unwanted directory from jar B
+        delete file("${jarBContents}/org/apache/spark/unused")
+
+        // Re-compress jar B
+        ant.zip(destfile: jarB, baseDir: jarBContents)
+
+        def jarCContents = file("$buildDir/tmp/JarBContents")
+        delete(jarCContents)
+        jarCContents.mkdirs()
+        copy {
+            from zipTree(jarC)
+            into jarCContents
+        }
+        // Remove the unwanted directory from jar C
+        delete file("${jarCContents}/org/apache/spark/unused")
+        delete file("${jarCContents}/org/apache/spark/SparkDriverExecutionException.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException\$.class")
+        delete file("${jarCContents}/org/apache/spark/SparkUserAppException*class")
+
+
+        // Re-compress jar C
+        ant.zip(destfile: jarC, baseDir: jarCContents)
+    }
+}
+
 
 task extractSqlJar(type: Copy) {
     mustRunAfter()
@@ -180,6 +266,7 @@ task extractAdJar(type: Copy) {
 tasks.addJarsToClasspath.dependsOn(extractSqlJar)
 tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
+tasks.addJarsToClasspath.dependsOn(addSparkJar)
 project.tasks.delombok.dependsOn(addJarsToClasspath)
 tasks.publishNebulaPublicationToMavenLocal.dependsOn ':generatePomFileForPluginZipPublication'
 tasks.validateNebulaPom.dependsOn ':generatePomFileForPluginZipPublication'
@@ -339,7 +426,6 @@ task integTest(type: RestIntegTestTask) {
 tasks.named("check").configure { dependsOn(integTest) }
 
 integTest {
-
     dependsOn "bundlePlugin"
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
@@ -398,7 +484,6 @@ integTest {
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
     }
 }
-
 // Set up integration test clusters, installs all zipArchive dependencies and this plugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
