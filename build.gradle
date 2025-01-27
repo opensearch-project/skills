@@ -141,7 +141,7 @@ dependencies {
     spark 'org.apache.spark:spark-core_2.13:3.5.4'
     spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
 
-    implementation 'org.scala-lang:scala-library:2.13.8'
+    implementation 'org.scala-lang:scala-library:2.13.9'
     implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
     implementation("org.json4s:json4s-ast_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
