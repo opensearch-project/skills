@@ -21,6 +21,7 @@ Fix github ci linux build and RAG tool missing return  ([#477](https://github.co
 
 ### Maintenance
 bump byte buddy version from 1.15.4 to 1.15.10  ([#466](https://github.com/opensearch-project/skills/pull/466))
+fix(deps): update dependency org.scala-lang:scala-library to v2.13.9  ([#496](https://github.com/opensearch-project/skills/pull/496))
 
 ### Documentation
 Sync maintainers list  ([#488](https://github.com/opensearch-project/skills/pull/488))
