@@ -105,7 +105,7 @@ public class PPLTool implements WithModelTool {
 
     private static Set<String> ALLOWED_FIELDS_TYPE;
 
-    private static Set<String> ALLOWED_FIELD_TYPE_FOR_S3;
+    private static Set<String> ALLOWED_FIELD_TYPE_FOR_SPARK;
 
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
@@ -132,19 +132,19 @@ public class PPLTool implements WithModelTool {
 
         // data type is from here
         // https://github.com/opensearch-project/opensearch-spark/blob/main/ppl-spark-integration/src/main/java/org/opensearch/sql/data/type/ExprCoreType.java#L76-L80
-        ALLOWED_FIELD_TYPE_FOR_S3 = new HashSet<>();
-        ALLOWED_FIELD_TYPE_FOR_S3.add("string");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("byte");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("short");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("integer");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("long");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("float");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("double");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("boolean");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("date");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("timestamp");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("time");
-        ALLOWED_FIELD_TYPE_FOR_S3.add("interval");
+        ALLOWED_FIELD_TYPE_FOR_SPARK = new HashSet<>();
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("string");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("byte");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("short");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("integer");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("long");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("float");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("double");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("boolean");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("date");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("timestamp");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("time");
+        ALLOWED_FIELD_TYPE_FOR_SPARK.add("interval");
 
         DEFAULT_PROMPT_DICT = loadDefaultPromptDict();
     }
@@ -427,8 +427,8 @@ public class PPLTool implements WithModelTool {
     }
 
     private void addSparkType(Map<String, String> fieldToType, String targetKey, String targetType) {
-        if (ALLOWED_FIELD_TYPE_FOR_S3.contains(targetType)) {
-            fieldToType.put(targetKey, targetType);
+        if (ALLOWED_FIELD_TYPE_FOR_SPARK.contains(targetType.toLowerCase(Locale.ROOT))) {
+            fieldToType.put(targetKey, targetType.toLowerCase(Locale.ROOT));
         }
     }
 
@@ -473,8 +473,8 @@ public class PPLTool implements WithModelTool {
         for (Map.Entry<String, Object> entry : schema.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue().toString();
-            if (ALLOWED_FIELD_TYPE_FOR_S3.contains(value)) {
-                fieldsToType.put(key, value);
+            if (ALLOWED_FIELD_TYPE_FOR_SPARK.contains(value.toLowerCase(Locale.ROOT))) {
+                fieldsToType.put(key, value.toLowerCase(Locale.ROOT));
             } else if (value.toLowerCase(Locale.ROOT).startsWith("struct<") || value.toLowerCase(Locale.ROOT).startsWith("array<")) {
                 extractS3Types(value, key, fieldsToType);
             }
