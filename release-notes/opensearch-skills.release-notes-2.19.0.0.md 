@@ -15,6 +15,7 @@ Support s3 using repackage  ([#482](https://github.com/opensearch-project/skills
 
 ### Bug Fixes
 fix compilation issue caused by AD change  ([#458](https://github.com/opensearch-project/skills/pull/458))
+fix fix ppl bug  ([#500](https://github.com/opensearch-project/skills/pull/500))
 
 ### Infrastructure
 Fix github ci linux build and RAG tool missing return  ([#477](https://github.com/opensearch-project/skills/pull/477))
