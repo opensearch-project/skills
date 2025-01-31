@@ -489,13 +489,14 @@ public class PPLTool implements WithModelTool {
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         for (String key : sortedKeys) {
             String line = "";
-            if (ALLOWED_FIELDS_TYPE.contains(fieldsToType.get(key))) {
+            if (ALLOWED_FIELD_TYPE_FOR_SPARK.contains(fieldsToType.get(key))) {
                 line = "- " + key + ": " + fieldsToType.get(key);
+                if (fieldsToSample.containsKey(key)) {
+                    line += " (" + fieldsToSample.get(key) + ")";
+                }
+                tableInfoJoiner.add(line);
             }
-            if (fieldsToSample.containsKey(key)) {
-                line += " (" + fieldsToSample.get(key) + ")";
-            }
-            tableInfoJoiner.add(line);
+
         }
         return tableInfoJoiner.toString();
 
