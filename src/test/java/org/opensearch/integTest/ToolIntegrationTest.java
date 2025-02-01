@@ -19,6 +19,7 @@ import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
 
@@ -45,7 +46,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         clusterSettings(false);
         connectorId = setUpConnectorWithRetry(5);
         TimeUnit.SECONDS.sleep(3);
-        queryConnector();
+        log.info(queryConnector());
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
         // wait for model to get deployed
@@ -160,14 +161,14 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         return JsonParser.parseString(resp).getAsJsonObject().get("model_group_id").getAsString();
     }
 
-    private String queryConnector() throws IOException {
+    private JsonObject queryConnector() throws IOException {
         Request request = new Request("POST", "/.plugins-ml-connector/_search");
         request.setJsonEntity("{\n" + "    \"query\": {\n" + "      \"match_all\": {}\n" + "} \n" + "} \n");
         Response response = executeRequest(request);
 
         String resp = readResponse(response);
 
-        return JsonParser.parseString(resp).getAsJsonObject().getAsString();
+        return JsonParser.parseString(resp).getAsJsonObject();
     }
 
     private String setupLLMModel(String connectorId, String modelGroupId) throws IOException {
