@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -19,6 +20,7 @@ import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
 
@@ -44,6 +46,13 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         server.start();
         clusterSettings(false);
         connectorId = setUpConnectorWithRetry(5);
+        TimeUnit.SECONDS.sleep(3);
+        JsonObject tmp = queryConnector();
+        log.info(tmp);
+        log.debug(tmp);
+        log.error(tmp);
+        //assertTrue(Objects.equals(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsString(), "0"));
+        //assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() > 0);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
         // wait for model to get deployed
@@ -64,10 +73,12 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
 
     @After
     public void deleteModel() {
-        deleteModel(modelId);
+        if (modelId != null) {
+            deleteModel(modelId);
+        }
     }
 
-    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException {
+    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException, IOException {
         int retryTimes = 0;
         String connectorId = null;
         while (retryTimes < maxRetryTimes) {
@@ -81,6 +92,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
                 TimeUnit.SECONDS.sleep(20);
             }
         }
+        queryConnector();
         return connectorId;
     }
 
@@ -155,6 +167,16 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         return JsonParser.parseString(resp).getAsJsonObject().get("model_group_id").getAsString();
     }
 
+    private JsonObject queryConnector() throws IOException {
+        Request request = new Request("POST", "/.plugins-ml-connector/_search");
+        request.setJsonEntity("{\n" + "    \"query\": {\n" + "      \"match_all\": {}\n" + "} \n" + "} \n");
+        Response response = executeRequest(request);
+
+        String resp = readResponse(response);
+
+        return JsonParser.parseString(resp).getAsJsonObject();
+    }
+
     private String setupLLMModel(String connectorId, String modelGroupId) throws IOException {
         Request request = new Request("POST", "/_plugins/_ml/models/_register?deploy=true");
         request
@@ -224,7 +246,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
         builder.addHeader("Content-Type", "application/json");
         request.setOptions(builder);
-        return client().performRequest(request);
+        return adminClient().performRequest(request);
     }
 
     public static String readResponse(Response response) throws IOException {
