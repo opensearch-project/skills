@@ -50,6 +50,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         log.info(tmp);
         log.debug(tmp);
         log.error(tmp);
+        assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() == 0);
         assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() > 0);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
