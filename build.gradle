@@ -154,7 +154,7 @@ dependencies {
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
-    compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
+    implementation fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
     implementation fileTree(dir: sparkDir, include: ["spark*.jar"])
