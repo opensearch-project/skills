@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -50,7 +51,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         log.info(tmp);
         log.debug(tmp);
         log.error(tmp);
-        // assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() == 0);
+        assertTrue(Objects.equals(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsString(), "0"));
         assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() > 0);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
