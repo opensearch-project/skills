@@ -77,7 +77,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             .endObject()
             .endObject();
         Response response = makeRequest(
-            client(),
+            adminClient(),
             "PUT",
             "_cluster/settings",
             null,
@@ -109,37 +109,37 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     protected String createConnector(String requestBody) {
-        Response response = makeRequest(client(), "POST", "/_plugins/_ml/connectors/_create", null, requestBody, null);
+        Response response = makeRequest(adminClient(), "POST", "/_plugins/_ml/connectors/_create", null, requestBody, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, MLModel.CONNECTOR_ID_FIELD).toString();
     }
 
     protected String registerModel(String requestBody) {
-        Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/_register", null, requestBody, null);
+        Response response = makeRequest(adminClient(), "POST", "/_plugins/_ml/models/_register", null, requestBody, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
     protected String deployModel(String modelId) {
-        Response response = makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_deploy", null, (String) null, null);
+        Response response = makeRequest(adminClient(), "POST", "/_plugins/_ml/models/" + modelId + "/_deploy", null, (String) null, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, MLTask.TASK_ID_FIELD).toString();
     }
 
     protected String indexMonitor(String monitorAsJsonString) {
-        Response response = makeRequest(client(), "POST", "_plugins/_alerting/monitors", null, monitorAsJsonString, null);
+        Response response = makeRequest(adminClient(), "POST", "_plugins/_alerting/monitors", null, monitorAsJsonString, null);
 
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, "_id").toString();
     }
 
     protected void deleteMonitor(String monitorId) {
-        Response response = makeRequest(client(), "DELETE", "_plugins/_alerting/monitors/" + monitorId, null, (String) null, null);
+        Response response = makeRequest(adminClient(), "DELETE", "_plugins/_alerting/monitors/" + monitorId, null, (String) null, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
     protected String indexDetector(String detectorAsJsonString) {
-        Response response = makeRequest(client(), "POST", "_plugins/_anomaly_detection/detectors", null, detectorAsJsonString, null);
+        Response response = makeRequest(adminClient(), "POST", "_plugins/_anomaly_detection/detectors", null, detectorAsJsonString, null);
 
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, "_id").toString();
@@ -147,7 +147,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     protected void startDetector(String detectorId) {
         Response response = makeRequest(
-            client(),
+            adminClient(),
             "POST",
             "_plugins/_anomaly_detection/detectors/" + detectorId + "/_start",
             null,
@@ -159,7 +159,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     protected void stopDetector(String detectorId) {
         Response response = makeRequest(
-            client(),
+            adminClient(),
             "POST",
             "_plugins/_anomaly_detection/detectors/" + detectorId + "/_stop",
             null,
@@ -171,7 +171,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     protected void deleteDetector(String detectorId) {
         Response response = makeRequest(
-            client(),
+            adminClient(),
             "DELETE",
             "_plugins/_anomaly_detection/detectors/" + detectorId,
             null,
@@ -189,7 +189,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         Predicate<Map<String, Object>> condition
     ) {
         for (int i = 0; i < MAX_TASK_RESULT_QUERY_TIME_IN_SECOND; i++) {
-            Response response = makeRequest(client(), method, endpoint, null, jsonEntity, null);
+            Response response = makeRequest(adminClient(), method, endpoint, null, jsonEntity, null);
             assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
             Map<String, Object> responseInMap = parseResponseToMap(response);
             if (condition.test(responseInMap)) {
@@ -236,15 +236,15 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     @SneakyThrows
     protected void deleteModel(String modelId) {
         // need to undeploy first as model can be in use
-        makeRequest(client(), "POST", "/_plugins/_ml/models/" + modelId + "/_undeploy", null, (String) null, null);
+        makeRequest(adminClient(), "POST", "/_plugins/_ml/models/" + modelId + "/_undeploy", null, (String) null, null);
         waitModelUndeployed(modelId);
-        makeRequest(client(), "DELETE", "/_plugins/_ml/models/" + modelId, null, (String) null, null);
+        makeRequest(adminClient(), "DELETE", "/_plugins/_ml/models/" + modelId, null, (String) null, null);
     }
 
     protected void createIndexWithConfiguration(String indexName, String indexConfiguration) throws Exception {
         boolean indexExists = indexExists(indexName);
         if (!indexExists) {
-            Response response = makeRequest(client(), "PUT", indexName, null, indexConfiguration, null);
+            Response response = makeRequest(adminClient(), "PUT", indexName, null, indexConfiguration, null);
             Map<String, Object> responseInMap = parseResponseToMap(response);
             assertEquals("true", responseInMap.get("acknowledged").toString());
             assertEquals(indexName, responseInMap.get("index").toString());
@@ -252,14 +252,14 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     }
 
     protected void createIngestPipelineWithConfiguration(String pipelineName, String body) throws Exception {
-        Response response = makeRequest(client(), "PUT", "/_ingest/pipeline/" + pipelineName, null, body, null);
+        Response response = makeRequest(adminClient(), "PUT", "/_ingest/pipeline/" + pipelineName, null, body, null);
         Map<String, Object> responseInMap = parseResponseToMap(response);
         assertEquals("true", responseInMap.get("acknowledged").toString());
     }
 
     // Similar to deleteExternalIndices, but including indices with "." prefix vs. excluding them
     protected void deleteSystemIndices() throws IOException {
-        final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
+        final Response response = adminClient().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
         final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (
             final XContentParser parser = xContentType
@@ -305,7 +305,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         }
         builder.endObject();
         Response response = makeRequest(
-            client(),
+            adminClient(),
             "POST",
             "/" + indexName + "/_doc/" + docId + "?refresh=true",
             null,
@@ -317,12 +317,12 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     protected void addDocToIndex(String indexName, String docId, String contents) {
-        Response response = makeRequest(client(), "POST", "/" + indexName + "/_doc/" + docId + "?refresh=true", null, contents, null);
+        Response response = makeRequest(adminClient(), "POST", "/" + indexName + "/_doc/" + docId + "?refresh=true", null, contents, null);
         assertEquals(RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
     public String createAgent(String requestBody) {
-        Response response = makeRequest(client(), "POST", "/_plugins/_ml/agents/_register", null, requestBody, null);
+        Response response = makeRequest(adminClient(), "POST", "/_plugins/_ml/agents/_register", null, requestBody, null);
         assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         return parseFieldFromResponse(response, AgentMLInput.AGENT_ID_FIELD).toString();
     }
@@ -343,7 +343,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
     // {"inference_results": [{"output": [{"name": "response","result": "the result to return."}]}]}
     @SneakyThrows
     public String executeAgent(String agentId, String requestBody) {
-        Response response = makeRequest(client(), "POST", "/_plugins/_ml/agents/" + agentId + "/_execute", null, requestBody, null);
+        Response response = makeRequest(adminClient(), "POST", "/_plugins/_ml/agents/" + agentId + "/_execute", null, requestBody, null);
         String responseBody = EntityUtils.toString(response.getEntity());
         logger.info("responseBody for agent execution: {}, agentId: {}", responseBody, agentId);
         return parseStringResponseFromExecuteAgentResponse(response);

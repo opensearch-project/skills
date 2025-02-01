@@ -245,7 +245,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
         builder.addHeader("Content-Type", "application/json");
         request.setOptions(builder);
-        return client().performRequest(request);
+        return adminClient().performRequest(request);
     }
 
     public static String readResponse(Response response) throws IOException {
