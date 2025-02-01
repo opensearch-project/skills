@@ -44,6 +44,8 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         server.start();
         clusterSettings(false);
         connectorId = setUpConnectorWithRetry(5);
+        TimeUnit.SECONDS.sleep(3);
+        queryConnector();
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
         // wait for model to get deployed
@@ -64,10 +66,12 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
 
     @After
     public void deleteModel() {
-        deleteModel(modelId);
+        if (modelId != null) {
+            deleteModel(modelId);
+        }
     }
 
-    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException {
+    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException, IOException {
         int retryTimes = 0;
         String connectorId = null;
         while (retryTimes < maxRetryTimes) {
@@ -81,6 +85,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
                 TimeUnit.SECONDS.sleep(20);
             }
         }
+        queryConnector();
         return connectorId;
     }
 
@@ -153,6 +158,16 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         String resp = readResponse(response);
 
         return JsonParser.parseString(resp).getAsJsonObject().get("model_group_id").getAsString();
+    }
+
+    private String queryConnector() throws IOException {
+        Request request = new Request("POST", "/.plugins-ml-connector/_search");
+        request.setJsonEntity("{\n" + "    \"query\": {\n" + "      \"match_all\": {}\n" + "} \n" + "} \n");
+        Response response = executeRequest(request);
+
+        String resp = readResponse(response);
+
+        return JsonParser.parseString(resp).getAsJsonObject().getAsString();
     }
 
     private String setupLLMModel(String connectorId, String modelGroupId) throws IOException {
