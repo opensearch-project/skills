@@ -46,7 +46,11 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         clusterSettings(false);
         connectorId = setUpConnectorWithRetry(5);
         TimeUnit.SECONDS.sleep(3);
-        log.info(queryConnector());
+        JsonObject tmp = queryConnector();
+        log.info(tmp);
+        log.debug(tmp);
+        log.error(tmp);
+        assertTrue(tmp.get("hits").getAsJsonObject().get("total").getAsJsonObject().get("value").getAsInt() > 0);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
         // wait for model to get deployed
