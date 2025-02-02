@@ -552,8 +552,9 @@ testClusters.integTest {
         setting("plugins.security.authcz.admin_dn", "\n- CN=kirk,OU=client,O=client,L=test, C=de")
         setting('plugins.security.restapi.roles_enabled', '["all_access", "security_rest_api_access"]')
         setting('plugins.security.restapi.admin.enabled', "true")
-        setting('plugins.security.system_indices.enabled', "true")
-        setting('plugins.security.system_indices.permission.enabled', "true")
+        //setting('plugins.security.system_indices.enabled', "true")
+        //setting('plugins.security.system_indices.permission.enabled', "true")
+        /*
         setting('plugins.security.system_indices.indices', '[' +
                 '".plugins-ml-config", ' +
                 '".plugins-ml-connector", ' +
@@ -582,7 +583,7 @@ testClusters.integTest {
                 ']'
         )
 
-
+        */
         setSecure(true)
     }
 
