@@ -69,7 +69,7 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         }
     }
 
-    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException, IOException {
+    private String setUpConnectorWithRetry(int maxRetryTimes) throws InterruptedException {
         int retryTimes = 0;
         String connectorId = null;
         while (retryTimes < maxRetryTimes) {

@@ -286,7 +286,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
                 .collect(Collectors.toList());
 
             for (final String indexName : externalIndices) {
-                Response deleteResponse = client().performRequest(new Request("DELETE", "/" + indexName));
+                Response deleteResponse = adminClient().performRequest(new Request("DELETE", "/" + indexName));
                 Map<String, Object> responseInMap = parseResponseToMap(deleteResponse);
                 assertEquals(
                     String.format(Locale.ROOT, "delete index %s failed with response: %s", indexName, gson.toJson(responseInMap)),
