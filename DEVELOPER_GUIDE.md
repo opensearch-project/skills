@@ -30,6 +30,21 @@ To build from the command line, use `./gradlew`.
 ./gradlew publishToMavenLocal
 ```
 
+### Build your custom tool
+
+* Create a new Java file in the specified package directory -> eg. cat src/main/java/org/opensearch/agent/tools/NewTool.java
+* Modify ToolPlugin file to instantiate, initialize, and add the new tool, refer -> ([here](https://github.com/opensearch-project/skills/pull/81/files))
+* Start the server with ./gradlew run
+
+### Test your custom tool
+
+* Make sure to have access to the LLM that you're using
+* Create any remote connector using ([remote_inference_blueprints](https://github.com/opensearch-project/ml-commons/blob/main/docs/remote_inference_blueprints))
+* Get the model_id from the step above and provide it as a parameter in below step to register the agent
+* Register the agent that will run your custom tool for ([reference](https://opensearch.org/docs/latest/ml-commons-plugin/agents-tools/tools/ml-model-tool/#step-3-register-a-flow-agent-that-will-run-the-mlmodeltool))
+* Get the agent_id from the step above and provide it as part of URL in below step to run the agent
+* Run the agent ([refer](https://opensearch.org/docs/latest/ml-commons-plugin/agents-tools/tools/ml-model-tool/#step-4-run-the-agent))
+
 ### Using IntelliJ IDEA
 
 Launch Intellij IDEA, choose **Import Project**, and select the `settings.gradle` file in the root of this package. 
