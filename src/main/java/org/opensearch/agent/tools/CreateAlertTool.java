@@ -302,7 +302,7 @@ public class CreateAlertTool implements WithModelTool {
         @Override
         public CreateAlertTool create(Map<String, Object> params) {
             String modelId = (String) params.get(COMMON_MODEL_ID_FIELD);
-            if (org.apache.commons.lang3.StringUtils.isBlank(modelId)) {
+            if (org.apache.commons.lang3.StringUtils.isNullOrEmpty(modelId) || modelId.isBlank()) {
                 throw new IllegalArgumentException("model_id cannot be null or blank.");
             }
             String modelType = (String) params.getOrDefault("model_type", ModelType.CLAUDE.toString());

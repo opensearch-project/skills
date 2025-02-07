@@ -111,7 +111,8 @@ public class VectorDBToolIT extends BaseAgentToolsIT {
             + modelId
             + "\",\n"
             + "        \"field_map\": {\n"
-            + "          \"text\": \"embedding\"\n"
+            + "          \"text\": \"" +
+                                "\"\n"
             + "        }\n"
             + "      }\n"
             + "    }\n"

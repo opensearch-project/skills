@@ -1,0 +1,19 @@
+{
+  "name": "Test_PainlessTool",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "PainlessTool",
+      "name": "PPL",
+      "parameters": {
+        "script": "<SCRIPT1>"
+      }
+    },
+    {
+      "type": "PainlessTool",
+      "parameters": {
+        "script": "<SCRIPT2>"
+      }
+    }
+  ]
+}

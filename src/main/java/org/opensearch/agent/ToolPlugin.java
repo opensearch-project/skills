@@ -15,6 +15,7 @@ import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
 import org.opensearch.agent.tools.LogPatternTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
+import org.opensearch.agent.tools.PainlessScriptTool;
 import org.opensearch.agent.tools.RAGTool;
 import org.opensearch.agent.tools.SearchAlertsTool;
 import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
@@ -73,6 +74,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         CreateAlertTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
+        PainlessTool.Factory.getInstance().init(scriptService);
         return Collections.emptyList();
     }
 
@@ -91,6 +93,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance()
+                PainlessTool.Factory.getInstance()
             );
     }
 
