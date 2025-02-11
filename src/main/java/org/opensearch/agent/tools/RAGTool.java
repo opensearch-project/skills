@@ -7,6 +7,8 @@ package org.opensearch.agent.tools;
 
 import static org.apache.commons.lang3.StringEscapeUtils.escapeJson;
 import static org.opensearch.agent.tools.AbstractRetrieverTool.*;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
+import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.toJson;
 
@@ -24,8 +26,8 @@ import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
-import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 
@@ -44,7 +46,7 @@ import lombok.extern.log4j.Log4j2;
 @Setter
 @Getter
 @ToolAnnotation(RAGTool.TYPE)
-public class RAGTool implements Tool {
+public class RAGTool implements WithModelTool {
     public static final String TYPE = "RAGTool";
     public static String DEFAULT_DESCRIPTION =
         "Use this tool to retrieve helpful information to optimize the output of the large language model to answer questions.";
@@ -94,6 +96,8 @@ public class RAGTool implements Tool {
     }
 
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        final String tenantId = parameters.get(TENANT_ID_FIELD);
+
         String input = null;
 
         if (!this.validate(parameters)) {
@@ -113,6 +117,7 @@ public class RAGTool implements Tool {
             T queryToolOutput;
             if (!this.enableContentGeneration) {
                 listener.onResponse(r);
+                return;
             }
             if (r.equals("Can not get any match from search result.")) {
                 queryToolOutput = (T) "";
@@ -144,7 +149,7 @@ public class RAGTool implements Tool {
 
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet.builder().parameters(tmpParameters).build();
             MLInput mlInput = MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build();
-            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput, null);
+            ActionRequest request = new MLPredictionTaskRequest(this.inferenceModelId, mlInput, null, tenantId);
 
             client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(resp -> {
                 ModelTensorOutput modelTensorOutput = (ModelTensorOutput) resp.getOutput();
@@ -193,7 +198,7 @@ public class RAGTool implements Tool {
     /**
      * Factory class to create RAGTool
      */
-    public static class Factory implements Tool.Factory<RAGTool> {
+    public static class Factory implements WithModelTool.Factory<RAGTool> {
         private Client client;
         private NamedXContentRegistry xContentRegistry;
 
@@ -227,7 +232,7 @@ public class RAGTool implements Tool {
             String inferenceModelId = enableContentGeneration ? (String) params.get(INFERENCE_MODEL_ID_FIELD) : "";
             switch (queryType) {
                 case "neural_sparse":
-                    params.put(NeuralSparseSearchTool.MODEL_ID_FIELD, embeddingModelId);
+                    params.put(COMMON_MODEL_ID_FIELD, embeddingModelId);
                     NeuralSparseSearchTool neuralSparseSearchTool = NeuralSparseSearchTool.Factory.getInstance().create(params);
                     return RAGTool
                         .builder()
@@ -238,7 +243,7 @@ public class RAGTool implements Tool {
                         .queryTool(neuralSparseSearchTool)
                         .build();
                 case "neural":
-                    params.put(VectorDBTool.MODEL_ID_FIELD, embeddingModelId);
+                    params.put(COMMON_MODEL_ID_FIELD, embeddingModelId);
                     VectorDBTool vectorDBTool = VectorDBTool.Factory.getInstance().create(params);
                     return RAGTool
                         .builder()
@@ -268,6 +273,11 @@ public class RAGTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public List<String> getAllModelKeys() {
+            return List.of(INFERENCE_MODEL_ID_FIELD, EMBEDDING_MODEL_ID_FIELD);
         }
     }
 }
