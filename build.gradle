@@ -153,7 +153,8 @@ dependencies {
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
 
     // Plugin dependencies
-    compileOnly group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
+    compileOnly group: 'org.opensearch', name:'opensearch-ml-common', version: "${opensearch_build}"
+    compileOnly group: 'org.opensearch', name:'opensearch-ml-spi', version: "${opensearch_build}"
     compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
