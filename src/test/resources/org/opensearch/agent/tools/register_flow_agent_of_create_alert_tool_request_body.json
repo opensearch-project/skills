@@ -1,0 +1,12 @@
+{
+  "name": "Test_create_alert_flow_agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "CreateAlertTool",
+      "parameters": {
+        "model_id": "<MODEL_ID>"
+      }
+    }
+  ]
+}

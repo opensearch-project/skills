@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.opensearch.agent.tools.AbstractRetrieverTool.*;
 import static org.opensearch.agent.tools.AbstractRetrieverToolTests.*;
 import static org.opensearch.agent.tools.VectorDBTool.DEFAULT_K;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.io.IOException;
@@ -426,7 +427,7 @@ public class RAGToolTests {
         params.put(VectorDBTool.NESTED_PATH_FIELD, TEST_NESTED_PATH);
         RAGTool rAGtool1 = factoryMock.create(params);
         VectorDBTool.Factory.getInstance().init(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY);
-        params.put(VectorDBTool.MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
+        params.put(COMMON_MODEL_ID_FIELD, TEST_EMBEDDING_MODEL_ID);
         VectorDBTool queryTool = VectorDBTool.Factory.getInstance().create(params);
         RAGTool rAGtool2 = new RAGTool(client, TEST_XCONTENT_REGISTRY_FOR_NEURAL_QUERY, TEST_INFERENCE_MODEL_ID, true, queryTool);
 

@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public class VectorDBToolTests {
         params.put(VectorDBTool.INDEX_FIELD, AbstractRetrieverToolTests.TEST_INDEX);
         params.put(VectorDBTool.EMBEDDING_FIELD, TEST_EMBEDDING_FIELD);
         params.put(VectorDBTool.SOURCE_FIELD, gson.toJson(AbstractRetrieverToolTests.TEST_SOURCE_FIELDS));
-        params.put(VectorDBTool.MODEL_ID_FIELD, TEST_MODEL_ID);
+        params.put(COMMON_MODEL_ID_FIELD, TEST_MODEL_ID);
         params.put(VectorDBTool.DOC_SIZE_FIELD, AbstractRetrieverToolTests.TEST_DOC_SIZE.toString());
         params.put(VectorDBTool.K_FIELD, TEST_K.toString());
     }
@@ -93,7 +94,7 @@ public class VectorDBToolTests {
     @SneakyThrows
     public void testGetQueryBodyWithIllegalParams() {
         Map<String, Object> illegalParams1 = new HashMap<>(params);
-        illegalParams1.remove(VectorDBTool.MODEL_ID_FIELD);
+        illegalParams1.remove(COMMON_MODEL_ID_FIELD);
         VectorDBTool tool1 = VectorDBTool.Factory.getInstance().create(illegalParams1);
         Exception exception1 = assertThrows(
             IllegalArgumentException.class,
@@ -118,7 +119,7 @@ public class VectorDBToolTests {
 
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.EMBEDDING_FIELD, 123)));
 
-        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.MODEL_ID_FIELD, 123)));
+        assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(COMMON_MODEL_ID_FIELD, 123)));
 
         assertThrows(
             ClassCastException.class,

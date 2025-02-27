@@ -7,6 +7,7 @@ package org.opensearch.integTest;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,8 +66,7 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"wrong\", \"index\": \"employee\"}}")
         );
-        MatcherAssert.assertThat(exception.getMessage(), allOf(containsString("execute ppl:source=employee| asd, get error")));
-
+        assertTrue(exception.getMessage().contains("Failed to parse query due to offending symbol [asd]"));
     }
 
     public void testPPLTool_withWrongModelId_thenThrowException() {

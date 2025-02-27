@@ -15,6 +15,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -172,6 +173,122 @@ public class PPLToolTests {
             assertEquals("ppl result", returnResults.get("executionResult"));
             assertEquals("source=demo| head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testTool_ForSparkInputWithWrongSchema() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        List<Object> samples = List.of(Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133"))));
+        String wrongSchema = "array<structss<name:string,value:string>>";
+        Map<String, Object> schema = Map.of("headers", Map.of("col_name", "headers", "data_type", wrongSchema));
+        Exception exception = assertThrows(
+            IllegalStateException.class,
+            () -> tool
+                .run(
+                    ImmutableMap
+                        .of(
+                            "index",
+                            "demo",
+                            "question",
+                            "demo",
+                            "samples",
+                            gson.toJson(samples),
+                            "schema",
+                            gson.toJson(schema),
+                            "type",
+                            "s3"
+                        ),
+                    ActionListener.<String>wrap(executePPLResult -> {
+                        Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                        assertEquals("ppl result", returnResults.get("executionResult"));
+                        assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                    }, e -> { throw new IllegalStateException(e.getMessage()); })
+                )
+        );
+        assertEquals("Unable to extract field types from schema " + wrongSchema, exception.getMessage());
+
+    }
+
+    @Test
+    public void testTool_ForSparkInputWithArrayInput() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        List<Object> samples = List.of(Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133"))));
+        Map<String, Object> schema = Map
+            .of("headers", Map.of("col_name", "headers", "data_type", "array<struct<name:string,value:string>>"));
+        tool
+            .run(
+                ImmutableMap
+                    .of("index", "demo", "question", "demo", "samples", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                ActionListener.<String>wrap(executePPLResult -> {
+                    Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                    assertEquals("ppl result", returnResults.get("executionResult"));
+                    assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                }, e -> { log.info(e); })
+            );
+
+    }
+
+    @Test
+    public void testTool_ForSparkInputWithArrayString() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        List<Object> samples = List.of(Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133"))));
+        Map<String, Object> schema = Map.of("headers", Map.of("col_name", "headers", "data_type", "array<string>"));
+        tool
+            .run(
+                ImmutableMap
+                    .of("index", "demo", "question", "demo", "samples", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                ActionListener.<String>wrap(executePPLResult -> {
+                    Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                    assertEquals("ppl result", returnResults.get("executionResult"));
+                    assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                }, e -> { log.info(e); })
+            );
+
+    }
+
+    @Test
+    public void testTool_ForSparkInputWithStructInput() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        List<Object> samples = List
+            .of(
+                Map
+                    .of(
+                        "httpMethod",
+                        "POST",
+                        "httpRequest",
+                        Map.of("headers", List.of(Map.of("name", "X-Forwarded-For", "value", "34.210.155.133")))
+                    )
+            );
+        Map<String, Object> schema = Map
+            .of(
+                "httpRequest",
+                Map.of("col_name", "httpRequest", "data_type", "struct<headers:array<struct<name:string,value:string>>,httpMethod:string>"),
+                "httpMethod",
+                Map.of("col_name", "httpMethod", "data_type", "string")
+            );
+        tool
+            .run(
+                ImmutableMap
+                    .of("index", "demo", "question", "demo", "samples", gson.toJson(samples), "schema", gson.toJson(schema), "type", "s3"),
+                ActionListener.<String>wrap(executePPLResult -> {
+                    Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                    assertEquals("ppl result", returnResults.get("executionResult"));
+                    assertEquals("source=demo| head 1", returnResults.get("ppl"));
+                }, e -> { log.info(e); })
+            );
 
     }
 

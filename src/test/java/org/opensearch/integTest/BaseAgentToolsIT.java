@@ -6,6 +6,8 @@
 package org.opensearch.integTest;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -88,9 +90,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     @SneakyThrows
     private Map<String, Object> parseResponseToMap(Response response) {
-        Map<String, Object> responseInMap = XContentHelper
-            .convertToMap(XContentType.JSON.xContent(), EntityUtils.toString(response.getEntity()), false);
-        return responseInMap;
+        String responseBody = EntityUtils.toString(response.getEntity());
+        try {
+            return XContentHelper.convertToMap(XContentType.JSON.xContent(), responseBody, false);
+        } catch (Exception e) {
+            logger.error("failed to parse response to map: {}", responseBody, e);
+            return Collections.emptyMap();
+        }
     }
 
     @SneakyThrows
@@ -333,6 +339,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
 
     // execute the agent, and return the String response from the json structure
     // {"inference_results": [{"output": [{"name": "response","result": "the result to return."}]}]}
+    @SneakyThrows
     public String executeAgent(String agentId, String requestBody) {
         Response response = makeRequest(client(), "POST", "/_plugins/_ml/agents/" + agentId + "/_execute", null, requestBody, null);
         return parseStringResponseFromExecuteAgentResponse(response);
@@ -387,5 +394,13 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
             request.setEntity(entity);
         }
         return client.performRequest(request);
+    }
+
+    @SneakyThrows
+    protected String registerAgent(String modelId, String requestBodyResourceFile) {
+        String registerAgentRequestBody = Files
+            .readString(Path.of(this.getClass().getClassLoader().getResource(requestBodyResourceFile).toURI()));
+        registerAgentRequestBody = registerAgentRequestBody.replace("<MODEL_ID>", modelId);
+        return createAgent(registerAgentRequestBody);
     }
 }

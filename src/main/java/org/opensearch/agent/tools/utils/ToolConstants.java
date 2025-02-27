@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools.utils;
 
+import java.util.Locale;
+
 public class ToolConstants {
     // Detector state is not cleanly defined on the backend plugin. So, we persist a standard
     // set of states here for users to interface with when fetching and filtering detectors.
@@ -15,6 +17,15 @@ public class ToolConstants {
         Disabled,
         Failed,
         Initializing
+    }
+
+    public enum ModelType {
+        CLAUDE,
+        OPENAI;
+
+        public static ModelType from(String value) {
+            return valueOf(value.toUpperCase(Locale.ROOT));
+        }
     }
 
     // System indices constants are not cleanly exposed from the AD & Alerting plugins, so we persist our
