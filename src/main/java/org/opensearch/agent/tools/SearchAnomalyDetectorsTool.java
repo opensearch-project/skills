@@ -23,7 +23,6 @@ import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
-import org.opensearch.client.Client;
 import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
@@ -41,6 +40,7 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
 import org.opensearch.timeseries.transport.GetConfigRequest;
+import org.opensearch.transport.client.Client;
 
 import lombok.Getter;
 import lombok.Setter;

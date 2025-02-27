@@ -9,7 +9,6 @@ import static org.apache.commons.lang3.StringEscapeUtils.escapeJson;
 import static org.opensearch.agent.tools.AbstractRetrieverTool.*;
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
 import static org.opensearch.ml.common.utils.StringUtils.toJson;
 
 import java.util.HashMap;
@@ -17,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.action.ActionRequest;
-import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
@@ -30,6 +28,7 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.transport.client.Client;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;

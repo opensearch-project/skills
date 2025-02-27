@@ -36,7 +36,6 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
-import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
@@ -57,6 +56,7 @@ import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
+import org.opensearch.transport.client.Client;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;

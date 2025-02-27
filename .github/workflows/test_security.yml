@@ -16,7 +16,7 @@ jobs:
   integ-test-with-security-linux:
     strategy:
       matrix:
-        java: [21]
+        java: [21, 23]
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     name: Run Security Integration Tests on Linux

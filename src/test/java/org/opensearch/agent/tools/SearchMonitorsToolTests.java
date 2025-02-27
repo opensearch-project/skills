@@ -30,10 +30,6 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
-import org.opensearch.client.AdminClient;
-import org.opensearch.client.ClusterAdminClient;
-import org.opensearch.client.IndicesAdminClient;
-import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.alerting.model.CronSchedule;
 import org.opensearch.commons.alerting.model.DataSources;
@@ -46,6 +42,10 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.aggregations.Aggregations;
+import org.opensearch.transport.client.AdminClient;
+import org.opensearch.transport.client.ClusterAdminClient;
+import org.opensearch.transport.client.IndicesAdminClient;
+import org.opensearch.transport.client.node.NodeClient;
 
 public class SearchMonitorsToolTests {
     @Mock
