@@ -14,7 +14,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.agent.tools.utils.ToolConstants;
-import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.index.IndexNotFoundException;
@@ -31,6 +30,7 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
+import org.opensearch.transport.client.Client;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -181,7 +181,7 @@ public class SearchAnomalyResultsTool implements Tool {
             sb.append("}");
         }
         sb.append("]");
-        sb.append("TotalAnomalyResults=").append(searchHits.getTotalHits().value);
+        sb.append("TotalAnomalyResults=").append(searchHits.getTotalHits().value());
         listener.onResponse((T) sb.toString());
     }
 

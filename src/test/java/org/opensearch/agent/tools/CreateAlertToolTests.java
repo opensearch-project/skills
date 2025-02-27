@@ -27,9 +27,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.admin.indices.get.GetIndexResponse;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
-import org.opensearch.client.AdminClient;
-import org.opensearch.client.Client;
-import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.common.action.ActionFuture;
 import org.opensearch.core.action.ActionListener;
@@ -40,6 +37,9 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
+import org.opensearch.transport.client.AdminClient;
+import org.opensearch.transport.client.Client;
+import org.opensearch.transport.client.IndicesAdminClient;
 
 import com.google.common.collect.ImmutableMap;
 

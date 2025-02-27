@@ -26,14 +26,14 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionType;
-import org.opensearch.client.AdminClient;
-import org.opensearch.client.ClusterAdminClient;
-import org.opensearch.client.IndicesAdminClient;
-import org.opensearch.client.node.NodeClient;
 import org.opensearch.commons.alerting.action.GetAlertsResponse;
 import org.opensearch.commons.alerting.model.Alert;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.transport.client.AdminClient;
+import org.opensearch.transport.client.ClusterAdminClient;
+import org.opensearch.transport.client.IndicesAdminClient;
+import org.opensearch.transport.client.node.NodeClient;
 
 public class SearchAlertsToolTests {
     @Mock

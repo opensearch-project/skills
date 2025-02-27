@@ -15,10 +15,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.opensearch.client.Client;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
+import org.opensearch.transport.client.Client;
 
 import lombok.Builder;
 import lombok.Getter;

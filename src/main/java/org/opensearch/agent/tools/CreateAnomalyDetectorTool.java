@@ -31,7 +31,6 @@ import org.apache.commons.text.StringSubstitutor;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
-import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
@@ -45,6 +44,7 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.transport.client.Client;
 
 import com.google.common.collect.ImmutableMap;
 

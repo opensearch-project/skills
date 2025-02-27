@@ -26,7 +26,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.agent.tools.utils.BrainLogParser;
 import org.opensearch.agent.tools.utils.ToolHelper;
-import org.opensearch.client.Client;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.logging.LoggerMessageFormat;
 import org.opensearch.core.common.util.CollectionUtils;
@@ -37,6 +36,7 @@ import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
+import org.opensearch.transport.client.Client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.reflect.TypeToken;

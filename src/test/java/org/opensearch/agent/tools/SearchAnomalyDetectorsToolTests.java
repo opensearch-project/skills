@@ -37,7 +37,6 @@ import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.ad.transport.SearchAnomalyDetectorAction;
 import org.opensearch.agent.TestHelpers;
 import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
-import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -46,6 +45,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.search.SearchHit;
 import org.opensearch.timeseries.model.IntervalTimeConfiguration;
+import org.opensearch.transport.client.node.NodeClient;
 
 public class SearchAnomalyDetectorsToolTests {
     @Mock
