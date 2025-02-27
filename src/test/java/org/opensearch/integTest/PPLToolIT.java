@@ -66,7 +66,7 @@ public class PPLToolIT extends ToolIntegrationTest {
             ResponseException.class,
             () -> executeAgent(agentId, "{\"parameters\": {\"question\": \"wrong\", \"index\": \"employee\"}}")
         );
-        assertTrue(exception.getMessage().contains("Failed to parse query due to offending symbol [asd]"));
+        assertTrue(exception.getMessage().contains("[asd] is not a valid term at this part of the query"));
     }
 
     public void testPPLTool_withWrongModelId_thenThrowException() {
