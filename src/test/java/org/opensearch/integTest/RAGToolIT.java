@@ -161,7 +161,6 @@ public class RAGToolIT extends ToolIntegrationTest {
             + "  },\n"
             + "  \"settings\": {\n"
             + "    \"index\": {\n"
-            + "      \"knn.space_type\": \"cosinesimil\",\n"
             + "      \"default_pipeline\": \"test-embedding-model\",\n"
             + "      \"knn\": \"true\"\n"
             + "    }\n"
