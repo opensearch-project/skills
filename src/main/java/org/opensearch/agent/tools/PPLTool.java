@@ -560,7 +560,13 @@ public class PPLTool implements WithModelTool {
             String p = entry.getKey();
             Object v = entry.getValue();
             while (v instanceof List<?>) {
-                v = ((List<?>) v).get(0);
+                List<?> ListValue = (List<?>) v;
+                if (!ListValue.isEmpty()) {
+                    v = ((List<?>) v).get(0);
+                } else {
+                    break;
+                }
+
             }
 
             String fullKey = prefix + p;
