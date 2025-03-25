@@ -559,8 +559,15 @@ public class PPLTool implements WithModelTool {
         for (Map.Entry<String, Object> entry : sampleSource.entrySet()) {
             String p = entry.getKey();
             Object v = entry.getValue();
-            while (v instanceof List<?>) {
-                v = ((List<?>) v).get(0);
+
+            while (!Objects.isNull(v) && v instanceof List<?>) {
+                List<?> listValue = (List<?>) v;
+                if (!listValue.isEmpty()) {
+                    v = ((List<?>) v).get(0);
+                } else {
+                    break;
+                }
+
             }
 
             String fullKey = prefix + p;
