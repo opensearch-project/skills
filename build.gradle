@@ -96,6 +96,7 @@ configurations {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
+            force("org.apache.httpcomponents.client5:httpclient5:5.4.1")
         }
     }
 }
@@ -138,6 +139,11 @@ dependencies {
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
+    compileOnly(group: 'org.apache.httpcomponents.core5', name: 'httpcore5', version: "${versions.httpcore5}")
+    compileOnly(group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: "${versions.httpcore5}")
+    compileOnly ('com.jayway.jsonpath:json-path:2.9.0') {
+        exclude group: 'net.minidev', module: 'json-smart'
+    }
 
     spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
     spark 'org.apache.spark:spark-core_2.13:3.5.4'
@@ -151,6 +157,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.module:jackson-module-scala_3:2.18.2'
     implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
+    implementation("org.jsoup:jsoup:1.19.1")
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-common', version: "${opensearch_build}"

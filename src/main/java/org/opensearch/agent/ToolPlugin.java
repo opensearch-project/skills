@@ -21,6 +21,7 @@ import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
 import org.opensearch.agent.tools.SearchAnomalyResultsTool;
 import org.opensearch.agent.tools.SearchMonitorsTool;
 import org.opensearch.agent.tools.VectorDBTool;
+import org.opensearch.agent.tools.WebSearchTool;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
@@ -90,7 +91,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 SearchMonitorsTool.Factory.getInstance(),
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
-                LogPatternTool.Factory.getInstance()
+                LogPatternTool.Factory.getInstance(),
+                WebSearchTool.Factory.getInstance()
             );
     }
 
