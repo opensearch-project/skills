@@ -157,7 +157,7 @@ dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-spi', version: "${opensearch_build}"
     compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
-    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
+    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
     implementation fileTree(dir: sparkDir, include: ["spark*.jar"])
     compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -264,11 +264,10 @@ task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
 
 task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
     from("$buildDir/opensearch-sql")
-    archiveFileName = "opensearch-sql-thin.jar"
+    archiveFileName = "opensearch-sql-thin-${opensearch_build}.jar"
     destinationDirectory = file(sqlJarDirectory)
     doLast {
         file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
-        file("${sqlJarDirectory}/opensearch-sql-thin.jar").renameTo("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
     }
 }
 
