@@ -54,7 +54,10 @@ public class PPLToolIT extends ToolIntegrationTest {
         String agentId = registerAgent();
         String result = executeAgent(agentId, "{\"parameters\": {\"question\": \"correct\", \"index\": \"employee\"}}");
         assertEquals(
-            "{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\",\"executionResult\":\"{\\n  \\\"schema\\\": [\\n    {\\n      \\\"name\\\": \\\"cnt\\\",\\n      \\\"type\\\": \\\"integer\\\"\\n    }\\n  ],\\n  \\\"datarows\\\": [\\n    [\\n      0\\n    ]\\n  ],\\n  \\\"total\\\": 1,\\n  \\\"size\\\": 1\\n}\"}",
+            "{\"ppl\":\"source\\u003demployee| where age \\u003e 56 | stats COUNT() as cnt\","
+                + "\"executionResult\":\"{\\n  \\\"schema\\\": [\\n    {\\n      \\\"name\\\": \\\"cnt\\\",\\n      "
+                + "\\\"type\\\": \\\"int\\\"\\n    }\\n  ],\\n  \\\"datarows\\\": [\\n    [\\n      0\\n    ]\\n  ],\\n  "
+                + "\\\"total\\\": 1,\\n  \\\"size\\\": 1\\n}\"}",
             result
         );
     }
