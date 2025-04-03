@@ -256,6 +256,22 @@ task extractSqlJar(type: Copy) {
     from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-sql-plugin")}))
     into sqlJarDirectory
 }
+task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
+    from zipTree("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
+    into("$buildDir/opensearch-sql")
+    include 'org/opensearch/sql/**'
+}
+
+task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
+    from("$buildDir/opensearch-sql")
+    archiveFileName = "opensearch-sql-thin.jar"
+    destinationDirectory = file(sqlJarDirectory)
+    doLast {
+        file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
+        file("${sqlJarDirectory}/opensearch-sql-thin.jar").renameTo("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
+    }
+}
+
 
 task extractJsJar(type: Copy) {
     mustRunAfter()
@@ -269,7 +285,7 @@ task extractAdJar(type: Copy) {
     into adJarDirectory
 }
 
-tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(replaceSqlJar)
 tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
 tasks.addJarsToClasspath.dependsOn(addSparkJar)
