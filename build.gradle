@@ -11,8 +11,8 @@ import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "3.0.0-alpha1-SNAPSHOT")
-         buildVersionQualifier = System.getProperty("build.version_qualifier", "alpha1")
+        opensearch_version = System.getProperty("opensearch.version", "3.0.0-beta1-SNAPSHOT")
+         buildVersionQualifier = System.getProperty("build.version_qualifier", "beta1")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
@@ -157,7 +157,7 @@ dependencies {
     compileOnly group: 'org.opensearch', name:'opensearch-ml-spi', version: "${opensearch_build}"
     compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
-    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
+    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar"])
     implementation fileTree(dir: sparkDir, include: ["spark*.jar"])
     compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -181,8 +181,8 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240303'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.14.2'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.15.10")
-    testImplementation("net.bytebuddy:byte-buddy-agent:1.15.10")
+    testImplementation("net.bytebuddy:byte-buddy:1.17.5")
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.17.5")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
@@ -256,6 +256,21 @@ task extractSqlJar(type: Copy) {
     from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-sql-plugin")}))
     into sqlJarDirectory
 }
+task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
+    from zipTree("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
+    into("$buildDir/opensearch-sql")
+    include 'org/opensearch/sql/**'
+}
+
+task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
+    from("$buildDir/opensearch-sql")
+    archiveFileName = "opensearch-sql-thin-${opensearch_build}.jar"
+    destinationDirectory = file(sqlJarDirectory)
+    doLast {
+        file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
+    }
+}
+
 
 task extractJsJar(type: Copy) {
     mustRunAfter()
@@ -269,7 +284,7 @@ task extractAdJar(type: Copy) {
     into adJarDirectory
 }
 
-tasks.addJarsToClasspath.dependsOn(extractSqlJar)
+tasks.addJarsToClasspath.dependsOn(replaceSqlJar)
 tasks.addJarsToClasspath.dependsOn(extractJsJar)
 tasks.addJarsToClasspath.dependsOn(extractAdJar)
 tasks.addJarsToClasspath.dependsOn(addSparkJar)
