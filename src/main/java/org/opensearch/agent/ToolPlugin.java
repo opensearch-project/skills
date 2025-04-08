@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
-import com.google.common.collect.ImmutableList;
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
 import org.opensearch.agent.tools.LogPatternTool;
@@ -41,6 +40,8 @@ import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
+
+import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
 
@@ -108,12 +109,12 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
     @Override
     public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
         FixedExecutorBuilder websearchCrawlThread = new FixedExecutorBuilder(
-                settings,
-                WEBSEARCH_CRAWLER_THREADPOOL,
-                Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
-                100,
-                SKILLS_THREAD_POOL_PREFIX,
-                false
+            settings,
+            WEBSEARCH_CRAWLER_THREADPOOL,
+            Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            100,
+            SKILLS_THREAD_POOL_PREFIX,
+            false
         );
 
         return ImmutableList.of(websearchCrawlThread);

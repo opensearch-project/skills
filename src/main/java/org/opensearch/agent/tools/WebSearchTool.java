@@ -33,6 +33,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.utils.StringUtils;
+import org.opensearch.threadpool.ThreadPool;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
@@ -42,7 +43,6 @@ import com.google.gson.JsonParser;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
-import org.opensearch.threadpool.ThreadPool;
 
 @Log4j2
 @Setter
