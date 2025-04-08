@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
+import com.google.common.collect.ImmutableList;
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
 import org.opensearch.agent.tools.LogPatternTool;
@@ -24,6 +25,8 @@ import org.opensearch.agent.tools.VectorDBTool;
 import org.opensearch.agent.tools.WebSearchTool;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
@@ -33,6 +36,8 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
+import org.opensearch.threadpool.ExecutorBuilder;
+import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
@@ -44,6 +49,9 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
     private Client client;
     private ClusterService clusterService;
     private NamedXContentRegistry xContentRegistry;
+
+    public static final String SKILLS_THREAD_POOL_PREFIX = "thread_pool.skills";
+    public static final String WEBSEARCH_CRAWLER_THREADPOOL = "websearch-crawler-threadpool";
 
     @SneakyThrows
     @Override
@@ -74,6 +82,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         CreateAlertTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
+        WebSearchTool.Factory.getInstance().init(threadPool);
         return Collections.emptyList();
     }
 
@@ -94,6 +103,20 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 LogPatternTool.Factory.getInstance(),
                 WebSearchTool.Factory.getInstance()
             );
+    }
+
+    @Override
+    public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
+        FixedExecutorBuilder websearchCrawlThread = new FixedExecutorBuilder(
+                settings,
+                WEBSEARCH_CRAWLER_THREADPOOL,
+                Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+                100,
+                SKILLS_THREAD_POOL_PREFIX,
+                false
+        );
+
+        return ImmutableList.of(websearchCrawlThread);
     }
 
 }

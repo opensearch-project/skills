@@ -15,8 +15,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -30,6 +28,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.opensearch.agent.ToolPlugin;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
@@ -43,6 +42,7 @@ import com.google.gson.JsonParser;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import org.opensearch.threadpool.ThreadPool;
 
 @Log4j2
 @Setter
@@ -68,10 +68,11 @@ public class WebSearchTool implements Tool {
     private String version;
     private CloseableHttpClient httpClient;
 
-    ExecutorService executor = Executors.newFixedThreadPool(8);
+    private final ThreadPool threadPool;
 
-    public WebSearchTool() {
+    public WebSearchTool(ThreadPool threadPool) {
         this.httpClient = HttpClients.createDefault();
+        this.threadPool = threadPool;
     }
 
     @Override
@@ -88,8 +89,7 @@ public class WebSearchTool implements Tool {
 
         // Google search parameters
         String engineId = parameters.getOrDefault("engine_id", null);
-
-        executor.submit(() -> {
+        threadPool.executor(ToolPlugin.WEBSEARCH_CRAWLER_THREADPOOL).submit(() -> {
             try {
                 AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
                     String parsedNextPage = null;
@@ -367,6 +367,7 @@ public class WebSearchTool implements Tool {
 
     public static class Factory implements Tool.Factory<WebSearchTool> {
         private static Factory INSTANCE;
+        private ThreadPool threadPool;
 
         public static Factory getInstance() {
             if (INSTANCE == null) {
@@ -379,10 +380,14 @@ public class WebSearchTool implements Tool {
             return INSTANCE;
         }
 
+        public void init(ThreadPool threadPool) {
+            this.threadPool = threadPool;
+        }
+
         @Override
         public WebSearchTool create(Map<String, Object> map) {
             validateParameters(map);
-            return new WebSearchTool();
+            return new WebSearchTool(threadPool);
         }
 
         private void validateParameters(Map<String, Object> map) {
