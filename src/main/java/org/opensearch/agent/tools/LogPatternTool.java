@@ -81,6 +81,7 @@ public class LogPatternTool extends AbstractRetrieverTool {
     private int topNPattern;
     private int sampleLogSize;
     private BrainLogParser logParser;
+    private Map<String, Object> attributes;
 
     @Builder
     public LogPatternTool(

@@ -71,6 +71,9 @@ public class SearchAnomalyDetectorsTool implements Tool {
     private Parser<?, ?> inputParser;
     @Setter
     private Parser<?, ?> outputParser;
+    @Getter
+    @Setter
+    private Map<String, Object> attributes;
 
     public SearchAnomalyDetectorsTool(Client client, NamedWriteableRegistry namedWriteableRegistry) {
         this.client = client;

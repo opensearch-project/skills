@@ -62,6 +62,9 @@ public class SearchMonitorsTool implements Tool {
     private Parser<?, ?> inputParser;
     @Setter
     private Parser<?, ?> outputParser;
+    @Getter
+    @Setter
+    private Map<String, Object> attributes;
 
     public SearchMonitorsTool(Client client) {
         this.client = client;

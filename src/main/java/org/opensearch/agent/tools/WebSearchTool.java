@@ -69,6 +69,7 @@ public class WebSearchTool implements Tool {
     private CloseableHttpClient httpClient;
 
     private final ThreadPool threadPool;
+    private Map<String, Object> attributes;
 
     public WebSearchTool(ThreadPool threadPool) {
         this.httpClient = HttpClients.createDefault();

@@ -51,6 +51,7 @@ public abstract class AbstractRetrieverTool implements Tool {
     protected String[] sourceFields;
     protected Integer docSize;
     protected String version;
+    protected Map<String, Object> attributes;
 
     protected AbstractRetrieverTool(
         Client client,

@@ -70,6 +70,9 @@ public class CreateAlertTool implements WithModelTool {
     private final String modelType;
     @Getter
     private final String toolPrompt;
+    @Getter
+    @Setter
+    private Map<String, Object> attributes;
 
     private static final String PROMPT_FILE_PATH = "CreateAlertDefaultPrompt.json";
     private static final String DEFAULT_QUESTION = "Create an alert as your recommendation based on the context";
