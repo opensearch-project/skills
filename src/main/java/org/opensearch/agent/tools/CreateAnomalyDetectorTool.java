@@ -130,6 +130,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
     private ModelType modelType;
     // the default prompt for creating anomaly detector
     private String contextPrompt;
+    private Map<String, Object> attributes;
 
     enum ModelType {
         CLAUDE,

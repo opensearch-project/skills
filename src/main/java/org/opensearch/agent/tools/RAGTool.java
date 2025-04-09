@@ -71,6 +71,7 @@ public class RAGTool implements WithModelTool {
     private Parser inputParser;
     @Setter
     private Parser outputParser;
+    private Map<String, Object> attributes;
 
     @Builder
     public RAGTool(

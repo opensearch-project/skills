@@ -61,6 +61,9 @@ public class SearchAnomalyResultsTool implements Tool {
     private Parser<?, ?> inputParser;
     @Setter
     private Parser<?, ?> outputParser;
+    @Getter
+    @Setter
+    private Map<String, Object> attributes;
 
     public SearchAnomalyResultsTool(Client client, NamedWriteableRegistry namedWriteableRegistry) {
         this.client = client;

@@ -99,6 +99,8 @@ public class PPLTool implements WithModelTool {
 
     private int head;
 
+    private Map<String, Object> attributes;
+
     private static Gson gson = org.opensearch.ml.common.utils.StringUtils.gson;
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
