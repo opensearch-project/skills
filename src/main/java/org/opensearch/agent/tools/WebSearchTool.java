@@ -52,9 +52,13 @@ public class WebSearchTool implements Tool {
 
     public static final String TYPE = "WebSearchTool";
 
-    private static final String DEFAULT_DESCRIPTION = "A generic web search tool that supports multiple search engines and endpoints. "
-        + "Parameters: {\"query\": \"search terms\", \"engine\": \"google|duckduckgo|bing\", "
-        + "\"endpoint\": \"API endpoint\", \"next_page\": \"search result next page link\"}";
+    private static final String DEFAULT_DESCRIPTION = "A generic web search tool that supports multiple search engines and endpoints. " +
+            "Parameters: {" +
+            "\\\"query\\\": \\\"search terms\\\", " +
+            "\\\"engine\\\": \\\"google|duckduckgo|bing\\\", " +
+            "\\\"endpoint\\\": \\\"API endpoint\\\", " +
+            "\\\"next_page\\\": \\\"search result next page link\\\"" +
+            "}";
 
     private static final String USER_AGENT = "OpenSearchWebCrawler/1.0";
 
