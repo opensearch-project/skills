@@ -390,14 +390,7 @@ public class WebSearchTool implements Tool {
 
         @Override
         public WebSearchTool create(Map<String, Object> map) {
-            validateParameters(map);
             return new WebSearchTool(threadPool);
-        }
-
-        private void validateParameters(Map<String, Object> map) {
-            if (!map.containsKey("engine")) {
-                throw new IllegalArgumentException("WebSearchTool requires 'engine' parameter");
-            }
         }
 
         @Override
