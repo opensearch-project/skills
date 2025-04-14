@@ -52,12 +52,12 @@ public class WebSearchTool implements Tool {
 
     public static final String TYPE = "WebSearchTool";
 
-    private static final String DEFAULT_DESCRIPTION = "A generic web search tool that supports multiple search engines and endpoints. " +
-            "Parameters: {" +
-            "\\\"query\\\": \\\"search terms\\\", " +
-            "\\\"engine\\\": \\\"google|duckduckgo|bing\\\", " +
-            "\\\"next_page\\\": \\\"search result next page link\\\"" +
-            "}";
+    private static final String DEFAULT_DESCRIPTION = "A generic web search tool that supports multiple search engines and endpoints. "
+        + "Parameters: {"
+        + "\\\"query\\\": \\\"search terms\\\", "
+        + "\\\"engine\\\": \\\"google|duckduckgo|bing\\\", "
+        + "\\\"next_page\\\": \\\"search result next page link\\\""
+        + "}";
 
     private static final String USER_AGENT = "OpenSearchWebCrawler/1.0";
 
@@ -390,14 +390,7 @@ public class WebSearchTool implements Tool {
 
         @Override
         public WebSearchTool create(Map<String, Object> map) {
-            validateParameters(map);
             return new WebSearchTool(threadPool);
-        }
-
-        private void validateParameters(Map<String, Object> map) {
-            if (!map.containsKey("engine")) {
-                throw new IllegalArgumentException("WebSearchTool requires 'engine' parameter");
-            }
         }
 
         @Override
