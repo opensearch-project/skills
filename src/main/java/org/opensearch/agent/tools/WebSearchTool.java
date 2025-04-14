@@ -56,7 +56,6 @@ public class WebSearchTool implements Tool {
             "Parameters: {" +
             "\\\"query\\\": \\\"search terms\\\", " +
             "\\\"engine\\\": \\\"google|duckduckgo|bing\\\", " +
-            "\\\"endpoint\\\": \\\"API endpoint\\\", " +
             "\\\"next_page\\\": \\\"search result next page link\\\"" +
             "}";
 
