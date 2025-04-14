@@ -74,6 +74,7 @@ apply from: 'build-tools/opensearchplugin-coverage.gradle'
 apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.pluginzip'
+apply plugin: 'opensearch.java-agent'
 
 java {
     targetCompatibility = JavaVersion.VERSION_21
