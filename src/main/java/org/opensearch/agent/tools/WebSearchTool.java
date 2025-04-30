@@ -233,7 +233,7 @@ public class WebSearchTool implements Tool {
                 parseBingResults(rawJson, nextPage, listener);
                 break;
             case "custom":
-                List<String> urls = JsonPath.read(rawJson, customResUrlJsonpath);
+                List<String> urls = JsonPath.read(rawResponse, customResUrlJsonpath);
                 parseCustomResults(urls, authorization, nextPage, listener);
                 break;
             default:
