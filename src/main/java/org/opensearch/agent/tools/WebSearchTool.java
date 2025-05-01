@@ -162,6 +162,7 @@ public class WebSearchTool implements Tool {
                         } else {
                             // Search engine not supported.
                             listener.onFailure(new IllegalArgumentException("Unsupported search engine: %s".formatted(engine)));
+                            return;
                         }
                         CloseableHttpResponse res = httpClient.execute(getRequest);
                         if (res.getCode() >= HttpStatus.SC_BAD_REQUEST) {
