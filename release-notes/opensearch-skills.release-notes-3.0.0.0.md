@@ -9,7 +9,7 @@ Compatible with OpenSearch 3.0.0.0
 * Fix list bug of PPLTool when pass empty list ([#541](https://github.com/opensearch-project/skills/pull/541))
 
 ### Infrastructure
-* Replace `ml-common-client` build dependency to `ml-common-common` and `ml-common-spi` (#529)[https://github.com/opensearch-project/skills/pull/529]
+* Replace `ml-common-client` build dependency to `ml-common-common` and `ml-common-spi` ([#529](https://github.com/opensearch-project/skills/pull/529))
 
 ### Maintainance
 * Remove `space_type` in integ test to adapt to the change of k-NN plugin ([#535](https://github.com/opensearch-project/skills/pull/535))
