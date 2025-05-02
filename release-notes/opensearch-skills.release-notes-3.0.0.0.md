@@ -1,6 +1,6 @@
-## Version 3.0.0.0-beta1 Release Notes
+## Version 3.0.0.0 Release Notes
 
-Compatible with OpenSearch 3.0.0.0-beta1
+Compatible with OpenSearch 3.0.0.0
 
 ### Features
 * Add web search tool ([#547](https://github.com/opensearch-project/skills/pull/547))
