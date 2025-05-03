@@ -97,7 +97,7 @@ configurations {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
-            force("org.apache.httpcomponents.client5:httpclient5:5.4.1")
+            force("org.apache.httpcomponents.client5:httpclient5:${versions.httpclient5}")
         }
     }
 }
@@ -141,7 +141,7 @@ dependencies {
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
     compileOnly(group: 'org.apache.httpcomponents.core5', name: 'httpcore5', version: "${versions.httpcore5}")
-    compileOnly(group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: "${versions.httpcore5}")
+    compileOnly(group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: "${versions.httpclient5}")
     compileOnly ('com.jayway.jsonpath:json-path:2.9.0') {
         exclude group: 'net.minidev', module: 'json-smart'
     }
