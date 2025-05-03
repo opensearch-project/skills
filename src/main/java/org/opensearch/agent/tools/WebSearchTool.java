@@ -5,6 +5,8 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,8 +45,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
-import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
-
 @Log4j2
 @Setter
 @Getter
@@ -54,32 +54,28 @@ public class WebSearchTool implements Tool {
     public static final String TYPE = "WebSearchTool";
 
     public static final String DEFAULT_DESCRIPTION =
-            "This tool performs a web search using the specified query or fetches the next page of a previous search. " +
-                    "It accepts one mandatory argument: `query`, which is a search term used to initiate a new search, " +
-                    "and one optional argument: `next_page`, which is a link to retrieve the next set of search results from a previous response. " +
-                    "The tool returns the raw documents retrieved from the search engine, along with a `next_page` field for pagination.";
+        "This tool performs a web search using the specified query or fetches the next page of a previous search. "
+            + "It accepts one mandatory argument: `query`, which is a search term used to initiate a new search, "
+            + "and one optional argument: `next_page`, which is a link to retrieve the next set of search results from a previous response. "
+            + "The tool returns the raw documents retrieved from the search engine, along with a `next_page` field for pagination.";
 
     private static final String USER_AGENT = "OpenSearchWebCrawler/1.0";
-    public static final String DEFAULT_INPUT_SCHEMA =
-            "{"
-            + "\"type\":\"object\","
-            + "\"properties\":{"
-                + "\"query\":{"
-                    + "\"type\":\"string\","
-                    + "\"description\":\"The search term to query using the configured search engine. This is the primary input used to perform the search.\""
-                + "},"
-                + "\"next_page\":{"
-                    + "\"type\":\"string\","
-                    + "\"description\":\"URL to the next page of search results. If provided, the tool will fetch and return results from this page instead of executing a new search query.\""
-                + "}"
-            + "},"
-            + "\"required\":[\"query\"]"
+    public static final String DEFAULT_INPUT_SCHEMA = "{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"query\":{"
+        + "\"type\":\"string\","
+        + "\"description\":\"The search term to query using the configured search engine. This is the primary input used to perform the search.\""
+        + "},"
+        + "\"next_page\":{"
+        + "\"type\":\"string\","
+        + "\"description\":\"URL to the next page of search results. If provided, the tool will fetch and return results from this page instead of executing a new search query.\""
+        + "}"
+        + "},"
+        + "\"required\":[\"query\"]"
         + "}";
 
-    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(
-            TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA,
-            "strict", false
-    );
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, "strict", false);
 
     @Setter
     @Getter
@@ -167,9 +163,9 @@ public class WebSearchTool implements Tool {
                         CloseableHttpResponse res = httpClient.execute(getRequest);
                         if (res.getCode() >= HttpStatus.SC_BAD_REQUEST) {
                             listener
-                                    .onFailure(
-                                            new IllegalArgumentException("Web search failed: %d %s".formatted(res.getCode(), res.getReasonPhrase()))
-                                    );
+                                .onFailure(
+                                    new IllegalArgumentException("Web search failed: %d %s".formatted(res.getCode(), res.getReasonPhrase()))
+                                );
                         } else {
                             String responseString = EntityUtils.toString(res.getEntity());
                             parseResponse(responseString, authorization, parsedNextPage, engine, customResUrlJsonpath, listener);
@@ -205,12 +201,12 @@ public class WebSearchTool implements Tool {
     }
 
     private String buildCustomNextPage(
-            String endpoint,
-            String currentPage,
-            String queryKey,
-            String query,
-            String offsetKey,
-            String limitKey
+        String endpoint,
+        String currentPage,
+        String queryKey,
+        String query,
+        String offsetKey,
+        String limitKey
     ) {
         String[] pageSplit = currentPage.split("&%s=".formatted(offsetKey));
         int offsetValue = NumberUtils.toInt(pageSplit[1].split("&")[0], 0) + 10;
@@ -237,12 +233,12 @@ public class WebSearchTool implements Tool {
     }
 
     private <T> void parseResponse(
-            String rawResponse,
-            String authorization,
-            String nextPage,
-            String engine,
-            String customResUrlJsonpath,
-            ActionListener<T> listener
+        String rawResponse,
+        String authorization,
+        String nextPage,
+        String engine,
+        String customResUrlJsonpath,
+        ActionListener<T> listener
     ) {
         JsonObject rawJson = JsonParser.parseString(rawResponse).getAsJsonObject();
         switch (engine.toLowerCase(Locale.ROOT)) {
@@ -312,9 +308,9 @@ public class WebSearchTool implements Tool {
         try {
             Document doc = Jsoup.connect(endpoint).timeout(10000).get();
             Optional<Elements> pageResult = Optional
-                    .of(doc)
-                    .map(x -> x.getElementById("links"))
-                    .map(x -> x.getElementsByClass("results_links"));
+                .of(doc)
+                .map(x -> x.getElementById("links"))
+                .map(x -> x.getElementsByClass("results_links"));
             if (pageResult.isEmpty()) {
                 listener.onFailure(new IllegalStateException("Failed to fetch duckduckgo results!"));
                 return;
@@ -324,11 +320,11 @@ public class WebSearchTool implements Tool {
             List<Map<String, String>> crawlResults = new ArrayList<>();
             for (Element result : pageResult.get()) {
                 Optional<Element> elementOptional = Optional
-                        .of(result)
-                        .map(x -> x.getElementsByClass("links_main"))
-                        .stream()
-                        .findFirst()
-                        .map(x -> Objects.requireNonNull(x.first()).getElementsByTag("a").first());
+                    .of(result)
+                    .map(x -> x.getElementsByClass("links_main"))
+                    .stream()
+                    .findFirst()
+                    .map(x -> Objects.requireNonNull(x.first()).getElementsByTag("a").first());
                 if (elementOptional.isEmpty()) {
                     listener.onFailure(new IllegalStateException("Failed to fetch duckduckgo results as no valid link element found!"));
                     return;
@@ -412,14 +408,14 @@ public class WebSearchTool implements Tool {
         String html = doc.html().toLowerCase(Locale.ROOT);
         // 1. Check for CAPTCHA indicators
         return !doc.select("input[name*='captcha'], input[id*='captcha']").isEmpty() ||
-                // Google reCAPTCHA markers
-                !doc.select(".g-recaptcha, div[data-sitekey]").isEmpty() ||
-                // CAPTCHA image patterns
-                !doc.select("img[src*='captcha'], img[src*='recaptcha']").isEmpty() ||
-                // Text-based indicators
-                org.apache.commons.lang3.StringUtils.containsIgnoreCase(html, "verify you are human") ||
-                // hCAPTCHA detection
-                !doc.select(".h-captcha").isEmpty();
+        // Google reCAPTCHA markers
+            !doc.select(".g-recaptcha, div[data-sitekey]").isEmpty() ||
+            // CAPTCHA image patterns
+            !doc.select("img[src*='captcha'], img[src*='recaptcha']").isEmpty() ||
+            // Text-based indicators
+            org.apache.commons.lang3.StringUtils.containsIgnoreCase(html, "verify you are human") ||
+            // hCAPTCHA detection
+            !doc.select(".h-captcha").isEmpty();
     }
 
     @Override
@@ -440,7 +436,8 @@ public class WebSearchTool implements Tool {
             return false;
         }
 
-        boolean isEndpointEmpty = org.apache.commons.lang3.StringUtils.isEmpty(parameters.getOrDefault("endpoint", getDefaultEndpoint(engine)));
+        boolean isEndpointEmpty = org.apache.commons.lang3.StringUtils
+            .isEmpty(parameters.getOrDefault("endpoint", getDefaultEndpoint(engine)));
         if (isEndpointEmpty) {
             log.warn("Endpoint is empty");
             return false;
@@ -448,9 +445,9 @@ public class WebSearchTool implements Tool {
 
         if ("google".equalsIgnoreCase(engine)) {
             boolean hasEngineIdAndApiKey = parameters.containsKey("engine_id")
-                    && !parameters.get("engine_id").isEmpty()
-                    && parameters.containsKey("api_key")
-                    && !parameters.get("api_key").isEmpty();
+                && !parameters.get("engine_id").isEmpty()
+                && parameters.containsKey("api_key")
+                && !parameters.get("api_key").isEmpty();
             if (!hasEngineIdAndApiKey) {
                 log.warn("Google search engine_id or api_key is empty");
                 return false;
@@ -469,7 +466,7 @@ public class WebSearchTool implements Tool {
             String customApi = parameters.get("custom_api");
             String customResUrlJsonpath = parameters.get("custom_res_url_jsonpath");
             if (org.apache.commons.lang3.StringUtils.isEmpty(customApi)
-                    || org.apache.commons.lang3.StringUtils.isEmpty(customResUrlJsonpath)) {
+                || org.apache.commons.lang3.StringUtils.isEmpty(customResUrlJsonpath)) {
                 log.warn("custom search API is empty or result json path is empty");
                 return false;
             }
