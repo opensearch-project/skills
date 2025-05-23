@@ -146,9 +146,9 @@ dependencies {
         exclude group: 'net.minidev', module: 'json-smart'
     }
 
-    spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
-    spark 'org.apache.spark:spark-core_2.13:3.5.4'
-    spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
+    spark 'org.apache.spark:spark-sql-api_2.13:4.0.0-preview1'
+    spark 'org.apache.spark:spark-core_2.13:4.0.0-preview1'
+    spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '4.0.0-preview1'
 
     implementation 'org.scala-lang:scala-library:2.13.9'
     implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
@@ -205,9 +205,9 @@ task addSparkJar(type: Copy) {
     into sparkDir
 
     doLast {
-        def jarA = file("$sparkDir/spark-sql-api_2.13-3.5.4.jar")
-        def jarB = file("$sparkDir/spark-core_2.13-3.5.4.jar")
-        def jarC = file("$sparkDir/spark-common-utils_2.13-3.5.4.jar")
+        def jarA = file("$sparkDir/spark-sql-api_2.13-4.0.0-preview1.jar")
+        def jarB = file("$sparkDir/spark-core_2.13-4.0.0-preview1.jar")
+        def jarC = file("$sparkDir/spark-common-utils_2.13-4.0.0-preview1.jar")
 
         // 3a. Extract jar A to manipulate it
         def jarAContents = file("$buildDir/tmp/JarAContents")
