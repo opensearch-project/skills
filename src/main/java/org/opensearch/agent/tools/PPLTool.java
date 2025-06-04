@@ -217,7 +217,7 @@ public class PPLTool implements WithModelTool {
             String prompt = constructPrompt(tableInfo, question.strip(), indexName);
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Collections.singletonMap("prompt", prompt))
+                .parameters(Map.of("prompt", prompt, "datasourceType", parameters.getOrDefault("type", "Opensearch")))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
