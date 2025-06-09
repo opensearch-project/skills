@@ -2,6 +2,9 @@
 
 Compatible with OpenSearch 3.1.0.0
 
+### Features
+* Add data source type in the request body from PPL tool to meet the requirement of Text2Spark PPL ([#587](https://github.com/opensearch-project/skills/pull/587))
+
 ### Bug fix
 * Fix fields bug in PPL tool ([#581](https://github.com/opensearch-project/skills/pull/581))
 
