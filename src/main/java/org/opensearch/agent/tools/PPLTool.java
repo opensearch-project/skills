@@ -518,21 +518,9 @@ public class PPLTool implements WithModelTool {
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             MergeRuleHelper.merge(mappingSource, allFields);
         }
-        log.info("all fields");
-        log.info(allFields.toString());
-        log.info("--------------------");
-        log.error("all fields");
-        log.error(allFields.toString());
-        log.error("--------------------");
         Map<String, String> fieldsToType = new HashMap<>();
         ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
 
-        log.info("all fields result");
-        log.info(fieldsToType.toString());
-        log.info("--------------------");
-        log.error("all fields result");
-        log.error(fieldsToType.toString());
-        log.error("--------------------");
 
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
