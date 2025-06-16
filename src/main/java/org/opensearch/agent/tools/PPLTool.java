@@ -514,7 +514,7 @@ public class PPLTool implements WithModelTool {
             );
         }
         Map<String, String> fieldsToType = new HashMap<>();
-        ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
+        ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", false);
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
