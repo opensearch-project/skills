@@ -16,8 +16,7 @@ public class LatestRule implements MergeRule {
     }
 
     @Override
-    public void mergeInto(
-            String key, Map<String, Object> source, Map<String, Object> target) {
+    public void mergeInto(String key, Map<String, Object> source, Map<String, Object> target) {
         target.put(key, source);
     }
 }

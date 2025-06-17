@@ -513,14 +513,13 @@ public class PPLTool implements WithModelTool {
             );
         }
         Map<String, Object> allFields = new HashMap<>();
-        for  (Object index:mappings.keySet().toArray()) {
+        for (Object index : mappings.keySet().toArray()) {
             MappingMetadata mappingMetadata = mappings.get(index);
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             MergeRuleHelper.merge(mappingSource, allFields);
         }
         Map<String, String> fieldsToType = new HashMap<>();
         ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
-
 
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());

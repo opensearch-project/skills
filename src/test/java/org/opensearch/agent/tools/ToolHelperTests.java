@@ -10,12 +10,13 @@ import static org.junit.Assert.assertEquals;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.google.gson.Gson;
 import org.junit.Test;
 import org.opensearch.agent.tools.utils.ToolHelper;
+import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
+
+import com.google.gson.Gson;
 
 import lombok.extern.log4j.Log4j2;
-import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
 
 @Log4j2
 public class ToolHelperTests {
@@ -91,76 +92,78 @@ public class ToolHelperTests {
     }
 
     private Gson gson = new Gson();
+
     private Map<String, Object> prepareMap1() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            }
+            {
+                "event": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
                         }
-                    } 
+                    }
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
+
     private Map<String, Object> prepareMap2() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field2": {
-                                "type": "string"
-                            }
+            {
+                "event": {
+                    "properties": {
+                        "field2": {
+                            "type": "string"
                         }
-                    } 
+                    }
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
 
     private Map<String, Object> prepareNormalMap1() {
         String mapBlock = """
-                {
-                    "event1": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            }
+            {
+                "event1": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
                         }
-                    },
-                    "replace" : {
-                        "type":"string"
-                    } 
-                 
+                    }
+                },
+                "replace" : {
+                    "type":"string"
                 }
-                
-                """;
+
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
 
     private Map<String, Object> prepareNormalMap2() {
         String mapBlock = """
-                {
-                    "event2": {
-                        "properties": {
-                            "field2": {
-                                "type": "string"
-                            }
+            {
+                "event2": {
+                    "properties": {
+                        "field2": {
+                            "type": "string"
                         }
-                    },
-                    "replace" : {
-                        "type":"keyword"
-                    }  
+                    }
+                },
+                "replace" : {
+                    "type":"keyword"
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
@@ -168,20 +171,20 @@ public class ToolHelperTests {
     @Test
     public void testMergeTwoObjectMaps() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            },
-                            "field2": {
-                                "type": "string"
-                            }
+            {
+                "event": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
+                        },
+                        "field2": {
+                            "type": "string"
                         }
                     }
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> allFields = new HashMap<>();
         Map<String, Object> map1 = prepareMap1();
         Map<String, Object> map2 = prepareMap2();
@@ -190,31 +193,30 @@ public class ToolHelperTests {
         assertEquals(allFields, gson.fromJson(mapBlock, Map.class));
     }
 
-
     @Test
     public void testMergeTwoNormalMaps() {
         String mapBlock = """
-                {
-                    "event1": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            }
+            {
+                "event1": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
                         }
-                    },
-                    "event2": {
-                        "properties": {
-                            "field2": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "replace" : {
-                        "type":"keyword"
                     }
+                },
+                "event2": {
+                    "properties": {
+                        "field2": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "replace" : {
+                    "type":"keyword"
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> allFields = new HashMap<>();
         Map<String, Object> map1 = prepareNormalMap1();
         Map<String, Object> map2 = prepareNormalMap2();
@@ -226,31 +228,31 @@ public class ToolHelperTests {
     @Test
     public void testMergeTwoDeepMaps() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            },
-                            "field2": {
-                                "type": "string"
-                            },
-                            "deep": {
-                                "properties": {
-                                    "field1": {
-                                        "type": "string"
-                                    },
-                                    "field2": {
-                                        "type": "string"
-                                    }
+            {
+                "event": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
+                        },
+                        "field2": {
+                            "type": "string"
+                        },
+                        "deep": {
+                            "properties": {
+                                "field1": {
+                                    "type": "string"
+                                },
+                                "field2": {
+                                    "type": "string"
                                 }
                             }
                         }
                     }
-                 
                 }
-                
-                """;
+
+            }
+
+            """;
         Map<String, Object> allFields = new HashMap<>();
         Map<String, Object> map1 = prepareDeepMap1();
         Map<String, Object> map2 = prepareDeepMap2();
@@ -261,49 +263,49 @@ public class ToolHelperTests {
 
     private Map<String, Object> prepareDeepMap1() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field1": {
-                                "type": "string"
-                            },
-                            "deep": {
-                                "properties": {
-                                    "field1": {
-                                        "type": "string"
-                                    }
+            {
+                "event": {
+                    "properties": {
+                        "field1": {
+                            "type": "string"
+                        },
+                        "deep": {
+                            "properties": {
+                                "field1": {
+                                    "type": "string"
                                 }
                             }
                         }
                     }
-                 
                 }
-                
-                """;
+
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
 
     private Map<String, Object> prepareDeepMap2() {
         String mapBlock = """
-                {
-                    "event": {
-                        "properties": {
-                            "field2": {
-                                "type": "string"
-                            },
-                            "deep": {
-                                "properties": {
-                                    "field2": {
-                                        "type": "string"
-                                    }
+            {
+                "event": {
+                    "properties": {
+                        "field2": {
+                            "type": "string"
+                        },
+                        "deep": {
+                            "properties": {
+                                "field2": {
+                                    "type": "string"
                                 }
                             }
                         }
                     }
                 }
-                
-                """;
+            }
+
+            """;
         Map<String, Object> tmpMap = gson.fromJson(mapBlock, Map.class);
         return tmpMap;
     }
