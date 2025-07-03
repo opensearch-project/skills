@@ -50,8 +50,6 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
-import com.google.common.collect.ImmutableList;
-
 import lombok.SneakyThrows;
 
 public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlugin {
@@ -136,7 +134,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
             false
         );
 
-        return ImmutableList.of(websearchCrawlThread);
+        return List.of(websearchCrawlThread);
     }
 
 }
