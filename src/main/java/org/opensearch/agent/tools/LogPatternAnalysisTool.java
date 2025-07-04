@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,7 +87,7 @@ public class LogPatternAnalysisTool implements Tool {
     // the default description of this tool
     private static final String DEFAULT_DESCRIPTION =
         "This is a tool used to detect abnormal log patterns by the patterns command in PPL or to detect abnormal log sequences by the log clustering algorithm.";
-    private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
+    private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.6;
     @Setter
     @Getter
     private String name = TYPE;
@@ -151,8 +152,8 @@ public class LogPatternAnalysisTool implements Tool {
 
         // Step 1. generate log patterns for normal time range
         String normalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where time>'%s' and time <'%s' | patterns %s method=brain "
-            + "variable_count_threshold=2 | fields %s, patterns_field | sort time")
-            .formatted(index, traceFieldName, normalTimeRangeStart, normalTimeRangeEnd, logFieldName, traceFieldName);
+            + "variable_count_threshold=2 | fields %s, patterns_field, time | sort %s,time")
+            .formatted(index, traceFieldName, normalTimeRangeStart, normalTimeRangeEnd, logFieldName, traceFieldName, traceFieldName);
         // log ppl
         log.info("normalTimeRangeLogPatternPPL: {}", normalTimeRangeLogPatternPPL);
         executePPL(normalTimeRangeLogPatternPPL, ActionListener.wrap(normalTimeRangeResult -> {
@@ -182,22 +183,21 @@ public class LogPatternAnalysisTool implements Tool {
                     simplifiedPattern = rawPatternToSimplifiedPatternMap.get(rawPattern);
                 }
 
-                if (normalTimeRangeTraceIdPatternMap.containsKey(traceId)) {
-                    Set<String> newPatterns = new HashSet<>(normalTimeRangeTraceIdPatternMap.get(traceId));
-                    newPatterns.add(simplifiedPattern);
-                    normalTimeRangeTraceIdPatternMap.put(traceId, newPatterns);
-                } else {
-                    normalTimeRangeTraceIdPatternMap.put(traceId, Set.of(simplifiedPattern));
-                }
+                normalTimeRangeTraceIdPatternMap.compute(traceId, (k, v) -> {
+                    Set<String> patterns = v == null ? new LinkedHashSet<>() : v;
+                    patterns.add(simplifiedPattern);
+                    return patterns;
+                });
 
-                normalTimeRangePatternCountMap
-                    .put(simplifiedPattern, normalTimeRangePatternCountMap.getOrDefault(simplifiedPattern, 0) + 1);
+                normalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> v == null ? 1 : v + 1);
             }
 
             int normalTimeRangeTraceCount = normalTimeRangeTraceIdPatternMap.size();
             for (Map.Entry<String, Integer> entry : normalTimeRangePatternCountMap.entrySet()) {
                 if (entry.getValue() != 0) {
+                    // IDF
                     double value = Math.log((double) normalTimeRangeTraceCount / entry.getValue());
+                    // sigmoid
                     value = 1 / (1 + Math.exp(-value));
                     normalTimeRangePatternValue.put(entry.getKey(), value);
                 } else {
@@ -207,18 +207,26 @@ public class LogPatternAnalysisTool implements Tool {
 
             log.info("normalTimeRangeTraceIdPatternMap");
             for (Map.Entry<String, Set<String>> entry : normalTimeRangeTraceIdPatternMap.entrySet()) {
-                 log.debug(entry.getKey() + ": " + entry.getValue().toString());
+                log.debug(entry.getKey() + ": " + entry.getValue().toString());
             }
 
             log.info("normalTimeRangePatternValue:");
             for (Map.Entry<String, Double> entry : normalTimeRangePatternValue.entrySet()) {
-                 log.debug(entry.getKey() + ": " + entry.getValue());
+                log.debug(entry.getKey() + ": " + entry.getValue());
             }
 
             // Step 2. generate log patterns for abnormal time range
             String abnormalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where time>'%s' and time <'%s' | patterns %s method=brain "
-                + "variable_count_threshold=2 | fields %s, patterns_field | sort time")
-                .formatted(index, traceFieldName, abnormalTimeRangeStart, abnormalTimeRangeEnd, logFieldName, traceFieldName);
+                + "variable_count_threshold=2 | fields %s, patterns_field, time | sort %s,time")
+                .formatted(
+                    index,
+                    traceFieldName,
+                    abnormalTimeRangeStart,
+                    abnormalTimeRangeEnd,
+                    logFieldName,
+                    traceFieldName,
+                    traceFieldName
+                );
             // log abnormal ppl
             log.info("abnormalTimeRangeLogPatternPPL:{}", abnormalTimeRangeLogPatternPPL);
             Map<String, Set<String>> abnormalTimeRangeTraceIdPatternMap = new HashMap<>();
@@ -243,16 +251,14 @@ public class LogPatternAnalysisTool implements Tool {
                         simplifiedPattern = rawPatternToSimplifiedPatternMap.get(rawPattern);
                     }
 
-                    if (abnormalTimeRangeTraceIdPatternMap.containsKey(traceId)) {
-                        Set<String> newPatterns = new HashSet<>(abnormalTimeRangeTraceIdPatternMap.get(traceId));
-                        newPatterns.add(simplifiedPattern);
-                        abnormalTimeRangeTraceIdPatternMap.put(traceId, newPatterns);
-                    } else {
-                        abnormalTimeRangeTraceIdPatternMap.put(traceId, Set.of(simplifiedPattern));
-                    }
+                    abnormalTimeRangeTraceIdPatternMap.compute(traceId, (k, v) -> {
+                        Set<String> patterns = v == null ? new LinkedHashSet<>() : v;
+                        patterns.add(simplifiedPattern);
+                        return patterns;
+                    });
 
-                    abnormalTimeRangePatternCountMap
-                        .put(simplifiedPattern, abnormalTimeRangePatternCountMap.getOrDefault(simplifiedPattern, 0) + 1);
+                    abnormalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> v == null ? 1 : v + 1);
+
                 }
 
                 log.info("abnormalTimeRangeTraceIdPatternMap");
@@ -278,17 +284,17 @@ public class LogPatternAnalysisTool implements Tool {
 
                 // Step 3. construct pattern index, take all patterns into consideration, and associate each pattern with a number as the
                 // index in the vector
-                Map<String, Integer> patternIndex = new HashMap<>();
+                Map<String, Integer> patternIndexMap = new HashMap<>();
                 Set<String> patternSet = new HashSet<>(normalTimeRangePatternCountMap.keySet());
                 patternSet.addAll(abnormalTimeRangePatternCountMap.keySet());
                 List<String> patternList = new ArrayList<>(patternSet);
                 Collections.sort(patternList);
                 for (int i = 0; i < patternList.size(); i++) {
-                    patternIndex.put(patternList.get(i), i);
+                    patternIndexMap.put(patternList.get(i), i);
                 }
 
                 log.info("pattern index:");
-                for (Map.Entry<String, Integer> entry : patternIndex.entrySet()) {
+                for (Map.Entry<String, Integer> entry : patternIndexMap.entrySet()) {
                     log.debug(entry.getKey() + ": " + entry.getValue());
                 }
 
@@ -297,7 +303,7 @@ public class LogPatternAnalysisTool implements Tool {
                 for (Map.Entry<String, Set<String>> entry : normalTimeRangeTraceIdPatternMap.entrySet()) {
                     double[] vector = new double[patternList.size()];
                     for (String pattern : entry.getValue()) {
-                        vector[patternIndex.get(pattern)] = 0.5 * normalTimeRangePatternValue.get(pattern);
+                        vector[patternIndexMap.get(pattern)] = 0.5 * normalTimeRangePatternValue.get(pattern);
                     }
                     normalTimeRangeVectorMap.put(entry.getKey(), vector);
                 }
@@ -327,7 +333,7 @@ public class LogPatternAnalysisTool implements Tool {
                     for (String pattern : entry.getValue()) {
                         int existenceWeight = abnormalTimeRangePatternCountMap.containsKey(pattern)
                             && !normalTimeRangePatternCountMap.containsKey(pattern) ? 1 : 0;
-                        vector[patternIndex.get(pattern)] = 0.5 * abnormalTimeRangePatternValue.get(pattern) + 0.5 * existenceWeight;
+                        vector[patternIndexMap.get(pattern)] = 0.5 * abnormalTimeRangePatternValue.get(pattern) + 0.5 * existenceWeight;
                     }
                     abnormalTimeRangeVectorMap.put(entry.getKey(), vector);
                 }
@@ -337,31 +343,33 @@ public class LogPatternAnalysisTool implements Tool {
                     log.debug(entry.getKey() + ": " + Arrays.toString(entry.getValue()));
                 }
 
-                // Step 7. find all non-existent traces in abnormal time range
-                Set<String> abnormalTraces = findAbnormalTraces(centroids, normalTimeRangeVectorMap, abnormalTimeRangeVectorMap);
-                Map<String, double[]> abnormalTracesVectorMap = new HashMap<>();
-                for (Map.Entry<String, double[]> entry : abnormalTimeRangeVectorMap.entrySet()) {
-                    if (abnormalTraces.contains(entry.getKey())) {
-                        abnormalTracesVectorMap.put(entry.getKey(), entry.getValue());
+                List<List<String>> abnormalCluster = clusterLogVectors(abnormalTimeRangeVectorMap);
+                log.info("abnormalCluster: size={}", abnormalCluster.size());
+                List<String> centriodsForSelection = findCentroids(abnormalTimeRangeVectorMap, abnormalCluster);
+
+                List<String> abnormnalCentroids = new ArrayList<>();
+
+                for (String selection : centriodsForSelection) {
+                    boolean abnormal = true;
+                    for (String centroid : centroids) {
+                        double[] vector1 = normalTimeRangeVectorMap.get(centroid);
+                        double[] vector2 = abnormalTimeRangeVectorMap.get(selection);
+                        if (cosineSimilarity(vector1, vector2) > LOG_VECTORS_CLUSTERING_THRESHOLD) {
+                            abnormal = false;
+                            break;
+                        }
+                    }
+                    if (abnormal) {
+                        abnormnalCentroids.add(selection);
                     }
                 }
 
-                log.info("abnormalTraces:");
-                log.info(abnormalTraces);
-
-                // Step 7. cluster the non-existent trances and find centroids in abnormal time range
-                List<List<String>> abnormalClusters = clusterLogVectors(abnormalTracesVectorMap);
-                List<String> abnormalClustersCentroids = findCentroids(abnormalTracesVectorMap, abnormalClusters);
-
-                log.info("abnormalClusters:");
-                log.info(abnormalClusters);
-
                 log.info("abnormalClustersCentroids:");
-                log.info(abnormalClustersCentroids);
+                log.info(abnormnalCentroids);
 
                 // get actual log sequence
                 Map<String, String> abnormalLogSequenceMap = new HashMap<>();
-                for (String traceId : abnormalClustersCentroids) {
+                for (String traceId : abnormnalCentroids) {
                     Set<String> set = abnormalTimeRangeTraceIdPatternMap.get(traceId);
                     abnormalLogSequenceMap.put(traceId, String.join(" -> ", set));
                 }
