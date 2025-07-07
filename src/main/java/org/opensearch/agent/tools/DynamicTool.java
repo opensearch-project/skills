@@ -205,10 +205,14 @@ public class DynamicTool implements Tool {
             if (!map.containsKey(URI_KEY) || StringUtils.isBlank(String.valueOf(map.get(URI_KEY)))) {
                 throw new IllegalArgumentException("valid uri is required in DynamicTool configuration!");
             }
-            if (!map.containsKey(METHOD_KEY)
-                || map.get(METHOD_KEY) == null
-                || RestRequest.Method.valueOf(String.valueOf(map.get(METHOD_KEY))) == null) {
-                throw new IllegalArgumentException("valid method is required in DynamicTool configuration!");
+            if (!map.containsKey(METHOD_KEY) || map.get(METHOD_KEY) == null) {
+                throw new IllegalArgumentException("method is required and not null in DynamicTool configuration!");
+            } else {
+                try {
+                    RestRequest.Method.valueOf(String.valueOf(map.get(METHOD_KEY)));
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("valid method value is required in DynamicTool configuration!");
+                }
             }
 
             return new DynamicTool(client, toolExecutor, dynamicRestRequestCreator, namedXContentRegistry);

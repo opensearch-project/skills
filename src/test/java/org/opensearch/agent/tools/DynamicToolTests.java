@@ -95,12 +95,30 @@ public class DynamicToolTests {
     }
 
     @Test
+    public void test_createTool_invalidUri() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> DynamicTool.Factory.getInstance().create(ImmutableMap.of("uri", ""))
+        );
+        assertEquals("valid uri is required in DynamicTool configuration!", exception.getMessage());
+    }
+
+    @Test
     public void test_createTool_missMethod() {
         Exception exception = assertThrows(
             IllegalArgumentException.class,
             () -> DynamicTool.Factory.getInstance().create(ImmutableMap.of("uri", "/my_index/_search"))
         );
-        assertEquals("valid method is required in DynamicTool configuration!", exception.getMessage());
+        assertEquals("method is required and not null in DynamicTool configuration!", exception.getMessage());
+    }
+
+    @Test
+    public void test_createTool_invalidMethod() {
+        Exception exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> DynamicTool.Factory.getInstance().create(ImmutableMap.of("uri", "/my_index/_search", "method", "NULL"))
+        );
+        assertEquals("valid method value is required in DynamicTool configuration!", exception.getMessage());
     }
 
     @Test
@@ -109,6 +127,33 @@ public class DynamicToolTests {
         registerAgentParameters.put("uri", "/my_index/_search");
         registerAgentParameters.put("method", "POST");
         registerAgentParameters.put("request_body", "{\"query\": {\"match\": {\"name\": \"${parameters.search_content}\"}}}");
+        DynamicTool tool = DynamicTool.Factory.getInstance().create(registerAgentParameters);
+        registerAgentParameters.put("search_content", "test");
+        doAnswer(invocationOnMock -> {
+            ActionListener<RestResponse> actionListener = invocationOnMock.getArgument(1);
+            RestResponse restResponse = mock(RestResponse.class);
+            BytesReference mockResponseBody = BytesReference
+                .fromByteBuffer(ByteBuffer.wrap("mock response body".getBytes(StandardCharsets.UTF_8)));
+            when(restResponse.content()).thenReturn(mockResponseBody);
+            actionListener.onResponse(restResponse);
+            return null;
+        }).when(dynamicToolExecutor).execute(any(), isA(ActionListener.class));
+        tool.run(StringUtils.getParameterMap(registerAgentParameters), listener);
+        ArgumentCaptor<String> argumentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(listener).onResponse(argumentCaptor.capture());
+        assertNotNull(argumentCaptor.getValue());
+        assertEquals("mock response body", argumentCaptor.getValue());
+    }
+
+    @Test
+    public void test_run_requestBodyNullOrNotExist_successful() throws Exception {
+        Map<String, Object> registerAgentParameters = new HashMap<>();
+        registerAgentParameters.put("uri", "/my_index/_search");
+        registerAgentParameters.put("method", "POST");
+        registerAgentParameters.put("request_body", null);
+        DynamicTool tool0 = DynamicTool.Factory.getInstance().create(registerAgentParameters);
+        assertNotNull(tool0);
+        registerAgentParameters.remove("request_body");
         DynamicTool tool = DynamicTool.Factory.getInstance().create(registerAgentParameters);
         registerAgentParameters.put("search_content", "test");
         doAnswer(invocationOnMock -> {
