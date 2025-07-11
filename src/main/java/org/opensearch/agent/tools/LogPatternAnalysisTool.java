@@ -10,6 +10,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,6 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.json.JSONObject;
 import org.opensearch.core.action.ActionListener;
@@ -88,6 +90,7 @@ public class LogPatternAnalysisTool implements Tool {
     private static final String DEFAULT_DESCRIPTION =
         "This is a tool used to detect abnormal log patterns by the patterns command in PPL or to detect abnormal log sequences by the log clustering algorithm.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.6;
+    private static final double LOG_PATTERN_THRESHOLD = 0.75;
     @Setter
     @Getter
     private String name = TYPE;
@@ -130,7 +133,8 @@ public class LogPatternAnalysisTool implements Tool {
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         String index = parameters.getOrDefault("index", "");
-        String logFieldName = parameters.getOrDefault("logFieldName", "");
+        String timeFiled = parameters.getOrDefault("timeFiled", "");
+        String logMessageFieldName = parameters.getOrDefault("logMessageFieldName", "");
         String traceFieldName = parameters.getOrDefault("traceFieldName", "");
         String normalTimeRangeStart = parameters.getOrDefault("normalTimeRangeStart", "");
         String normalTimeRangeEnd = parameters.getOrDefault("normalTimeRangeEnd", "");
@@ -138,22 +142,58 @@ public class LogPatternAnalysisTool implements Tool {
         String abnormalTimeRangeEnd = parameters.getOrDefault("abnormalTimeRangeEnd", "");
 
         if (Strings.isEmpty(index)
-            || Strings.isEmpty(logFieldName)
-            || Strings.isEmpty(traceFieldName)
+            || Strings.isEmpty(timeFiled)
+            || Strings.isEmpty(logMessageFieldName)
             || Strings.isEmpty(normalTimeRangeStart)
             || Strings.isEmpty(normalTimeRangeEnd)
             || Strings.isEmpty(abnormalTimeRangeStart)
             || Strings.isEmpty(abnormalTimeRangeEnd)) {
-            throw new IllegalArgumentException(
-                "Invalid parameters, please check the parameters of LogPatternAnalysisTool,"
-                    + " index|logFieldName|traceFieldName|normalTimeRangeStart|normalTimeRangeEnd|abnormalTimeRangeStart|abnormalTimeRangeEnd are required!"
-            );
+            listener
+                .onFailure(
+                    new IllegalArgumentException(
+                        "Invalid parameters, please check the parameters of LogPatternAnalysisTool,"
+                            + " index|timeFiled|logMessageFieldName|normalTimeRangeStart|normalTimeRangeEnd"
+                            + "|abnormalTimeRangeStart|abnormalTimeRangeEnd are required!"
+                    )
+                );
+            return;
         }
 
+        // log pattern analysis
+        if (Strings.isEmpty(traceFieldName)) {
+            logPatternAnalysis(parameters, listener);
+            return;
+        }
+
+        logSequenceAnalysis(parameters, listener);
+    }
+
+    private <T> void logSequenceAnalysis(Map<String, String> parameters, ActionListener<T> listener) {
+        String index = parameters.getOrDefault("index", "");
+        String timeFiled = parameters.getOrDefault("timeFiled", "");
+        String logMessageFieldName = parameters.getOrDefault("logMessageFieldName", "");
+        String traceFieldName = parameters.getOrDefault("traceFieldName", "");
+        String normalTimeRangeStart = parameters.getOrDefault("normalTimeRangeStart", "");
+        String normalTimeRangeEnd = parameters.getOrDefault("normalTimeRangeEnd", "");
+        String abnormalTimeRangeStart = parameters.getOrDefault("abnormalTimeRangeStart", "");
+        String abnormalTimeRangeEnd = parameters.getOrDefault("abnormalTimeRangeEnd", "");
+
         // Step 1. generate log patterns for normal time range
-        String normalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where time>'%s' and time <'%s' | patterns %s method=brain "
-            + "variable_count_threshold=2 | fields %s, patterns_field, time | sort %s,time")
-            .formatted(index, traceFieldName, normalTimeRangeStart, normalTimeRangeEnd, logFieldName, traceFieldName, traceFieldName);
+        String normalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where %s >'%s' and %s <'%s' | patterns "
+            + "%s method=brain "
+            + "variable_count_threshold=3 | fields %s, patterns_field, %s | sort %s")
+            .formatted(
+                index,
+                traceFieldName,
+                timeFiled,
+                timeFiled,
+                normalTimeRangeStart,
+                normalTimeRangeEnd,
+                logMessageFieldName,
+                traceFieldName,
+                timeFiled,
+                timeFiled
+            );
         // log ppl
         log.info("normalTimeRangeLogPatternPPL: {}", normalTimeRangeLogPatternPPL);
         executePPL(normalTimeRangeLogPatternPPL, ActionListener.wrap(normalTimeRangeResult -> {
@@ -163,8 +203,8 @@ public class LogPatternAnalysisTool implements Tool {
                 .getOrDefault("datarows", new ArrayList<>());
             // map traceId to its patterns
             Map<String, Set<String>> normalTimeRangeTraceIdPatternMap = new HashMap<>();
-            // map pattern to its count
-            Map<String, Integer> normalTimeRangePatternCountMap = new HashMap<>();
+            // map pattern to its trace ids
+            Map<String, Set<String>> normalTimeRangePatternCountMap = new HashMap<>();
             // map pattern to weight
             Map<String, Double> normalTimeRangePatternValue = new HashMap<>();
 
@@ -174,14 +214,7 @@ public class LogPatternAnalysisTool implements Tool {
                 String traceId = (String) row.get(0);
                 String rawPattern = (String) row.get(1);
 
-                String simplifiedPattern;
-                if (!rawPatternToSimplifiedPatternMap.containsKey(rawPattern)) {
-                    simplifiedPattern = postProcessPattern(rawPattern);
-                    // cache the raw pattern to simplified pattern map
-                    rawPatternToSimplifiedPatternMap.put(rawPattern, simplifiedPattern);
-                } else {
-                    simplifiedPattern = rawPatternToSimplifiedPatternMap.get(rawPattern);
-                }
+                String simplifiedPattern = rawPatternToSimplifiedPatternMap.computeIfAbsent(rawPattern, this::postProcessPattern);
 
                 normalTimeRangeTraceIdPatternMap.compute(traceId, (k, v) -> {
                     Set<String> patterns = v == null ? new LinkedHashSet<>() : v;
@@ -189,14 +222,18 @@ public class LogPatternAnalysisTool implements Tool {
                     return patterns;
                 });
 
-                normalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> v == null ? 1 : v + 1);
+                normalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> {
+                    Set<String> traceIds = v == null ? new HashSet<>() : v;
+                    traceIds.add(traceId);
+                    return traceIds;
+                });
             }
 
             int normalTimeRangeTraceCount = normalTimeRangeTraceIdPatternMap.size();
-            for (Map.Entry<String, Integer> entry : normalTimeRangePatternCountMap.entrySet()) {
-                if (entry.getValue() != 0) {
+            for (Map.Entry<String, Set<String>> entry : normalTimeRangePatternCountMap.entrySet()) {
+                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
                     // IDF
-                    double value = Math.log((double) normalTimeRangeTraceCount / entry.getValue());
+                    double value = Math.log((double) normalTimeRangeTraceCount / entry.getValue().size());
                     // sigmoid
                     value = 1 / (1 + Math.exp(-value));
                     normalTimeRangePatternValue.put(entry.getKey(), value);
@@ -205,32 +242,28 @@ public class LogPatternAnalysisTool implements Tool {
                 }
             }
 
-            log.info("normalTimeRangeTraceIdPatternMap");
-            for (Map.Entry<String, Set<String>> entry : normalTimeRangeTraceIdPatternMap.entrySet()) {
-                log.debug(entry.getKey() + ": " + entry.getValue().toString());
-            }
-
-            log.info("normalTimeRangePatternValue:");
-            for (Map.Entry<String, Double> entry : normalTimeRangePatternValue.entrySet()) {
-                log.debug(entry.getKey() + ": " + entry.getValue());
-            }
-
             // Step 2. generate log patterns for abnormal time range
-            String abnormalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where time>'%s' and time <'%s' | patterns %s method=brain "
-                + "variable_count_threshold=2 | fields %s, patterns_field, time | sort %s,time")
+            String abnormalTimeRangeLogPatternPPL = ("source=%s | where %s!='' | where %s>'%s' and %s <'%s' | "
+                + "patterns %s method=brain "
+                + "variable_count_threshold=3 | fields %s, patterns_field, %s | "
+                + "sort %s")
                 .formatted(
                     index,
                     traceFieldName,
+                    timeFiled,
+                    timeFiled,
                     abnormalTimeRangeStart,
                     abnormalTimeRangeEnd,
-                    logFieldName,
+                    logMessageFieldName,
                     traceFieldName,
-                    traceFieldName
+                    timeFiled,
+                    timeFiled
                 );
             // log abnormal ppl
             log.info("abnormalTimeRangeLogPatternPPL:{}", abnormalTimeRangeLogPatternPPL);
+
             Map<String, Set<String>> abnormalTimeRangeTraceIdPatternMap = new HashMap<>();
-            Map<String, Integer> abnormalTimeRangePatternCountMap = new HashMap<>();
+            Map<String, Set<String>> abnormalTimeRangePatternCountMap = new HashMap<>();
             Map<String, Double> abnormalTimeRangePatternValue = new HashMap<>();
             executePPL(abnormalTimeRangeLogPatternPPL, ActionListener.wrap(abnormalTimeRangeResult -> {
                 Map<String, Object> abnormalTimeRangePPLResult = gson
@@ -257,29 +290,23 @@ public class LogPatternAnalysisTool implements Tool {
                         return patterns;
                     });
 
-                    abnormalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> v == null ? 1 : v + 1);
+                    abnormalTimeRangePatternCountMap.compute(simplifiedPattern, (k, v) -> {
+                        Set<String> traceIds = v == null ? new HashSet<>() : v;
+                        traceIds.add(traceId);
+                        return traceIds;
+                    });
 
-                }
-
-                log.info("abnormalTimeRangeTraceIdPatternMap");
-                for (Map.Entry<String, Set<String>> entry : abnormalTimeRangeTraceIdPatternMap.entrySet()) {
-                    log.debug(entry.getKey() + ": " + entry.getValue().toString());
                 }
 
                 int abnormalTimeRangeTraceCount = abnormalTimeRangeTraceIdPatternMap.size();
-                for (Map.Entry<String, Integer> entry : abnormalTimeRangePatternCountMap.entrySet()) {
-                    if (entry.getValue() != 0) {
-                        double value = Math.log((double) abnormalTimeRangeTraceCount / entry.getValue());
+                for (Map.Entry<String, Set<String>> entry : abnormalTimeRangePatternCountMap.entrySet()) {
+                    if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                        double value = Math.log((double) abnormalTimeRangeTraceCount / entry.getValue().size());
                         value = 1 / (1 + Math.exp(-value));
                         abnormalTimeRangePatternValue.put(entry.getKey(), value);
                     } else {
                         abnormalTimeRangePatternValue.put(entry.getKey(), 0.0);
                     }
-                }
-
-                log.info("abnormalTimeRangePatternValue:");
-                for (Map.Entry<String, Double> entry : abnormalTimeRangePatternValue.entrySet()) {
-                    log.debug(entry.getKey() + ": " + entry.getValue());
                 }
 
                 // Step 3. construct pattern index, take all patterns into consideration, and associate each pattern with a number as the
@@ -389,6 +416,137 @@ public class LogPatternAnalysisTool implements Tool {
         }));
     }
 
+    private <T> void logPatternAnalysis(Map<String, String> parameters, ActionListener<T> listener) {
+        String index = parameters.getOrDefault("index", "");
+        String logFieldName = parameters.getOrDefault("logFieldName", "");
+        String normalTimeRangeStart = parameters.getOrDefault("normalTimeRangeStart", "");
+        String normalTimeRangeEnd = parameters.getOrDefault("normalTimeRangeEnd", "");
+        String abnormalTimeRangeStart = parameters.getOrDefault("abnormalTimeRangeStart", "");
+        String abnormalTimeRangeEnd = parameters.getOrDefault("abnormalTimeRangeEnd", "");
+
+        // Step 1. generate log patterns for normal time range
+        String normalTimeRangeLogPatternPPL = ("source=%s | where time>'%s' and time <'%s' | patterns %s method=brain "
+            + "variable_count_threshold=3 | fields patterns_field | stats "
+            + "count() as cnt by patterns_field").formatted(index, normalTimeRangeStart, normalTimeRangeEnd, logFieldName);
+
+        executePPL(normalTimeRangeLogPatternPPL, ActionListener.wrap((response) -> {
+            final Map<String, Double> patternMapBase = parseLogPatterns(response);
+
+            mergeSimilarPatterns(patternMapBase);
+
+            double baseTotal = patternMapBase.values().stream().reduce(0d, Double::sum);
+
+            String selectionTimeRangeLogPatternPPL = ("source=%s | where time>'%s' and time <'%s' | patterns %s "
+                + "method=brain "
+                + "variable_count_threshold=3 | fields patterns_field | stats "
+                + "count() as cnt by patterns_field").formatted(index, abnormalTimeRangeStart, abnormalTimeRangeEnd, logFieldName);
+
+            executePPL(selectionTimeRangeLogPatternPPL, ActionListener.wrap((selectionResponse) -> {
+                final Map<String, Double> patternMapSelection = parseLogPatterns(selectionResponse);
+                mergeSimilarPatterns(patternMapSelection);
+
+                double total = patternMapSelection.values().stream().reduce(0d, Double::sum);
+                // calculate the difference between the two maps
+                Map<String, Double> patternMapDifference = new HashMap<>();
+
+                for (Map.Entry<String, Double> entry : patternMapSelection.entrySet()) {
+                    String pattern = entry.getKey();
+                    if (patternMapBase.containsKey(pattern)) {
+                        Double cnt = patternMapBase.get(pattern);
+                        Double selectionCnt = patternMapSelection.get(pattern);
+                        double lift = (selectionCnt / total) / (cnt / baseTotal);
+                        if (lift < 1) {
+                            lift = 1 / lift;
+                        }
+                        if (lift > 2) {
+                            log.info("pattern: {}, cnt: {}, selectionCnt: {}, lift: {}", pattern, cnt, selectionCnt, lift);
+                            // patternMapDifference.put(pattern, "base: %s, selection: %s, lift: %s".formatted(cnt,
+                            // selectionCnt, lift));
+                        }
+                    } else {
+                        patternMapDifference.put(pattern, entry.getValue());
+                    }
+
+                }
+
+                Map<String, Object> finalResult = new HashMap<>();
+                finalResult.put("patternMapDifference", patternMapDifference);
+                finalResult.put("patternMapSelection", patternMapSelection);
+                finalResult.put("patternMapBase", patternMapBase);
+                listener.onResponse((T) gson.toJson(finalResult));
+
+            }, e -> { listener.onFailure(e); }));
+
+        }, e -> { listener.onFailure(e); }));
+    }
+
+    private Map<String, Double> parseLogPatterns(String response) {
+        Map<String, Object> normalTimeRangePPLResult = gson.fromJson(response, new TypeToken<Map<String, Object>>() {
+        }.getType());
+        List<List<Object>> normalTimeRangeDataRows = (List<List<Object>>) normalTimeRangePPLResult
+            .getOrDefault("datarows", new ArrayList<>());
+
+        return normalTimeRangeDataRows
+            .stream()
+            .collect(HashMap::new, (map, row) -> map.put((String) row.get(1), (Double) row.get(0)), HashMap::putAll);
+    }
+
+    private boolean isSimilar(String pattern, Collection<String> baselinePatterns) {
+        for (String basePattern : baselinePatterns) {
+            if (jacCardSimilarity(pattern, basePattern) > LOG_PATTERN_THRESHOLD) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private double jacCardSimilarity(String pattern1, String pattern2) {
+        Set<String> set1 = new HashSet<>(Arrays.asList(pattern1.split("\\s+")));
+        Set<String> set2 = new HashSet<>(Arrays.asList(pattern2.split("\\s+")));
+
+        // calculate intersection and union of set1 and set2
+        Set<String> intersection = new HashSet<>(set1);
+        intersection.retainAll(set2);
+
+        Set<String> union = new HashSet<>(set1);
+        set1.addAll(set2);
+
+        return intersection.size() * 1.0d / union.size();
+    }
+
+    private void mergeSimilarPatterns(Map<String, Double> patternMap) {
+        List<String> patterns = new ArrayList<>(patternMap.keySet());
+        patterns.sort(String::compareTo);
+        List<String> removed = new ArrayList<>();
+        for (int i = 0; i < patterns.size(); i++) {
+            if (removed.contains(patterns.get(i))) {
+                continue;
+            }
+
+            for (int j = i + 1; j < patterns.size(); j++) {
+                String pattern1 = patterns.get(i);
+                String pattern2 = patterns.get(j);
+                if (jacCardSimilarity(pattern1, pattern2) > LOG_PATTERN_THRESHOLD) {
+                    // merge pattern2 into pattern1
+                    patternMap.put(pattern1, patternMap.getOrDefault(pattern1, 0d) + patternMap.getOrDefault(pattern2, 0d));
+                    removed.add(pattern2);
+                    patternMap.remove(pattern2);
+                }
+            }
+        }
+
+        // loop patternMap and merge patterns with similar patterns
+        Map<String, String> toReplaced = patternMap.entrySet().stream().filter(entry -> {
+            String newPattern = postProcessPattern(entry.getKey());
+            return !newPattern.equals(entry.getKey());
+        }).collect(Collectors.toMap(Map.Entry::getKey, entry -> postProcessPattern(entry.getKey())));
+
+        toReplaced.forEach((key, newPattern) -> {
+            double cnt = patternMap.remove(key);
+            patternMap.merge(newPattern, cnt, Double::sum);
+        });
+    }
+
     private String postProcessPattern(String pattern) {
         if (pattern.endsWith("]")) {
             pattern = pattern.substring(0, pattern.length() - 1);
@@ -445,32 +603,6 @@ public class LogPatternAnalysisTool implements Tool {
             i += maxSeqLen * maxRepeatCount;
         }
         return String.join(" ", result);
-    }
-
-    private Set<String> findAbnormalTraces(
-        List<String> normalTimeRangeLogClusterCentroids,
-        Map<String, double[]> normalTimeRangeVectorMap,
-        Map<String, double[]> abnormalTimeRangeVectorMap
-    ) {
-        Set<String> abnormalTraces = new HashSet<>();
-        for (Map.Entry<String, double[]> entry : abnormalTimeRangeVectorMap.entrySet()) {
-            String traceId = entry.getKey();
-            double[] vector = entry.getValue();
-            boolean found = false;
-            for (String centroid : normalTimeRangeLogClusterCentroids) {
-                double[] centroidVector = normalTimeRangeVectorMap.get(centroid);
-                double similarity = cosineSimilarity(vector, centroidVector);
-                if (similarity >= LOG_VECTORS_CLUSTERING_THRESHOLD) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                abnormalTraces.add(traceId);
-            }
-        }
-
-        return abnormalTraces;
     }
 
     private void executePPL(String ppl, ActionListener<String> listener) {
@@ -594,6 +726,7 @@ public class LogPatternAnalysisTool implements Tool {
 
         /**
          * Initialize this factory
+         *
          * @param client The OpenSearch client
          */
         public void init(Client client) {
