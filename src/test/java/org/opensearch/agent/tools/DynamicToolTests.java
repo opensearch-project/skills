@@ -17,7 +17,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -311,7 +310,7 @@ public class DynamicToolTests {
         tool.setAttributes(ImmutableMap.of("test_input", "{}"));
         Map<String, Object> attributes = tool.getAttributes();
         assertNotNull(attributes);
-        assertEquals(ImmutableMap.of("test_input", "{}"), attributes.get(TOOL_INPUT_SCHEMA_FIELD));
+        assertEquals(ImmutableMap.of("test_input", "{}"), attributes);
     }
 
     @Test
