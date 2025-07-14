@@ -5,8 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,8 +100,7 @@ public class DynamicTool implements Tool {
     @Override
     public void setAttributes(Map<String, Object> map) {
         this.attributes = new HashMap<>();
-        this.attributes.put(TOOL_INPUT_SCHEMA_FIELD, map);
-        attributes.put("strict", false);
+        this.attributes.putAll(map);
     }
 
     @Override
