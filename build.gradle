@@ -140,6 +140,7 @@ dependencies {
     compileOnly("com.google.guava:guava:33.2.1-jre")
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
     compileOnly(group: 'org.apache.httpcomponents.core5', name: 'httpcore5', version: "${versions.httpcore5}")
