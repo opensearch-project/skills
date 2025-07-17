@@ -140,7 +140,9 @@ dependencies {
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
 
     spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
-    spark 'org.apache.spark:spark-core_2.13:3.5.4'
+    spark ('org.apache.spark:spark-core_2.13:3.5.4') {
+        exclude group: 'org.eclipse.jetty', module: 'jetty-server'
+    }
     spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
 
     implementation 'org.scala-lang:scala-library:2.13.9'
@@ -225,7 +227,9 @@ task addSparkJar(type: Copy) {
         // Remove the unwanted directory from jar B
         delete file("${jarBContents}/org/apache/spark/unused")
         delete file("${jarBContents}/org/sparkproject/jetty/http")
+        delete file("${jarBContents}/org/sparkproject/jetty/server")
         delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-http")
+        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-server")
         // Re-compress jar B
         ant.zip(destfile: jarB, baseDir: jarBContents)
 
