@@ -200,6 +200,8 @@ dependencies {
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
     testImplementation "com.cronutils:cron-utils:9.2.1"
     testImplementation 'com.jayway.jsonpath:json-path:2.9.0'
+    testImplementation('net.minidev:json-smart:2.5.2')
+    testImplementation 'net.minidev:asm:1.0.2'
     testImplementation "commons-validator:commons-validator:1.8.0"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.2'
 }
