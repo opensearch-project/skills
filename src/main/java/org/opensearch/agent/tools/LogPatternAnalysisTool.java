@@ -17,7 +17,9 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import org.apache.commons.math3.ml.clustering.CentroidCluster;
@@ -40,6 +42,8 @@ import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+
+import javax.swing.text.html.Option;
 
 /**
  * Usage:
@@ -129,8 +133,6 @@ public class LogPatternAnalysisTool implements Tool {
             if (Strings.isEmpty(index)
                 || Strings.isEmpty(timeField)
                 || Strings.isEmpty(logFieldName)
-                || Strings.isEmpty(baseTimeRangeStart)
-                || Strings.isEmpty(baseTimeRangeEnd)
                 || Strings.isEmpty(selectionTimeRangeStart)
                 || Strings.isEmpty(selectionTimeRangeEnd)) {
                 throw new IllegalArgumentException(
@@ -138,6 +140,10 @@ public class LogPatternAnalysisTool implements Tool {
                         + "baseTimeRangeEnd, selectionTimeRangeStart, selectionTimeRangeEnd are required!"
                 );
             }
+        }
+
+        boolean hasBaseTime() {
+            return !Strings.isEmpty(baseTimeRangeStart) && !Strings.isEmpty(baseTimeRangeEnd);
         }
 
         boolean hasTraceField() {
@@ -152,8 +158,10 @@ public class LogPatternAnalysisTool implements Tool {
         Map<String, Double> patternValues, int totalTraceCount) {
     }
 
-    private record PatternDiff(String pattern, double base, double selection, double lift) {
+    private record PatternDiff(String pattern, Double base, Double selection, Double lift) {
     }
+
+    private record PatternWithSamples(String pattern, double count, List<?> sampleLogs) {}
 
     // Instance fields
     @Setter
@@ -201,12 +209,15 @@ public class LogPatternAnalysisTool implements Tool {
             log.info("Starting log pattern analysis with parameters: {}", parameters.keySet());
             AnalysisParameters params = new AnalysisParameters(parameters);
 
-            if (params.hasTraceField()) {
+            if (params.hasTraceField() && params.hasBaseTime()) {
                 log.info("Performing log sequence analysis for index: {}", params.index);
                 logSequenceAnalysis(params, listener);
-            } else {
+            } else if (params.hasBaseTime()){
                 log.info("Performing log pattern analysis for index: {}", params.index);
-                logPatternAnalysis(params, listener);
+                logPatternDiffAnalysis(params, listener);
+            } else {
+                log.info("");
+                logInsight(params, listener);
             }
         } catch (IllegalArgumentException e) {
             log.error("Invalid parameters for LogPatternAnalysisTool: {}", e.getMessage());
@@ -546,7 +557,7 @@ public class LogPatternAnalysisTool implements Tool {
         return result;
     }
 
-    private <T> void logPatternAnalysis(AnalysisParameters params, ActionListener<T> listener) {
+    private <T> void logPatternDiffAnalysis(AnalysisParameters params, ActionListener<T> listener) {
         log
             .debug(
                 "Starting log pattern analysis for time ranges: base[{} - {}], selection[{} - {}]",
@@ -564,11 +575,22 @@ public class LogPatternAnalysisTool implements Tool {
             params.baseTimeRangeStart,
             params.baseTimeRangeEnd
         );
+        Function<List<List<Object>>, Map<String, Double>> dataRowsParser = dataRows -> {
+            Map<String, Double> patternMap = new HashMap<>();
+            for (List<Object> row : dataRows) {
+                if (row.size() == 2) {
+                    String pattern = (String) row.get(1);
+                    double count = ((Number) row.get(0)).doubleValue();
+                    patternMap.put(pattern, count);
+                }
+            }
+            return patternMap;
+        };
 
         log.debug("Executing base time range pattern PPL: {}", baseTimeRangeLogPatternPPL);
         executePPL(baseTimeRangeLogPatternPPL, ActionListener.wrap(baseResponse -> {
             try {
-                Map<String, Double> basePatterns = parseLogPatterns(baseResponse);
+                Map<String, Double> basePatterns = parseLogPatterns(baseResponse, dataRowsParser).orElse(new HashMap<>());
                 mergeSimilarPatterns(basePatterns);
 
                 log.debug("Base patterns processed: {} patterns", basePatterns.size());
@@ -585,7 +607,8 @@ public class LogPatternAnalysisTool implements Tool {
                 log.debug("Executing selection time range pattern PPL: {}", selectionTimeRangeLogPatternPPL);
                 executePPL(selectionTimeRangeLogPatternPPL, ActionListener.wrap(selectionResponse -> {
                     try {
-                        Map<String, Double> selectionPatterns = parseLogPatterns(selectionResponse);
+                        Map<String, Double> selectionPatterns =
+                                parseLogPatterns(selectionResponse, dataRowsParser).orElse(new HashMap<>());
                         mergeSimilarPatterns(selectionPatterns);
 
                         log.debug("Selection patterns processed: {} patterns", selectionPatterns.size());
@@ -595,8 +618,6 @@ public class LogPatternAnalysisTool implements Tool {
 
                         Map<String, Object> finalResult = new HashMap<>();
                         finalResult.put("patternMapDifference", patternDifferences);
-                        finalResult.put("patternMapSelection", selectionPatterns);
-                        finalResult.put("patternMapBase", basePatterns);
 
                         log.info("Pattern analysis completed: {} differences found", patternDifferences.size());
                         log.debug("finalResult={}", gson.toJson(finalResult));
@@ -615,11 +636,55 @@ public class LogPatternAnalysisTool implements Tool {
         }, this::handlePPLError));
     }
 
+
+    private <T> void logInsight(AnalysisParameters params, ActionListener<T> listener) {
+        String selectionTimeRangeLogPatternPPL = String
+                .format(
+                        "source=%s | where %s>'%s' and %s<'%s' | where match(%s, 'exception timeout fatal failed " +
+                        "fail error') | patterns %s method=brain mode=aggregation max_sample_count=1"
+                        + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
+                        + "| sort -pattern_count | head 5",
+                        params.index,
+                        params.timeField,
+                        params.selectionTimeRangeStart,
+                        params.timeField,
+                        params.selectionTimeRangeEnd,
+                        params.logFieldName,
+                        params.logFieldName
+                );
+
+        Function<List<List<Object>>, List<PatternWithSamples>> dataRowsParser = dataRows -> {
+            List<PatternWithSamples> patternWithSamplesList = new ArrayList<>();
+            for (List<Object> row : dataRows) {
+                if (row.size() == 3) {
+                    String pattern = (String) row.get(0);
+                    double count = ((Number) row.get(1)).doubleValue();
+                    List<?> samples = (List<?>) row.get(2);
+                    patternWithSamplesList.add(new PatternWithSamples(pattern, count, samples));
+                }
+            }
+            return patternWithSamplesList;
+        };
+
+        executePPL(selectionTimeRangeLogPatternPPL, ActionListener.wrap(baseResponse -> {
+            try {
+                List<PatternWithSamples> logInsights =
+                        parseLogPatterns(baseResponse, dataRowsParser).orElse(new ArrayList<>());
+                Map<String, Object> finalResult = new HashMap<>();
+                finalResult.put("logInsights", logInsights);
+                listener.onResponse((T) gson.toJson(finalResult));
+            } catch (Exception e) {
+                log.error("Failed to process base pattern response", e);
+                listener.onFailure(new RuntimeException("Failed to process base patterns", e));
+            }
+        }, this::handlePPLError));
+    }
+
     private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime) {
         return String
             .format(
                 "source=%s | where %s>'%s' and %s<'%s' | patterns %s method=brain "
-                    + "variable_count_threshold=3 | fields patterns_field | stats count() as cnt by patterns_field",
+                    + "variable_count_threshold=3 | stats count() as cnt by patterns_field | fields cnt, patterns_field",
                 index,
                 timeField,
                 startTime,
@@ -648,19 +713,11 @@ public class LogPatternAnalysisTool implements Tool {
                 }
 
                 if (lift > 2.0) {
-                    log
-                        .debug(
-                            "Significant pattern change detected - pattern: {}, base: {}, selection: {}, lift: {}",
-                            pattern,
-                            baseCount,
-                            selectionCount,
-                            lift
-                        );
-                    differences.add(new PatternDiff(pattern, baseCount / baseTotal, selectionCount / selectionTotal, lift));
+                    differences.add(new PatternDiff(pattern, baseCount , selectionCount , lift));
                 }
             } else {
                 // Pattern only exists in selection time range
-                differences.add(new PatternDiff(pattern, 0, selectionCount / selectionTotal, 999));
+                differences.add(new PatternDiff(pattern, 0.0, selectionCount, null));
                 log.debug("New selection pattern detected: {} (count: {})", pattern, selectionCount);
             }
         }
@@ -668,7 +725,7 @@ public class LogPatternAnalysisTool implements Tool {
         return differences;
     }
 
-    private Map<String, Double> parseLogPatterns(String response) {
+    private <T> Optional<T> parseLogPatterns(String response, Function<List<List<Object>>, T> rowParser) {
         try {
             Map<String, Object> pplResult = gson.fromJson(response, new TypeToken<Map<String, Object>>() {
             }.getType());
@@ -676,27 +733,16 @@ public class LogPatternAnalysisTool implements Tool {
             Object datarowsObj = pplResult.get("datarows");
             if (datarowsObj == null || !(datarowsObj instanceof List)) {
                 log.warn("Invalid PPL response format: missing or invalid datarows");
-                return new HashMap<>();
+                return Optional.empty();
             }
 
             @SuppressWarnings("unchecked")
             List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
 
-            Map<String, Double> patternMap = new HashMap<>();
-            for (List<Object> row : dataRows) {
-                if (row.size() >= 2) {
-                    String pattern = (String) row.get(1);
-                    Double count = ((Number) row.get(0)).doubleValue();
-                    patternMap.put(pattern, count);
-                } else {
-                    log.warn("Skipping invalid row with insufficient columns: {}", row);
-                }
-            }
-
-            return patternMap;
+            return Optional.ofNullable(rowParser.apply(dataRows));
         } catch (Exception e) {
             log.error("Failed to parse log patterns from response", e);
-            return new HashMap<>();
+            return Optional.empty();
         }
     }
 

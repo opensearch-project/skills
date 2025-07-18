@@ -12,19 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/**
- * Simplified Hierarchical Agglomerative Clustering for cosine distance with threshold-based stopping
- *
- * This implementation is optimized for a specific use case:
- * - Uses cosine distance metric only
- * - Stops clustering when distance threshold is exceeded
- * - Memory-efficient implementation without caching
- * - Supports standard linkage methods: single, complete, average
- *
- * Usage:
- * HierarchicalAgglomerativeClustering clustering = new HierarchicalAgglomerativeClustering(data);
- * List<ClusterNode> clusters = clustering.fit(LinkageMethod.COMPLETE, 0.5);
- */
 public class HierarchicalAgglomerativeClustering {
 
     private final double[][] data;
@@ -144,19 +131,13 @@ public class HierarchicalAgglomerativeClustering {
         // Main clustering loop
         while (activeClusters.size() > 1) {
             // Find closest pair of clusters
-            int[] closestPair = findClosestClusters(activeClusters, linkage);
+            int[] closestPair = findClosestClusters(activeClusters, linkage, threshold);
             if (closestPair == null) {
                 break;
             }
 
             int i = closestPair[0];
             int j = closestPair[1];
-            double minDistance = computeClusterDistance(activeClusters.get(i), activeClusters.get(j), linkage);
-
-            // Stop if minimum distance exceeds threshold
-            if (minDistance > threshold) {
-                break;
-            }
 
             // Merge the two closest clusters
             ClusterNode newCluster = new ClusterNode(nextClusterId++, activeClusters.get(i), activeClusters.get(j));
@@ -173,8 +154,8 @@ public class HierarchicalAgglomerativeClustering {
     /**
      * Find the two closest clusters
      */
-    private int[] findClosestClusters(List<ClusterNode> clusters, LinkageMethod linkage) {
-        double minDistance = Double.MAX_VALUE;
+    private int[] findClosestClusters(List<ClusterNode> clusters, LinkageMethod linkage, double threshold) {
+        double minDistance = threshold;
         int bestI = -1, bestJ = -1;
 
         for (int i = 0; i < clusters.size(); i++) {
@@ -264,18 +245,16 @@ public class HierarchicalAgglomerativeClustering {
      */
     public int getClusterCentroid(ClusterNode cluster) {
         if (cluster.samples.size() == 1) {
-            return cluster.samples.get(0);
+            return cluster.samples.getFirst();
         }
 
-        int medoidIndex = cluster.samples.get(0);
+        int medoidIndex = cluster.samples.getFirst();
         double minTotalDistance = Double.MAX_VALUE;
 
         for (int pointI : cluster.samples) {
             double totalDistance = 0.0;
             for (int pointJ : cluster.samples) {
-                if (pointI != pointJ) {
-                    totalDistance += distanceMatrix[pointI][pointJ];
-                }
+                totalDistance += distanceMatrix[pointI][pointJ];
             }
 
             if (totalDistance < minTotalDistance) {
