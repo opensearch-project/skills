@@ -22,9 +22,11 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
+import org.apache.commons.math3.exception.DimensionMismatchException;
 import org.apache.commons.math3.ml.clustering.CentroidCluster;
 import org.apache.commons.math3.ml.clustering.DoublePoint;
 import org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer;
+import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.json.JSONObject;
 import org.opensearch.agent.tools.utils.HierarchicalAgglomerativeClustering;
 import org.opensearch.core.action.ActionListener;
@@ -1051,7 +1053,8 @@ public class LogPatternAnalysisTool implements Tool {
      */
     private List<List<Integer>> performKMeansClustering(double[][] vectors, int numClusters) {
         try {
-            KMeansPlusPlusClusterer<DoublePoint> clusterer = new KMeansPlusPlusClusterer<>(numClusters);
+            KMeansPlusPlusClusterer<DoublePoint> clusterer = new KMeansPlusPlusClusterer<>(numClusters, 300,
+                    (DistanceMeasure) (a, b) -> 1- calculateCosineSimilarity(a, b));
 
             // Convert vectors to DoublePoint objects
             List<DoublePoint> points = new ArrayList<>();
