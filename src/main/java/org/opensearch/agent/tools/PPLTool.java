@@ -32,6 +32,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.spark.sql.types.DataType;
 import org.json.JSONObject;
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
@@ -260,8 +261,14 @@ public class PPLTool implements WithModelTool {
                     );
                 // Execute output here
             }, e -> {
+
                 log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
-                listener.onFailure(e);
+                if (e instanceof OpenSearchStatusException) {
+                    String errorMessage = redactSagemakerArns(redactCloudwatchUrl(e.getMessage()));
+                    listener.onFailure(new OpenSearchStatusException(errorMessage, ((OpenSearchStatusException) e).status()));
+                } else {
+                    listener.onFailure(e);
+                }
             }));
         }, e -> {
             log.info("fail to get index schema");
@@ -676,5 +683,21 @@ public class PPLTool implements WithModelTool {
             log.error("Failed to load default prompt dict", e);
         }
         return new HashMap<>();
+    }
+
+    private static String redactSagemakerArns(String input) {
+        String regex = "arn:aws:logs:[^:]+:\\d+:log-group:/aws/sagemaker/Endpoints/[^ \\t\\n\\r\\f\\v,\"']+";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        return matcher.replaceAll("<SAGEMAKER_ENDPOINT>");
+    }
+
+    public static String redactCloudwatchUrl(String input) {
+        String regex = "See\\s+.+?\\s+in\\s+account\\s+.+?\\s+for\\s+more\\s+information";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        return matcher.replaceAll("");
     }
 }
