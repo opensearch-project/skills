@@ -23,12 +23,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -173,6 +175,36 @@ public class PPLToolTests {
             assertEquals("ppl result", returnResults.get("executionResult"));
             assertEquals("source=demo| head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testToolWhenGettingSagemakerError() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        doAnswer(invocation -> {
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            OpenSearchStatusException exception = new OpenSearchStatusException(
+                "Error from remote service: {\"ErrorCode\":\"CLIENT_ERROR_FROM_MODEL\",\"LogStreamArn\":\"arn:aws:logs:us-east-1:12345678:log-group:/aws/sagemaker/Endpoints/demo-test-name\",\"Message\":\"Received client error (404) from primary with message \\\"{\\n \\\"code\\\":404,\\n \\\"message\\\":\\\"prediction failure\\\",\\n \\\"error\\\":\\\"Input token limit exceeded. The model only supports schemas with less than 1000-1500 fields, and has optimal performance for 350 fields or fewer.\\\"\\n}\\\". See https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logEventViewer:group=/aws/sagemaker/Endpoints/demo-test-name in account 12345678 for more information.\",\"OriginalMessage\":\"{\\n \\\"code\\\":500,\\n \\\"message\\\":\\\"prediction failure\\\",\\n \\\"error\\\":\\\"Input token limit exceeded. The model only supports schemas with less than 1000-1500 fields, and has optimal performance for 350 fields or fewer.\\\"\\n}\",\"OriginalStatusCode\":404}",
+                RestStatus.fromCode(404)
+            );
+
+            listener.onFailure(exception);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        OpenSearchStatusException exception = assertThrows(
+            OpenSearchStatusException.class,
+            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+                Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                assertEquals("ppl result", returnResults.get("executionResult"));
+                assertEquals("source=demo| head 1", returnResults.get("ppl"));
+            }, e -> { throw new OpenSearchStatusException(e.getMessage(), ((OpenSearchStatusException) e).status()); }))
+        );
+        assertTrue(exception.getMessage().contains("<SAGEMAKER_ENDPOINT>"));
+        assertFalse(exception.getMessage().contains("demo-test-name"));
+        assertFalse(exception.getMessage().contains("12345678"));
 
     }
 
