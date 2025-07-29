@@ -8,10 +8,12 @@ package org.opensearch.agent;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
+import org.opensearch.agent.tools.DynamicTool;
 import org.opensearch.agent.tools.LogPatternTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -23,8 +25,12 @@ import org.opensearch.agent.tools.SearchMonitorsTool;
 import org.opensearch.agent.tools.VectorDBTool;
 import org.opensearch.agent.tools.WebSearchTool;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.IndexScopedSettings;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -32,8 +38,13 @@ import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
 import org.opensearch.ml.common.spi.MLCommonsExtension;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
+import org.opensearch.rest.DynamicRestRequestCreator;
+import org.opensearch.rest.DynamicToolExecutor;
+import org.opensearch.rest.RestController;
+import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
 import org.opensearch.threadpool.ExecutorBuilder;
 import org.opensearch.threadpool.FixedExecutorBuilder;
@@ -45,14 +56,25 @@ import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
 
-public class ToolPlugin extends Plugin implements MLCommonsExtension {
+public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlugin {
 
-    private Client client;
-    private ClusterService clusterService;
-    private NamedXContentRegistry xContentRegistry;
-
+    private final AtomicReference<RestController> restControllerRef = new AtomicReference<>();
     public static final String SKILLS_THREAD_POOL_PREFIX = "thread_pool.skills";
     public static final String WEBSEARCH_CRAWLER_THREADPOOL = "websearch-crawler-threadpool";
+
+    @Override
+    public List<RestHandler> getRestHandlers(
+        Settings settings,
+        RestController restController,
+        ClusterSettings clusterSettings,
+        IndexScopedSettings indexScopedSettings,
+        SettingsFilter settingsFilter,
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        Supplier<DiscoveryNodes> nodesInCluster
+    ) {
+        restControllerRef.set(restController);
+        return Collections.emptyList();
+    }
 
     @SneakyThrows
     @Override
@@ -69,9 +91,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         IndexNameExpressionResolver indexNameExpressionResolver,
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
-        this.client = client;
-        this.clusterService = clusterService;
-        this.xContentRegistry = xContentRegistry;
         PPLTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
@@ -84,6 +103,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
         WebSearchTool.Factory.getInstance().init(threadPool);
+        DynamicToolExecutor toolExecutor = new DynamicToolExecutor(restControllerRef, client);
+        DynamicTool.Factory.getInstance().init(client, toolExecutor, new DynamicRestRequestCreator(), xContentRegistry);
         return Collections.emptyList();
     }
 
@@ -102,7 +123,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance(),
-                WebSearchTool.Factory.getInstance()
+                WebSearchTool.Factory.getInstance(),
+                DynamicTool.Factory.getInstance()
             );
     }
 
