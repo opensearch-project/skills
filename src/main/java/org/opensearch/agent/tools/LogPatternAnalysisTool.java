@@ -102,6 +102,7 @@ public class LogPatternAnalysisTool implements Tool {
         "This is a tool used to detect selection log patterns by the patterns command in PPL or to detect selection log sequences by the log clustering algorithm.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
+    private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
 
     // Compiled regex patterns for better performance
@@ -138,8 +139,7 @@ public class LogPatternAnalysisTool implements Tool {
                 || Strings.isEmpty(selectionTimeRangeStart)
                 || Strings.isEmpty(selectionTimeRangeEnd)) {
                 throw new IllegalArgumentException(
-                    "Invalid parameters: index, timeField, logFieldName, baseTimeRangeStart, "
-                        + "baseTimeRangeEnd, selectionTimeRangeStart, selectionTimeRangeEnd are required!"
+                    "Invalid parameters: index, timeField, logFieldName, selectionTimeRangeStart, selectionTimeRangeEnd are required!"
                 );
             }
         }
@@ -218,7 +218,6 @@ public class LogPatternAnalysisTool implements Tool {
                 log.info("Performing log pattern analysis for index: {}", params.index);
                 logPatternDiffAnalysis(params, listener);
             } else {
-                log.info("");
                 logInsight(params, listener);
             }
         } catch (IllegalArgumentException e) {
@@ -643,7 +642,7 @@ public class LogPatternAnalysisTool implements Tool {
         String selectionTimeRangeLogPatternPPL = String
                 .format(
                         "source=%s | where %s>'%s' and %s<'%s' | where match(%s, 'exception timeout fatal failed " +
-                        "fail error') | patterns %s method=brain mode=aggregation max_sample_count=1"
+                        "fail error') | patterns %s method=brain mode=aggregation max_sample_count=2"
                         + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
                         + "| sort -pattern_count | head 5",
                         params.index,
@@ -714,12 +713,12 @@ public class LogPatternAnalysisTool implements Tool {
                     lift = 1.0 / lift;
                 }
 
-                if (lift > 2.0) {
-                    differences.add(new PatternDiff(pattern, baseCount , selectionCount , lift));
+                if (lift > LOG_PATTERN_LIFT) {
+                    differences.add(new PatternDiff(pattern, baseCount/baseTotal , selectionCount/selectionTotal , lift));
                 }
             } else {
                 // Pattern only exists in selection time range
-                differences.add(new PatternDiff(pattern, 0.0, selectionCount, null));
+                differences.add(new PatternDiff(pattern, 0.0, selectionCount/selectionTotal, null));
                 log.debug("New selection pattern detected: {} (count: {})", pattern, selectionCount);
             }
         }
@@ -837,16 +836,11 @@ public class LogPatternAnalysisTool implements Tool {
             return pattern;
         }
 
-        // Remove trailing bracket if present
-        if (pattern.endsWith("]")) {
-            pattern = pattern.substring(0, pattern.length() - 1);
-        }
-
         // Replace repeated <*> with single <*> using compiled pattern
         pattern = REPEATED_WILDCARDS_PATTERN.matcher(pattern).replaceAll("<*>");
 
         // Merge repeated substrings
-        pattern = mergeRepeatedSubstrings(pattern);
+        // pattern = mergeRepeatedSubstrings(pattern);
 
         return pattern;
     }
