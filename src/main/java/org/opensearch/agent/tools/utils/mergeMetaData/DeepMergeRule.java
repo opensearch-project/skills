@@ -16,7 +16,7 @@ public class DeepMergeRule implements MergeRule {
             && target != null
             && source.get("properties") != null
             && target.get("properties") != null
-            && source.get("type").equals(target.get("type"));
+            && source.getOrDefault("type", "object").equals(target.getOrDefault("type", "object"));
     }
 
     @Override
