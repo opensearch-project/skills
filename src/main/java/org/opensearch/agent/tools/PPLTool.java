@@ -520,8 +520,7 @@ public class PPLTool implements WithModelTool {
             );
         }
         Map<String, Object> allFields = new HashMap<>();
-        for (Object index : mappings.keySet().toArray()) {
-            MappingMetadata mappingMetadata = mappings.get(index);
+        for (MappingMetadata mappingMetadata : mappings.values()) {
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             MergeRuleHelper.merge(mappingSource, allFields);
         }
