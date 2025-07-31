@@ -982,11 +982,14 @@ public class LogPatternAnalysisTool implements Tool {
             log.debug("Using {} K-means clusters for pre-clustering", numKMeansClusters);
 
             try {
+                log.info("Starting performKMeansClustering");
                 List<List<Integer>> kMeansClusters = performKMeansClustering(vectors, numKMeansClusters);
+                log.info("Completing performKMeansClustering");
 
                 // Phase 2: Apply hierarchical clustering within each K-means cluster
                 for (int clusterIdx = 0; clusterIdx < kMeansClusters.size(); clusterIdx++) {
                     List<Integer> kMeansCluster = kMeansClusters.get(clusterIdx);
+                    log.info("kMeansCluster " + kMeansCluster.size());
 
                     if (kMeansCluster.isEmpty()) {
                         continue;
@@ -995,6 +998,13 @@ public class LogPatternAnalysisTool implements Tool {
                     if (kMeansCluster.size() == 1) {
                         // Single point cluster - add directly
                         finalCentroids.add(indexTraceIdMap.get(kMeansCluster.getFirst()));
+                        continue;
+                    }
+
+                    if (kMeansCluster.size() > 500) {
+                        log.info("the cluster size is greater than 500, perform partitioning");
+                        List<String> clusterCentroids = performHierarchicalClusteringOfPartition(kMeansCluster, vectors,  indexTraceIdMap);
+                        finalCentroids.addAll(clusterCentroids);
                         continue;
                     }
 
@@ -1011,8 +1021,10 @@ public class LogPatternAnalysisTool implements Tool {
                     }
 
                     // Apply hierarchical clustering within this K-means cluster
+                    log.info("Starting performHierarchicalClustering");
                     List<String> clusterCentroids = performHierarchicalClustering(clusterVectors, clusterIndexTraceIdMap);
 
+                    log.info("Completing performHierarchicalClustering");
                     finalCentroids.addAll(clusterCentroids);
                 }
 
@@ -1122,6 +1134,94 @@ public class LogPatternAnalysisTool implements Tool {
 
         return centroids;
     }
+
+    /**
+     * If the first stage K-means clustering results exceed 500 clusters, implement batch processing and merge the results.
+     * @param kMeansCluster Clustering results from the first stage.
+     * @param vectors List of vectors by index.
+     * @param indexTraceIdMap Map of index to their trace id.
+     * @return
+     */
+    private List<String> performHierarchicalClusteringOfPartition(List<Integer> kMeansCluster, double[][] vectors, Map<Integer, String> indexTraceIdMap) {
+        List<List<Integer>> partition = new ArrayList<>();
+        int groupSize = 500;
+        for (int j = 0; j < kMeansCluster.size(); j += groupSize) {
+            int end = Math.min(j + groupSize, kMeansCluster.size());
+            partition.add(new ArrayList<>(kMeansCluster.subList(j, end)));
+        }
+        log.info("Completing parting. {}", partition.size());
+        List<double[]> vectorRes = new ArrayList<>();
+        Map<Integer, String> index2Trace = new HashMap<>();
+        for (List<Integer> partList: partition) {
+            double[][] clusterVectors = new double[partList.size()][];
+            Map<Integer, String> clusterIndexTraceIdMap = new HashMap<>();
+
+            for (int j = 0; j < partList.size(); j++) {
+                int originalIndex = partList.get(j);
+                clusterVectors[j] = vectors[originalIndex];
+                clusterIndexTraceIdMap.put(j, indexTraceIdMap.get(originalIndex));
+            }
+
+            log.info("Starting performHierarchicalClusteringOfPartition!");
+            if (clusterVectors.length == 0) {
+                continue;
+            }
+
+            if (clusterVectors.length == 1) {
+                vectorRes.add(clusterVectors[0]);
+                index2Trace.put(vectorRes.size() - 1, clusterIndexTraceIdMap.get(0));
+                continue;
+            }
+            try {
+                HierarchicalAgglomerativeClustering hac = new HierarchicalAgglomerativeClustering(clusterVectors);
+                List<HierarchicalAgglomerativeClustering.ClusterNode> clusters = hac
+                        .fit(HierarchicalAgglomerativeClustering.LinkageMethod.COMPLETE, LOG_VECTORS_CLUSTERING_THRESHOLD);
+                log.info("Completing performHierarchicalClusteringOfPartition!");
+                for (HierarchicalAgglomerativeClustering.ClusterNode cluster : clusters) {
+                    int centroidIndex = hac.getClusterCentroid(cluster);
+                    vectorRes.add(clusterVectors[centroidIndex]);
+                    index2Trace.put(vectorRes.size() - 1, clusterIndexTraceIdMap.get(centroidIndex));
+                }
+            } catch (Exception e) {
+                log.error("Hierarchical clustering failed: {}", e.getMessage(), e);
+                // Fallback: return first point as representative
+                vectorRes.add(clusterVectors[0]);
+                index2Trace.put(vectorRes.size() - 1, clusterIndexTraceIdMap.get(0));
+            }
+        }
+        return removeSimilarVectors(vectorRes, index2Trace);
+    }
+
+    /**
+     * Compute the cosine distance pairwise and return the corresponding trace.
+     * @param vectorRes List of vectors.
+     * @param index2Trace Map of index to their trace id.
+     * @return
+     */
+    private List<String> removeSimilarVectors(List<double[]> vectorRes, Map<Integer, String> index2Trace) {
+        Set<Integer> toRemove = new HashSet<>();
+
+        for (int i = 0; i < vectorRes.size(); i++) {
+            if (toRemove.contains(i)) continue;
+
+            for (int j = i + 1; j < vectorRes.size(); j++) {
+                if (toRemove.contains(j)) continue;
+
+                double distance =calculateCosineSimilarity(vectorRes.get(i), vectorRes.get(j));
+                if (distance < LOG_VECTORS_CLUSTERING_THRESHOLD) {
+                    toRemove.add(j);
+                }
+            }
+        }
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < vectorRes.size(); i++) {
+            if (!toRemove.contains(i)) {
+                result.add(index2Trace.get(i));
+            }
+        }
+        return result;
+    }
+
 
     public static class Factory implements Tool.Factory<LogPatternAnalysisTool> {
         private Client client;
