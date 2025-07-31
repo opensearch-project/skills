@@ -37,6 +37,7 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
+import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
@@ -296,6 +297,7 @@ public class PPLTool implements WithModelTool {
 
             return;
         }
+
         GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
         client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
             Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
@@ -512,16 +514,19 @@ public class PPLTool implements WithModelTool {
     }
 
     private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
-        String firstIndexName = (String) mappings.keySet().toArray()[0];
-        MappingMetadata mappingMetadata = mappings.get(firstIndexName);
-        Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-        if (Objects.isNull(mappingSource)) {
+        if (mappings.keySet().size() == 0) {
             throw new IllegalArgumentException(
                 "The querying index doesn't have mapping metadata, please add data to it or using another index."
             );
         }
+        Map<String, Object> allFields = new HashMap<>();
+        for (MappingMetadata mappingMetadata : mappings.values()) {
+            Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+            MergeRuleHelper.merge(mappingSource, allFields);
+        }
         Map<String, String> fieldsToType = new HashMap<>();
-        ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", false);
+        ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
+
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
