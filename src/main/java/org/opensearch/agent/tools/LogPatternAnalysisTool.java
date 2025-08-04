@@ -639,10 +639,23 @@ public class LogPatternAnalysisTool implements Tool {
 
 
     private <T> void logInsight(AnalysisParameters params, ActionListener<T> listener) {
+        List<String> errorKeywords = List.of(
+                "error", "err", "exception", "failed", "failure", "timeout", "panic", "fatal", "critical", "severe",
+                "abort", "aborted", "aborting", "crash", "crashed", "broken", "corrupt", "corrupted", "invalid",
+                "malformed", "unprocessable", "denied", "forbidden", "unauthorized", "conflict", "deadlock",
+                "overflow", "underflow", "resource_exhausted", "out_of_resources", "quota_exceeded",
+                "rate_limit_exceeded", "throttled", "disk_full", "no_space_left", "insufficient_storage",
+                "dependency", "retrying", "cold_start", "warmup", "saturation", "backpressure", "queue_full",
+                "degraded", "unexpected", "unusual", "missing", "stale", "expired", "mismatch",
+                "validation_failed", "schema_violation", "timeout_approaching", "deadline_exceeded", "retry_backoff",
+                "invalid_token", "expired_token", "token_revoked", "authentication_failed", "auth_error",
+                "permission_denied", "role_mismatch", "audit_failure", "access_violation"
+        );
+
         String selectionTimeRangeLogPatternPPL = String
                 .format(
-                        "source=%s | where %s>'%s' and %s<'%s' | where match(%s, 'exception timeout fatal failed " +
-                        "fail error') | patterns %s method=brain mode=aggregation max_sample_count=2"
+                        "source=%s | where %s>'%s' and %s<'%s' | where match(%s, '%s') | patterns %s method=brain " +
+                        "mode=aggregation max_sample_count=2"
                         + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
                         + "| sort -pattern_count | head 5",
                         params.index,
@@ -651,6 +664,7 @@ public class LogPatternAnalysisTool implements Tool {
                         params.timeField,
                         params.selectionTimeRangeEnd,
                         params.logFieldName,
+                        String.join(" ", errorKeywords),
                         params.logFieldName
                 );
 
