@@ -3,14 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.agent.tools.utils;
+package org.opensearch.agent.tools.utils.clustering;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
 
 public class HierarchicalAgglomerativeClustering {
 
@@ -57,10 +53,6 @@ public class HierarchicalAgglomerativeClustering {
         this.nSamples = data.length;
         this.nFeatures = data[0].length;
         this.distanceMatrix = new double[nSamples][nSamples];
-
-        if (nSamples == 0) {
-            throw new IllegalArgumentException("Input data cannot be empty");
-        }
 
         // Compute cosine distance matrix
         computeCosineDistanceMatrix();
@@ -110,8 +102,8 @@ public class HierarchicalAgglomerativeClustering {
 
     /**
      * Perform hierarchical clustering with distance threshold
-     * 
-     * @param linkage The linkage method to use
+     *
+     * @param linkage   The linkage method to use
      * @param threshold Distance threshold - clustering stops when minimum distance exceeds this value
      * @return List of final clusters
      */
@@ -130,7 +122,7 @@ public class HierarchicalAgglomerativeClustering {
 
         // Main clustering loop
         while (activeClusters.size() > 1) {
-            // Find closest pair of clusters
+            // Find the closest pair of clusters
             int[] closestPair = findClosestClusters(activeClusters, linkage, threshold);
             if (closestPair == null) {
                 break;
@@ -267,22 +259,6 @@ public class HierarchicalAgglomerativeClustering {
     }
 
     /**
-     * Convert clusters to label array
-     */
-    public int[] getLabels(List<ClusterNode> clusters) {
-        int[] labels = new int[nSamples];
-
-        for (int clusterId = 0; clusterId < clusters.size(); clusterId++) {
-            ClusterNode cluster = clusters.get(clusterId);
-            for (int pointIndex : cluster.samples) {
-                labels[pointIndex] = clusterId;
-            }
-        }
-
-        return labels;
-    }
-
-    /**
      * Backward compatibility method for cosine similarity calculation
      */
     public static double calculateCosineSimilarity(double[] a, double[] b) {
@@ -301,99 +277,5 @@ public class HierarchicalAgglomerativeClustering {
         }
 
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
-    /**
-     * Example usage for the simplified clustering
-     */
-    public static void main(String[] args) {
-        System.out.println("Simplified Hierarchical Clustering - Cosine Distance with Threshold");
-        System.out.println("===================================================================");
-
-        // Example data - document vectors
-        double[][] data = {
-            { 1.0, 1.0, 1.0, 0.0, 0.0, 0.0 },    // Document 1: topic A
-            { 1.0, 1.0, 0.5, 0.0, 0.0, 0.0 },    // Document 2: similar to topic A
-            { 0.0, 0.0, 0.0, 1.0, 0.5, 1.0 },    // Document 3: topic B
-            { 0.0, 0.0, 0.0, 0.9, 1.0, 1.0 },    // Document 4: similar to topic B
-            { 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 }     // Document 5: mixed topics
-        };
-
-        System.out.println("Input data: " + data.length + " documents with " + data[0].length + " features");
-
-        HierarchicalAgglomerativeClustering clustering = new HierarchicalAgglomerativeClustering(data);
-
-        // Test different thresholds
-        double[] thresholds = { 0.3, 0.5, 0.7 };
-
-        for (double threshold : thresholds) {
-            System.out.println("\n--- Threshold: " + threshold + " ---");
-
-            // Test different linkage methods
-            for (LinkageMethod linkage : LinkageMethod.values()) {
-                List<ClusterNode> clusters = clustering.fit(linkage, threshold);
-                int[] labels = clustering.getLabels(clusters);
-
-                System.out.printf("%s linkage: %d clusters, labels: %s%n", linkage, clusters.size(), Arrays.toString(labels));
-
-                // Show cluster details
-                for (int i = 0; i < clusters.size(); i++) {
-                    ClusterNode cluster = clusters.get(i);
-                    int centroid = clustering.getClusterCentroid(cluster);
-                    System.out.printf("  Cluster %d: points %s (size: %d, centroid: %d)%n", i, cluster.samples, cluster.size, centroid);
-                }
-            }
-        }
-
-        // Performance test
-        System.out.println("\n--- Performance Test ---");
-        double[][] largeData = generateTestData(500, 50);
-
-        long startTime = System.nanoTime();
-        HierarchicalAgglomerativeClustering largeClustering = new HierarchicalAgglomerativeClustering(largeData);
-        List<ClusterNode> largeClusters = largeClustering.fit(LinkageMethod.AVERAGE, 0.6);
-        long endTime = System.nanoTime();
-
-        double executionTime = (endTime - startTime) / 1_000_000.0;
-        System.out.printf("Clustered %d documents into %d clusters in %.2f ms%n", largeData.length, largeClusters.size(), executionTime);
-
-        // Show cluster size distribution
-        Map<Integer, Integer> sizeDistribution = new HashMap<>();
-        for (ClusterNode cluster : largeClusters) {
-            sizeDistribution.merge(cluster.size, 1, Integer::sum);
-        }
-        System.out.println("Cluster size distribution: " + sizeDistribution);
-    }
-
-    /**
-     * Generate random test data for performance testing
-     */
-    private static double[][] generateTestData(int nSamples, int nFeatures) {
-        Random random = new Random(42); // Fixed seed for reproducibility
-        double[][] data = new double[nSamples][nFeatures];
-
-        for (int i = 0; i < nSamples; i++) {
-            // Generate sparse vectors (common in text/document clustering)
-            for (int j = 0; j < nFeatures; j++) {
-                if (random.nextDouble() < 0.3) { // 30% chance of non-zero value
-                    data[i][j] = random.nextDouble();
-                }
-            }
-
-            // Normalize to unit vector (common preprocessing for cosine similarity)
-            double norm = 0.0;
-            for (double val : data[i]) {
-                norm += val * val;
-            }
-            norm = Math.sqrt(norm);
-
-            if (norm > 0) {
-                for (int j = 0; j < nFeatures; j++) {
-                    data[i][j] /= norm;
-                }
-            }
-        }
-
-        return data;
     }
 }
