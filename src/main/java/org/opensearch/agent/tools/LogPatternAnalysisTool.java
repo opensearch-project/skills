@@ -12,14 +12,19 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.json.JSONObject;
 import org.opensearch.agent.tools.utils.clustering.ClusteringHelper;
@@ -154,6 +159,20 @@ public class LogPatternAnalysisTool implements Tool {
 
     private record PatternDiffResult(String pattern, Double base, Double selection, Double lift) {
     }
+
+    Comparator<PatternDiffResult> comparator = (d1, d2) -> {
+        Double lift1 = Optional.ofNullable(d1.lift).orElse(Double.MIN_VALUE);
+        Double lift2 = Optional.ofNullable(d2.lift).orElse(Double.MIN_VALUE);
+
+        if (lift1.compareTo(lift2) == 0) {
+            return Optional
+                    .ofNullable(d2.selection)
+                    .orElse(Double.MIN_VALUE)
+                    .compareTo(Optional.ofNullable(d1.selection).orElse(Double.MIN_VALUE));
+        } else {
+            return lift2.compareTo(lift1);
+        }
+    };
 
     private record PatternWithSamples(String pattern, double count, List<?> sampleLogs) {
     }
@@ -571,11 +590,18 @@ public class LogPatternAnalysisTool implements Tool {
                         // Step 3: Calculate pattern differences
                         List<PatternDiffResult> patternDifferences = calculatePatternDifferences(basePatterns, selectionPatterns);
 
+                        // Step 4: Sort the difference and get top 10
+                        List<PatternDiffResult> topDiffs = Stream
+                            .concat(
+                                patternDifferences.stream().filter(diff -> !Objects.isNull(diff.lift)).sorted(comparator).limit(10),
+                                patternDifferences.stream().filter(diff -> Objects.isNull(diff.lift)).sorted(comparator).limit(10)
+                            )
+                            .collect(Collectors.toList());
+
                         Map<String, Object> finalResult = new HashMap<>();
-                        finalResult.put("patternMapDifference", patternDifferences);
+                        finalResult.put("patternMapDifference", topDiffs);
 
                         log.info("Pattern analysis completed: {} differences found", patternDifferences.size());
-                        log.debug("finalResult={}", gson.toJson(finalResult));
                         listener.onResponse((T) gson.toJson(finalResult));
 
                     } catch (Exception e) {
