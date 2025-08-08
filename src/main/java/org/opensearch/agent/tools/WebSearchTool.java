@@ -29,6 +29,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.opensearch.agent.ToolPlugin;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
@@ -99,7 +100,8 @@ public class WebSearchTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         try {
             // common search parameters
             String query = parameters.getOrDefault("query", parameters.get("question")).replaceAll(" ", "+");

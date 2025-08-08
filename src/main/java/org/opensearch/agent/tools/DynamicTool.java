@@ -15,6 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -114,7 +115,8 @@ public class DynamicTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         RestRequest.Method method = RestRequest.Method.valueOf(parameters.get(METHOD_KEY));
         String uri = parameters.get(URI_KEY);
         String requestBody = parameters.get(REQUEST_BODY_KEY);

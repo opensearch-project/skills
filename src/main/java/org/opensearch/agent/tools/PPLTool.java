@@ -196,7 +196,8 @@ public class PPLTool implements WithModelTool {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         final String tenantId = parameters.get(TENANT_ID_FIELD);
         extractFromChatParameters(parameters);
         String indexName = getIndexNameFromParameters(parameters);

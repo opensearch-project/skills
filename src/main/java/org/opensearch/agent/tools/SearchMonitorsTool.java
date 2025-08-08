@@ -16,6 +16,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
 import org.opensearch.commons.alerting.model.ScheduledJob;
@@ -84,7 +85,8 @@ public class SearchMonitorsTool implements Tool {
     // number of total monitors. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         final String monitorId = parameters.getOrDefault("monitorId", null);
         final String monitorName = parameters.getOrDefault("monitorName", null);
         final String monitorNamePattern = parameters.getOrDefault("monitorNamePattern", null);
