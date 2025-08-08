@@ -87,9 +87,6 @@ public class ToolHelper {
 
     /**
      * Wrapper to get PPL transport action listener
-     *
-     * <p>This method is copied from <a href="https://github.com/opensearch-project/ml-commons/blob/190b2dfc141a6709e18dcd6ca531cb3402877fa5/ml-algorithms/src/main/java/org/opensearch/ml/engine/tools/ToolUtils.java#L36">org.opensearch.ml.engine.tools.ToolUtils.extractInputParameters</a>
-     *
      * @param listener input action listener
      * @return wrapped action listener
      */
@@ -103,7 +100,6 @@ public class ToolHelper {
      * Extracts required parameters from the input parameter map based on tool attributes.
      * If the attributes contain a list of required parameters, only those parameters are extracted.
      * Otherwise, all parameters are returned.
-     *
      * @param parameters The input parameters map to extract from
      * @param attributes The tool attributes containing required parameter information
      * @return A map containing only the required parameters or all parameters if no required parameters are specified
