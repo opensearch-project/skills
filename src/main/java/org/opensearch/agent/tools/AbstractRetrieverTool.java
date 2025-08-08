@@ -16,6 +16,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.action.ActionListener;
@@ -94,7 +95,8 @@ public abstract class AbstractRetrieverTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         SearchRequest searchRequest;
         try {
             searchRequest = buildSearchRequest(parameters);

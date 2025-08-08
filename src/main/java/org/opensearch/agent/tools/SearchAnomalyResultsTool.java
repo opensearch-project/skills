@@ -14,6 +14,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.agent.tools.utils.ToolConstants;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.index.IndexNotFoundException;
@@ -84,7 +85,8 @@ public class SearchAnomalyResultsTool implements Tool {
     // and total # of results. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
         final String detectorId = parameters.getOrDefault("detectorId", null);
         final Boolean realTime = parameters.containsKey("realTime") ? Boolean.parseBoolean(parameters.get("realTime")) : null;
         final Double anomalyGradeThreshold = parameters.containsKey("anomalyGradeThreshold")

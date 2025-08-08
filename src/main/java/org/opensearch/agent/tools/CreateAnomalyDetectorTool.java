@@ -169,6 +169,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
      */
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        parameters = ToolHelper.extractInputParameters(parameters, attributes);
         final String tenantId = parameters.get(TENANT_ID_FIELD);
         Map<String, String> enrichedParameters = enrichParameters(parameters);
         String indexName = enrichedParameters.get("index");

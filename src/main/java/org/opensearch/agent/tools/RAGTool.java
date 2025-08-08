@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.action.ActionRequest;
+import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
@@ -95,7 +96,9 @@ public class RAGTool implements WithModelTool {
         };
     }
 
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
+
         final String tenantId = parameters.get(TENANT_ID_FIELD);
 
         String input = null;
