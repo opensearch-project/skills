@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
 import org.opensearch.commons.alerting.action.GetAlertsRequest;
 import org.opensearch.commons.alerting.action.GetAlertsResponse;
@@ -22,6 +21,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.node.NodeClient;
 
@@ -72,7 +72,7 @@ public class SearchAlertsTool implements Tool {
 
     @Override
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
-        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String tableSortOrder = parameters.getOrDefault("sortOrder", "asc");
         final String tableSortString = parameters.getOrDefault("sortString", "monitor_name.keyword");
         final int tableSize = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("size"))

@@ -16,7 +16,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.commons.alerting.AlertingPluginInterface;
 import org.opensearch.commons.alerting.action.SearchMonitorRequest;
 import org.opensearch.commons.alerting.model.ScheduledJob;
@@ -31,6 +30,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
@@ -86,7 +86,7 @@ public class SearchMonitorsTool implements Tool {
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
-        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String monitorId = parameters.getOrDefault("monitorId", null);
         final String monitorName = parameters.getOrDefault("monitorName", null);
         final String monitorNamePattern = parameters.getOrDefault("monitorNamePattern", null);

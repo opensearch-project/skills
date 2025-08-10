@@ -31,6 +31,7 @@ import org.opensearch.core.common.logging.LoggerMessageFormat;
 import org.opensearch.core.common.util.CollectionUtils;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
@@ -107,7 +108,8 @@ public class LogPatternTool extends AbstractRetrieverTool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         String dsl = parameters.get(INPUT_FIELD);
         String ppl = parameters.get(PPL_FIELD);
         if (!StringUtils.isBlank(dsl)) {

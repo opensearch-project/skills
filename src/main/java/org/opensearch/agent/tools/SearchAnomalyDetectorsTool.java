@@ -23,7 +23,6 @@ import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.transport.GetAnomalyDetectorResponse;
 import org.opensearch.agent.tools.utils.ToolConstants;
 import org.opensearch.agent.tools.utils.ToolConstants.DetectorStateString;
-import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
@@ -37,6 +36,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
@@ -96,7 +96,7 @@ public class SearchAnomalyDetectorsTool implements Tool {
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
-        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String detectorName = parameters.getOrDefault("detectorName", null);
         final String detectorNamePattern = parameters.getOrDefault("detectorNamePattern", null);
         final String indices = parameters.getOrDefault("indices", null);

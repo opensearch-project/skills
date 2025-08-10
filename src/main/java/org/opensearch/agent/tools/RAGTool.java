@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.action.ActionRequest;
-import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.FunctionName;
@@ -29,6 +28,7 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.transport.client.Client;
 
 import com.google.gson.Gson;
@@ -97,7 +97,7 @@ public class RAGTool implements WithModelTool {
     }
 
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
-        Map<String, String> parameters = ToolHelper.extractInputParameters(originalParameters, attributes);
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
 
         final String tenantId = parameters.get(TENANT_ID_FIELD);
 
