@@ -96,7 +96,7 @@ public class ToolPluginTests {
 
     @Test
     public void test_getToolFactories_successful() {
-        assertEquals(13, toolPlugin.getToolFactories().size());
+        assertEquals(12, toolPlugin.getToolFactories().size());
     }
 
     @Test
