@@ -13,7 +13,6 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
-import org.opensearch.agent.tools.DynamicTool;
 import org.opensearch.agent.tools.LogPatternTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -41,8 +40,6 @@ import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
-import org.opensearch.rest.DynamicRestRequestCreator;
-import org.opensearch.rest.DynamicToolExecutor;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
@@ -103,8 +100,6 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
         WebSearchTool.Factory.getInstance().init(threadPool);
-        DynamicToolExecutor toolExecutor = new DynamicToolExecutor(restControllerRef, client);
-        DynamicTool.Factory.getInstance().init(client, toolExecutor, new DynamicRestRequestCreator(), xContentRegistry);
         return Collections.emptyList();
     }
 
@@ -123,8 +118,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance(),
-                WebSearchTool.Factory.getInstance(),
-                DynamicTool.Factory.getInstance()
+                WebSearchTool.Factory.getInstance()
             );
     }
 
