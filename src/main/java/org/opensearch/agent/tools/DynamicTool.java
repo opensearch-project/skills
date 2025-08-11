@@ -25,6 +25,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.rest.DynamicRestRequestCreator;
 import org.opensearch.rest.DynamicToolExecutor;
 import org.opensearch.rest.RestRequest;
@@ -114,7 +115,8 @@ public class DynamicTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         RestRequest.Method method = RestRequest.Method.valueOf(parameters.get(METHOD_KEY));
         String uri = parameters.get(URI_KEY);
         String requestBody = parameters.get(REQUEST_BODY_KEY);

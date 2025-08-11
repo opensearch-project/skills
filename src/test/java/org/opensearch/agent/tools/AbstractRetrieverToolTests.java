@@ -165,7 +165,9 @@ public class AbstractRetrieverToolTests {
         mockedImpl.run(null, listener4);
 
         Exception exception4 = assertThrows(Exception.class, future4::join);
-        assertTrue(exception4.getCause() instanceof NullPointerException);
+        // parameter is re-created with extractInputParameters, thus will not be null
+        assertTrue(exception4.getCause() instanceof IllegalArgumentException);
+        assertEquals(exception4.getCause().getMessage(), "[input] is null or empty, can not process it.");
     }
 
     @Test

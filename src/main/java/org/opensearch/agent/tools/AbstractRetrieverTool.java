@@ -22,6 +22,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.ml.common.spi.tools.Tool;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.transport.client.Client;
@@ -94,7 +95,8 @@ public abstract class AbstractRetrieverTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         SearchRequest searchRequest;
         try {
             searchRequest = buildSearchRequest(parameters);

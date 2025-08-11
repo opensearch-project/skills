@@ -39,6 +39,7 @@ import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.StringUtils;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.transport.client.Client;
 
 import com.google.gson.reflect.TypeToken;
@@ -133,7 +134,8 @@ public class CreateAlertTool implements WithModelTool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         Map<String, String> tmpParams = new HashMap<>(parameters);
         if (!tmpParams.containsKey("indices") || Strings.isEmpty(tmpParams.get("indices"))) {
             throw new IllegalArgumentException(

@@ -44,6 +44,7 @@ import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.transport.client.Client;
 
 import com.google.common.collect.ImmutableMap;
@@ -169,6 +170,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
      */
     @Override
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+        parameters = ToolUtils.extractInputParameters(parameters, attributes);
         final String tenantId = parameters.get(TENANT_ID_FIELD);
         Map<String, String> enrichedParameters = enrichParameters(parameters);
         String indexName = enrichedParameters.get("index");
