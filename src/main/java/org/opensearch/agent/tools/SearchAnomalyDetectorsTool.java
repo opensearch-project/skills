@@ -36,6 +36,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
@@ -94,7 +95,8 @@ public class SearchAnomalyDetectorsTool implements Tool {
     // number of total detectors. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String detectorName = parameters.getOrDefault("detectorName", null);
         final String detectorNamePattern = parameters.getOrDefault("detectorNamePattern", null);
         final String indices = parameters.getOrDefault("indices", null);

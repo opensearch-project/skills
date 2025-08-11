@@ -30,6 +30,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
@@ -84,7 +85,8 @@ public class SearchMonitorsTool implements Tool {
     // number of total monitors. The output will likely need to be updated, standardized, and include more fields in the
     // future to cover a sufficient amount of potential questions the agent will need to handle.
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String monitorId = parameters.getOrDefault("monitorId", null);
         final String monitorName = parameters.getOrDefault("monitorName", null);
         final String monitorNamePattern = parameters.getOrDefault("monitorNamePattern", null);

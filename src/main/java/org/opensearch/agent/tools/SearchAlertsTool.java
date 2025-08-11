@@ -21,6 +21,7 @@ import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.Parser;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
+import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.node.NodeClient;
 
@@ -70,7 +71,8 @@ public class SearchAlertsTool implements Tool {
     }
 
     @Override
-    public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
+    public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
+        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String tableSortOrder = parameters.getOrDefault("sortOrder", "asc");
         final String tableSortString = parameters.getOrDefault("sortString", "monitor_name.keyword");
         final int tableSize = parameters.containsKey("size") && StringUtils.isNumeric(parameters.get("size"))
