@@ -36,5 +36,4 @@ public class ToolConstants {
 
     public static final String ALERTING_CONFIG_INDEX = ".opendistro-alerting-config";
     public static final String ALERTING_ALERTS_INDEX = ".opendistro-alerting-alerts";
-
 }
