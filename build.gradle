@@ -186,7 +186,6 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${opensearch_build}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-flow-framework', version: "${opensearch_build}"
     secureIntegTestPluginArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
 
     // Test dependencies
