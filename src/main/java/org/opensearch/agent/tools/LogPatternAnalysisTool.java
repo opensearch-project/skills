@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -376,6 +377,7 @@ public class LogPatternAnalysisTool implements Tool {
     ) {
         return String
             .format(
+                Locale.ROOT,
                 "source=%s | where %s!='' | where %s>'%s' and %s<'%s' | patterns %s method=brain "
                     + "variable_count_threshold=3 | fields %s, patterns_field, %s | sort %s",
                 index,
@@ -714,6 +716,7 @@ public class LogPatternAnalysisTool implements Tool {
 
         String selectionTimeRangeLogPatternPPL = String
             .format(
+                Locale.ROOT,
                 "source=%s | where %s>'%s' and %s<'%s' | where match(%s, '%s') | patterns %s method=brain "
                     + "mode=aggregation max_sample_count=2"
                     + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
@@ -756,6 +759,7 @@ public class LogPatternAnalysisTool implements Tool {
     private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime) {
         return String
             .format(
+                Locale.ROOT,
                 "source=%s | where %s>'%s' and %s<'%s' | patterns %s method=brain "
                     + "variable_count_threshold=3 | stats count() as cnt by patterns_field | fields cnt, patterns_field",
                 index,
@@ -920,12 +924,12 @@ public class LogPatternAnalysisTool implements Tool {
                             listener.onResponse(rowParser.apply(dataRows));
                         }
                     }, error -> {
-                        String errorMessage = String.format("PPL execution failed for error: %s", error.getMessage());
+                        String errorMessage = String.format(Locale.ROOT, "PPL execution failed for error: %s", error.getMessage());
                         listener.onFailure(new RuntimeException(errorMessage, error));
                     }))
                 );
         } catch (Exception e) {
-            String errorMessage = String.format("Failed to execute PPL query: %s", ppl);
+            String errorMessage = String.format(Locale.ROOT, "Failed to execute PPL query: %s", ppl);
             log.error(errorMessage, e);
             listener.onFailure(new RuntimeException(errorMessage, e));
         }
