@@ -118,7 +118,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance(),
-                WebSearchTool.Factory.getInstance()
+                WebSearchTool.Factory.getInstance(),
                 LogPatternAnalysisTool.Factory.getInstance()
             );
     }

@@ -452,10 +452,6 @@ public class LogPatternAnalysisTool implements Tool {
         for (Map.Entry<String, Set<String>> entry : tracePatternMap.entrySet()) {
             String traceId = entry.getKey();
             Set<String> patterns = entry.getValue();
-            // If traceId only have one pattern, that will covered by log pattern difference
-            if (patterns.size() == 1) {
-                continue;
-            }
             double[] vector = new double[dimension];
 
             for (String pattern : patterns) {
