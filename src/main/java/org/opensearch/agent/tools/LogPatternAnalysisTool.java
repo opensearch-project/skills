@@ -104,7 +104,8 @@ public class LogPatternAnalysisTool implements Tool {
     private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
 
-    public static final String DEFAULT_INPUT_SCHEMA = """
+    public static final String DEFAULT_INPUT_SCHEMA =
+        """
             {
                 "type": "object",
                 "properties": {
@@ -218,9 +219,9 @@ public class LogPatternAnalysisTool implements Tool {
 
         if (lift1.compareTo(lift2) == 0) {
             return Optional
-                    .ofNullable(d2.selection)
-                    .orElse(Double.MIN_VALUE)
-                    .compareTo(Optional.ofNullable(d1.selection).orElse(Double.MIN_VALUE));
+                .ofNullable(d2.selection)
+                .orElse(Double.MIN_VALUE)
+                .compareTo(Optional.ofNullable(d1.selection).orElse(Double.MIN_VALUE));
         } else {
             return lift2.compareTo(lift1);
         }
