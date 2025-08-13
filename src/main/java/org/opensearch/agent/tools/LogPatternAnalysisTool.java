@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.agent.tools.utils.ToolHelper.getPPLTransportActionListener;
 import static org.opensearch.agent.tools.utils.clustering.HierarchicalAgglomerativeClustering.calculateCosineSimilarity;
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.ArrayList;
@@ -80,7 +81,7 @@ import lombok.extern.log4j.Log4j2;
  *       "output": [
  *         {
  *           "name": "response",
- *           "result": """["34398ae14561313af05f1b02179aaf45","de0f0fa00083a5c54b8b732ae70ea158"]"""
+ *           "result": """{"EXCEPTIONAL": {"traceId": "sequence"}}"""
  *         }
  *       ]
  *     }
@@ -93,6 +94,7 @@ import lombok.extern.log4j.Log4j2;
 @ToolAnnotation(LogPatternAnalysisTool.TYPE)
 public class LogPatternAnalysisTool implements Tool {
     public static final String TYPE = "LogPatternAnalysisTool";
+    public static final String STRICT_FIELD = "strict";
 
     // Constants
     private static final String DEFAULT_DESCRIPTION =
@@ -101,6 +103,56 @@ public class LogPatternAnalysisTool implements Tool {
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
+
+    public static final String DEFAULT_INPUT_SCHEMA = """
+            {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "string",
+                        "description": "Target OpenSearch index name containing log data (e.g., 'ss4o_logs-otel-2025.06.24')"
+                    },
+                    "timeField": {
+                        "type": "string",
+                        "description": "Date/time field in the index mapping used for time-based filtering (ISO 8601 format expected)"
+                    },
+                    "logFieldName": {
+                        "type": "string",
+                        "description": "Field containing raw log messages to analyze (e.g., 'body', 'message', 'log')"
+                    },
+                    "traceFieldName": {
+                        "type": "string",
+                        "description": "[OPTIONAL] Field for trace/correlation ID to enable sequence analysis (e.g., 'traceId', 'correlationId'). Leave empty for pattern-only analysis."
+                    },
+                    "baseTimeRangeStart": {
+                        "type": "string",
+                        "description": "Start time for baseline comparison period (ISO 8601 format, e.g., '2025-06-24T07:33:05Z')"
+                    },
+                    "baseTimeRangeEnd": {
+                        "type": "string",
+                        "description": "End time for baseline comparison period (ISO 8601 format, e.g., '2025-06-24T07:51:27Z')"
+                    },
+                    "selectionTimeRangeStart": {
+                        "type": "string",
+                        "description": "Start time for analysis target period (ISO 8601 format, e.g., '2025-06-24T07:50:26.999Z')"
+                    },
+                    "selectionTimeRangeEnd": {
+                        "type": "string",
+                        "description": "End time for analysis target period (ISO 8601 format, e.g., '2025-06-24T07:55:56Z')"
+                    }
+                },
+                "required": [
+                    "index",
+                    "timeField",
+                    "logFieldName",
+                    "selectionTimeRangeStart",
+                    "selectionTimeRangeEnd"
+                ],
+                "additionalProperties": false
+            }
+            """;
+
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, STRICT_FIELD, false);
 
     // Compiled regex patterns for better performance
     private static final Pattern REPEATED_WILDCARDS_PATTERN = Pattern.compile("(<\\*>)(\\s+<\\*>)+");
@@ -922,6 +974,11 @@ public class LogPatternAnalysisTool implements Tool {
         @Override
         public String getDefaultType() {
             return TYPE;
+        }
+
+        @Override
+        public Map<String, Object> getDefaultAttributes() {
+            return DEFAULT_ATTRIBUTES;
         }
 
         @Override
