@@ -19,6 +19,7 @@ import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
 
@@ -46,8 +47,6 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
         connectorId = setUpConnectorWithRetry(5);
         modelGroupId = setupModelGroup();
         modelId = setupLLMModel(connectorId, modelGroupId);
-        // wait for model to get deployed
-        TimeUnit.SECONDS.sleep(1);
         agentId = setupConversationalAgent(modelId);
         log.info("model_id: {}, agent_id: {}", modelId, agentId);
     }
@@ -172,10 +171,11 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
                     + "}"
             );
         Response response = executeRequest(request);
-
         String resp = readResponse(response);
-
-        return JsonParser.parseString(resp).getAsJsonObject().get("model_id").getAsString();
+        JsonObject respObj = JsonParser.parseString(resp).getAsJsonObject();
+        String taskId = respObj.get("task_id").getAsString();
+        waitTaskComplete(taskId);
+        return respObj.get("model_id").getAsString();
     }
 
     private String setupConversationalAgent(String modelId) throws IOException {
