@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
+import org.opensearch.agent.tools.LogPatternAnalysisTool;
 import org.opensearch.agent.tools.LogPatternTool;
 import org.opensearch.agent.tools.NeuralSparseSearchTool;
 import org.opensearch.agent.tools.PPLTool;
@@ -48,8 +49,6 @@ import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
-
-import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
 
@@ -100,6 +99,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
         WebSearchTool.Factory.getInstance().init(threadPool);
+        LogPatternAnalysisTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
@@ -118,7 +118,8 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance(),
-                WebSearchTool.Factory.getInstance()
+                WebSearchTool.Factory.getInstance(),
+                LogPatternAnalysisTool.Factory.getInstance()
             );
     }
 
@@ -133,7 +134,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
             false
         );
 
-        return ImmutableList.of(websearchCrawlThread);
+        return List.of(websearchCrawlThread);
     }
 
 }
