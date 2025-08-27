@@ -772,8 +772,8 @@ public class LogPatternAnalysisTool implements Tool {
         return String
             .format(
                 Locale.ROOT,
-                "source=%s | where %s>'%s' and %s<'%s' | patterns %s method=brain "
-                    + "variable_count_threshold=3 | stats count() as cnt by patterns_field | fields cnt, patterns_field",
+                "source=%s | where %s>'%s' and %s<'%s' | patterns %s method=brain mode=aggregation "
+                    + "variable_count_threshold=3 | fields pattern_count, patterns_field",
                 index,
                 timeField,
                 startTime,
