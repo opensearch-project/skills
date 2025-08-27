@@ -185,14 +185,14 @@ public class LogPatternAnalysisTool implements Tool {
         }
 
         private void validate() {
-            if (Strings.isEmpty(index)
-                || Strings.isEmpty(timeField)
-                || Strings.isEmpty(logFieldName)
-                || Strings.isEmpty(selectionTimeRangeStart)
-                || Strings.isEmpty(selectionTimeRangeEnd)) {
-                throw new IllegalArgumentException(
-                    "Invalid parameters: index, timeField, logFieldName, selectionTimeRangeStart, selectionTimeRangeEnd are required!"
-                );
+            List<String> missingParams = new ArrayList<>();
+            if (Strings.isEmpty(index)) missingParams.add("index");
+            if (Strings.isEmpty(timeField)) missingParams.add("timeField");
+            if (Strings.isEmpty(logFieldName)) missingParams.add("logFieldName");
+            if (Strings.isEmpty(selectionTimeRangeStart)) missingParams.add("selectionTimeRangeStart");
+            if (Strings.isEmpty(selectionTimeRangeEnd)) missingParams.add("selectionTimeRangeEnd");
+            if (!missingParams.isEmpty()) {
+                throw new IllegalArgumentException("Missing required parameters: " + String.join(", ", missingParams));
             }
         }
 
@@ -280,6 +280,7 @@ public class LogPatternAnalysisTool implements Tool {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
             log.info("Starting log pattern analysis with parameters: {}", parameters.keySet());
             AnalysisParameters params = new AnalysisParameters(parameters);
+            params.validate();
 
             if (params.hasTraceField() && params.hasBaseTime()) {
                 log.info("Performing log sequence analysis for index: {}", params.index);
@@ -292,7 +293,7 @@ public class LogPatternAnalysisTool implements Tool {
             }
         } catch (IllegalArgumentException e) {
             log.error("Invalid parameters for LogPatternAnalysisTool: {}", e.getMessage());
-            listener.onFailure(e);
+            listener.onFailure(new IllegalArgumentException("Invalid parameters: " + e.getMessage(), e));
         } catch (Exception e) {
             log.error("Unexpected error in LogPatternAnalysisTool", e);
             listener.onFailure(new RuntimeException("Failed to execute log pattern analysis", e));
@@ -311,7 +312,10 @@ public class LogPatternAnalysisTool implements Tool {
                 // Step 3: Generate comparison result
                 generateSequenceComparisonResult(baseResult, selectionResult, listener);
             }, listener::onFailure));
-        }, this::handlePPLError));
+        }, error -> {
+            log.error("Failed to execute analysis", error);
+            listener.onFailure(new RuntimeException("Analysis failed: " + error.getMessage(), error));
+        }));
     }
 
     private void analyzeBaseTimeRange(AnalysisParameters params, ActionListener<PatternAnalysisResult> listener) {
@@ -474,7 +478,7 @@ public class LogPatternAnalysisTool implements Tool {
 
         } catch (Exception e) {
             log.error("Failed to generate sequence comparison result", e);
-            listener.onFailure(new RuntimeException("Failed to generate comparison result", e));
+            listener.onFailure(new RuntimeException("Failed to generate comparison result: " + e.getMessage(), e));
         }
     }
 
@@ -659,15 +663,18 @@ public class LogPatternAnalysisTool implements Tool {
 
                     } catch (Exception e) {
                         log.error("Failed to process selection pattern response", e);
-                        listener.onFailure(new RuntimeException("Failed to process selection patterns", e));
+                        listener.onFailure(new RuntimeException("Failed to process selection patterns: " + e.getMessage(), e));
                     }
                 }, listener::onFailure));
 
             } catch (Exception e) {
                 log.error("Failed to process base pattern response", e);
-                listener.onFailure(new RuntimeException("Failed to process base patterns", e));
+                listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
             }
-        }, this::handlePPLError));
+        }, error -> {
+            log.error("Failed to execute pattern analysis", error);
+            listener.onFailure(new RuntimeException("Analysis failed: " + error.getMessage(), error));
+        }));
     }
 
     private <T> void logInsight(AnalysisParameters params, ActionListener<T> listener) {
@@ -753,9 +760,12 @@ public class LogPatternAnalysisTool implements Tool {
                 listener.onResponse((T) gson.toJson(finalResult));
             } catch (Exception e) {
                 log.error("Failed to process base pattern response", e);
-                listener.onFailure(new RuntimeException("Failed to process base patterns", e));
+                listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
             }
-        }, this::handlePPLError));
+        }, error -> {
+            log.error("Failed to execute log insights analysis", error);
+            listener.onFailure(new RuntimeException("Log insights analysis failed: " + error.getMessage(), error));
+        }));
     }
 
     private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime) {
@@ -805,12 +815,12 @@ public class LogPatternAnalysisTool implements Tool {
     }
 
     private void handlePPLError(Throwable error) {
-        log.error("PPL execution failed: {}", error.getMessage());
-        if (error.toString().contains("IndexNotFoundException")) {
-            throw new IllegalArgumentException("Index not found: " + error.getMessage(), error);
-        } else {
-            throw new RuntimeException("PPL execution failed", error);
-        }
+        String errorMsg = error.getMessage();
+        String errorType = error.getClass().getSimpleName();
+        log.error("PPL execution failed [{}]: {}", errorType, errorMsg);
+        String errorString = error.toString();
+        String fullErrorMessage = errorMsg != null ? errorMsg : errorString;
+        throw new RuntimeException("PPL execution failed: " + fullErrorMessage, error);
     }
 
     private double jacCardSimilarity(String pattern1, String pattern2) {
@@ -913,25 +923,46 @@ public class LogPatternAnalysisTool implements Tool {
                         if (Strings.isEmpty(result)) {
                             listener.onFailure(new RuntimeException("Empty PPL response"));
                         } else {
-                            Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {
-                            }.getType());
+                            try {
+                                Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {}.getType());
+                                if (pplResult.containsKey("error")) {
+                                    Object errorObj = pplResult.get("error");
+                                    String errorDetail;
+                                    if (errorObj instanceof Map) {
+                                        Map<?, ?> errorMap = (Map<?, ?>) errorObj;
+                                        Object reason = errorMap.get("reason");
+                                        errorDetail = reason != null ? reason.toString() : errorMap.toString();
+                                    } else {
+                                        errorDetail = errorObj != null ? errorObj.toString() : "Unknown error";
+                                    }
+                                    throw new RuntimeException("PPL query error: " + errorDetail);
+                                }
 
-                            Object datarowsObj = pplResult.get("datarows");
-                            if (!(datarowsObj instanceof List)) {
-                                throw new IllegalStateException("Invalid PPL response format: missing or invalid datarows");
+                                Object datarowsObj = pplResult.get("datarows");
+                                if (!(datarowsObj instanceof List)) {
+                                    throw new IllegalStateException("Invalid PPL response format: missing or invalid datarows");
+                                }
+
+                                @SuppressWarnings("unchecked")
+                                List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
+                                if (dataRows.isEmpty()) {
+                                    log.warn("PPL query returned no data rows for the specified criteria");
+                                }
+                                listener.onResponse(rowParser.apply(dataRows));
+                            } catch (Exception parseError) {
+                                listener.onFailure(new RuntimeException("Failed to parse PPL response: " + parseError.getMessage() + ". Raw response: " + result.substring(0, Math.min(200, result.length())), parseError));
                             }
-
-                            @SuppressWarnings("unchecked")
-                            List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
-                            listener.onResponse(rowParser.apply(dataRows));
                         }
                     }, error -> {
-                        String errorMessage = String.format(Locale.ROOT, "PPL execution failed for error: %s", error.getMessage());
-                        listener.onFailure(new RuntimeException(errorMessage, error));
+                        try {
+                            handlePPLError(error);
+                        } catch (Exception handledException) {
+                            listener.onFailure(handledException);
+                        }
                     }))
                 );
         } catch (Exception e) {
-            String errorMessage = String.format(Locale.ROOT, "Failed to execute PPL query: %s", ppl);
+            String errorMessage = String.format(Locale.ROOT, "Failed to execute PPL query: %s. Query: %s", e.getMessage(), ppl.substring(0, Math.min(100, ppl.length())));
             log.error(errorMessage, e);
             listener.onFailure(new RuntimeException(errorMessage, e));
         }
