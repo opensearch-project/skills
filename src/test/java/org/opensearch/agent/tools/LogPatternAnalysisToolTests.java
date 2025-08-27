@@ -533,4 +533,34 @@ public class LogPatternAnalysisToolTests {
                     )
             );
     }
+
+    @Test
+    @SneakyThrows
+    public void testExecutionWithPPLErrorResponse() {
+        String errorResponse = "{\"error\":{\"type\":\"parsing_exception\",\"reason\":\"Syntax error in PPL query\"}}";
+        mockPPLInvocation(errorResponse);
+        LogPatternAnalysisTool tool = LogPatternAnalysisTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "timeField",
+                        "@timestamp",
+                        "logFieldName",
+                        "message",
+                        "selectionTimeRangeStart",
+                        "2025-01-01T00:00:00Z",
+                        "selectionTimeRangeEnd",
+                        "2025-01-01T01:00:00Z"
+                    ),
+                ActionListener
+                    .<String>wrap(
+                        response -> fail("Should have failed with PPL error response"),
+                        e -> MatcherAssert.assertThat(e.getMessage(), containsString("PPL query error"))
+                    )
+            );
+    }
 }
