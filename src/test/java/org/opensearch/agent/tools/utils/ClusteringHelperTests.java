@@ -38,8 +38,8 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testClusterLogVectorsWithSingleVector() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, 2.0, 3.0});
-        
+        logVectors.put("trace1", new double[] { 1.0, 2.0, 3.0 });
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertEquals(1, result.size());
         assertEquals("trace1", result.get(0));
@@ -48,10 +48,10 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testClusterLogVectorsWithSmallDataset() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, 0.0, 0.0});
-        logVectors.put("trace2", new double[]{0.9, 0.1, 0.0});
-        logVectors.put("trace3", new double[]{0.0, 1.0, 0.0});
-        
+        logVectors.put("trace1", new double[] { 1.0, 0.0, 0.0 });
+        logVectors.put("trace2", new double[] { 0.9, 0.1, 0.0 });
+        logVectors.put("trace3", new double[] { 0.0, 1.0, 0.0 });
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertFalse(result.isEmpty());
         assertTrue(result.size() <= 3);
@@ -60,77 +60,70 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testValidateLogVectorsWithNullTraceId() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put(null, new double[]{1.0, 2.0});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put(null, new double[] { 1.0, 2.0 });
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithEmptyTraceId() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("", new double[]{1.0, 2.0});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put("", new double[] { 1.0, 2.0 });
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithNullVector() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
         logVectors.put("trace1", null);
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithEmptyVector() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put("trace1", new double[] {});
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithDimensionMismatch() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, 2.0});
-        logVectors.put("trace2", new double[]{1.0, 2.0, 3.0});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put("trace1", new double[] { 1.0, 2.0 });
+        logVectors.put("trace2", new double[] { 1.0, 2.0, 3.0 });
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithNaNValue() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, Double.NaN});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put("trace1", new double[] { 1.0, Double.NaN });
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testValidateLogVectorsWithInfiniteValue() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, Double.POSITIVE_INFINITY});
-        
-        assertThrows(IllegalArgumentException.class, 
-            () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
+        logVectors.put("trace1", new double[] { 1.0, Double.POSITIVE_INFINITY });
+
+        assertThrows(IllegalArgumentException.class, () -> helper.clusterLogVectorsAndGetRepresentative(logVectors));
     }
 
     public void testClusterLogVectorsWithLargeDataset() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        
+
         // Create 1500 vectors to trigger large dataset processing
         for (int i = 0; i < 1500; i++) {
-            double[] vector = new double[]{Math.random(), Math.random(), Math.random()};
+            double[] vector = new double[] { Math.random(), Math.random(), Math.random() };
             logVectors.put("trace" + i, vector);
         }
-        
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertFalse(result.isEmpty());
         assertTrue(result.size() < 1500); // Should reduce the number of representatives
@@ -139,12 +132,12 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testClusterLogVectorsWithIdenticalVectors() {
         ClusteringHelper helper = new ClusteringHelper(0.8);
         Map<String, double[]> logVectors = new HashMap<>();
-        double[] vector = {1.0, 2.0, 3.0};
-        
+        double[] vector = { 1.0, 2.0, 3.0 };
+
         for (int i = 0; i < 5; i++) {
             logVectors.put("trace" + i, vector.clone());
         }
-        
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertEquals(1, result.size()); // Should cluster identical vectors into one
     }
@@ -152,9 +145,9 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testClusterLogVectorsWithHighThreshold() {
         ClusteringHelper helper = new ClusteringHelper(0.99);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, 0.0});
-        logVectors.put("trace2", new double[]{0.0, 1.0});
-        
+        logVectors.put("trace1", new double[] { 1.0, 0.0 });
+        logVectors.put("trace2", new double[] { 0.0, 1.0 });
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertEquals(2, result.size()); // High threshold should keep vectors separate
     }
@@ -162,9 +155,9 @@ public class ClusteringHelperTests extends OpenSearchTestCase {
     public void testClusterLogVectorsWithLowThreshold() {
         ClusteringHelper helper = new ClusteringHelper(0.1);
         Map<String, double[]> logVectors = new HashMap<>();
-        logVectors.put("trace1", new double[]{1.0, 0.1});
-        logVectors.put("trace2", new double[]{0.9, 0.2});
-        
+        logVectors.put("trace1", new double[] { 1.0, 0.1 });
+        logVectors.put("trace2", new double[] { 0.9, 0.2 });
+
         List<String> result = helper.clusterLogVectorsAndGetRepresentative(logVectors);
         assertTrue(result.size() <= 2); // Low threshold may cluster similar vectors
     }
