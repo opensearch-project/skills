@@ -186,11 +186,16 @@ public class LogPatternAnalysisTool implements Tool {
 
         private void validate() {
             List<String> missingParams = new ArrayList<>();
-            if (Strings.isEmpty(index)) missingParams.add("index");
-            if (Strings.isEmpty(timeField)) missingParams.add("timeField");
-            if (Strings.isEmpty(logFieldName)) missingParams.add("logFieldName");
-            if (Strings.isEmpty(selectionTimeRangeStart)) missingParams.add("selectionTimeRangeStart");
-            if (Strings.isEmpty(selectionTimeRangeEnd)) missingParams.add("selectionTimeRangeEnd");
+            if (Strings.isEmpty(index))
+                missingParams.add("index");
+            if (Strings.isEmpty(timeField))
+                missingParams.add("timeField");
+            if (Strings.isEmpty(logFieldName))
+                missingParams.add("logFieldName");
+            if (Strings.isEmpty(selectionTimeRangeStart))
+                missingParams.add("selectionTimeRangeStart");
+            if (Strings.isEmpty(selectionTimeRangeEnd))
+                missingParams.add("selectionTimeRangeEnd");
             if (!missingParams.isEmpty()) {
                 throw new IllegalArgumentException("Missing required parameters: " + String.join(", ", missingParams));
             }
@@ -924,7 +929,8 @@ public class LogPatternAnalysisTool implements Tool {
                             listener.onFailure(new RuntimeException("Empty PPL response"));
                         } else {
                             try {
-                                Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {}.getType());
+                                Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {
+                                }.getType());
                                 if (pplResult.containsKey("error")) {
                                     Object errorObj = pplResult.get("error");
                                     String errorDetail;
@@ -950,7 +956,16 @@ public class LogPatternAnalysisTool implements Tool {
                                 }
                                 listener.onResponse(rowParser.apply(dataRows));
                             } catch (Exception parseError) {
-                                listener.onFailure(new RuntimeException("Failed to parse PPL response: " + parseError.getMessage() + ". Raw response: " + result.substring(0, Math.min(200, result.length())), parseError));
+                                listener
+                                    .onFailure(
+                                        new RuntimeException(
+                                            "Failed to parse PPL response: "
+                                                + parseError.getMessage()
+                                                + ". Raw response: "
+                                                + result.substring(0, Math.min(200, result.length())),
+                                            parseError
+                                        )
+                                    );
                             }
                         }
                     }, error -> {
@@ -962,7 +977,13 @@ public class LogPatternAnalysisTool implements Tool {
                     }))
                 );
         } catch (Exception e) {
-            String errorMessage = String.format(Locale.ROOT, "Failed to execute PPL query: %s. Query: %s", e.getMessage(), ppl.substring(0, Math.min(100, ppl.length())));
+            String errorMessage = String
+                .format(
+                    Locale.ROOT,
+                    "Failed to execute PPL query: %s. Query: %s",
+                    e.getMessage(),
+                    ppl.substring(0, Math.min(100, ppl.length()))
+                );
             log.error(errorMessage, e);
             listener.onFailure(new RuntimeException(errorMessage, e));
         }
