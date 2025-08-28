@@ -70,10 +70,10 @@ import lombok.extern.log4j.Log4j2;
  *     "index": "ss4o_logs-otel-2025.06.24",
  *     "logFieldName": "body",
  *     "traceFieldName": "traceId",
- *     "baseTimeRangeStart": "2025-06-24T07:33:05Z",
- *     "baseTimeRangeEnd": "2025-06-24T07:51:27Z",
- *     "selectionTimeRangeStart": "2025-06-24T07:50:26.999999999Z",
- *     "selectionTimeRangeEnd": "2025-06-24T07:55:56Z"
+ *     "baseTimeRangeStart": "2025-06-24 07:33:05",
+ *     "baseTimeRangeEnd": "2025-06-24 07:51:27",
+ *     "selectionTimeRangeStart": "2025-06-24 07:50:26",
+ *     "selectionTimeRangeEnd": "2025-06-24 07:55:56"
  *   }
  * }
  * 3. Result: a list of selection traceId
@@ -117,7 +117,7 @@ public class LogPatternAnalysisTool implements Tool {
                     },
                     "timeField": {
                         "type": "string",
-                        "description": "Date/time field in the index mapping used for time-based filtering (ISO 8601 format expected)"
+                        "description": "Date/time field in the index mapping used for time-based filtering"
                     },
                     "logFieldName": {
                         "type": "string",
@@ -129,19 +129,19 @@ public class LogPatternAnalysisTool implements Tool {
                     },
                     "baseTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for baseline comparison period (ISO 8601 format, e.g., '2025-06-24T07:33:05Z')"
+                        "description": "Start time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:33:05')"
                     },
                     "baseTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for baseline comparison period (ISO 8601 format, e.g., '2025-06-24T07:51:27Z')"
+                        "description": "End time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:51:27')"
                     },
                     "selectionTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for analysis target period (ISO 8601 format, e.g., '2025-06-24T07:50:26.999Z')"
+                        "description": "Start time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:50:26')"
                     },
                     "selectionTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for analysis target period (ISO 8601 format, e.g., '2025-06-24T07:55:56Z')"
+                        "description": "End time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:55:56')"
                     }
                 },
                 "required": [
