@@ -644,32 +644,26 @@ public class LogPatternAnalysisTool implements Tool {
 
                 log.debug("Executing selection time range pattern PPL: {}", selectionTimeRangeLogPatternPPL);
                 executePPLAndParseResult(selectionTimeRangeLogPatternPPL, dataRowsParser, ActionListener.wrap(selectionPatterns -> {
-                    try {
-                        mergeSimilarPatterns(selectionPatterns);
+                    mergeSimilarPatterns(selectionPatterns);
 
-                        log.debug("Selection patterns processed: {} patterns", selectionPatterns.size());
+                    log.debug("Selection patterns processed: {} patterns", selectionPatterns.size());
 
-                        // Step 3: Calculate pattern differences
-                        List<PatternDiffResult> patternDifferences = calculatePatternDifferences(basePatterns, selectionPatterns);
+                    // Step 3: Calculate pattern differences
+                    List<PatternDiffResult> patternDifferences = calculatePatternDifferences(basePatterns, selectionPatterns);
 
-                        // Step 4: Sort the difference and get top 10
-                        List<PatternDiffResult> topDiffs = Stream
-                            .concat(
-                                patternDifferences.stream().filter(diff -> !Objects.isNull(diff.lift)).sorted(comparator).limit(10),
-                                patternDifferences.stream().filter(diff -> Objects.isNull(diff.lift)).sorted(comparator).limit(10)
-                            )
-                            .collect(Collectors.toList());
+                    // Step 4: Sort the difference and get top 10
+                    List<PatternDiffResult> topDiffs = Stream
+                        .concat(
+                            patternDifferences.stream().filter(diff -> !Objects.isNull(diff.lift)).sorted(comparator).limit(10),
+                            patternDifferences.stream().filter(diff -> Objects.isNull(diff.lift)).sorted(comparator).limit(10)
+                        )
+                        .collect(Collectors.toList());
 
-                        Map<String, Object> finalResult = new HashMap<>();
-                        finalResult.put("patternMapDifference", topDiffs);
+                    Map<String, Object> finalResult = new HashMap<>();
+                    finalResult.put("patternMapDifference", topDiffs);
 
-                        log.info("Pattern analysis completed: {} differences found", patternDifferences.size());
-                        listener.onResponse((T) gson.toJson(finalResult));
-
-                    } catch (Exception e) {
-                        log.error("Failed to process selection pattern response", e);
-                        listener.onFailure(new RuntimeException("Failed to process selection patterns: " + e.getMessage(), e));
-                    }
+                    log.info("Pattern analysis completed: {} differences found", patternDifferences.size());
+                    listener.onResponse((T) gson.toJson(finalResult));
                 }, listener::onFailure));
 
             } catch (Exception e) {
@@ -928,45 +922,32 @@ public class LogPatternAnalysisTool implements Tool {
                         if (Strings.isEmpty(result)) {
                             listener.onFailure(new RuntimeException("Empty PPL response"));
                         } else {
-                            try {
-                                Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {
-                                }.getType());
-                                if (pplResult.containsKey("error")) {
-                                    Object errorObj = pplResult.get("error");
-                                    String errorDetail;
-                                    if (errorObj instanceof Map) {
-                                        Map<?, ?> errorMap = (Map<?, ?>) errorObj;
-                                        Object reason = errorMap.get("reason");
-                                        errorDetail = reason != null ? reason.toString() : errorMap.toString();
-                                    } else {
-                                        errorDetail = errorObj != null ? errorObj.toString() : "Unknown error";
-                                    }
-                                    throw new RuntimeException("PPL query error: " + errorDetail);
+                            Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {
+                            }.getType());
+                            if (pplResult.containsKey("error")) {
+                                Object errorObj = pplResult.get("error");
+                                String errorDetail;
+                                if (errorObj instanceof Map) {
+                                    Map<?, ?> errorMap = (Map<?, ?>) errorObj;
+                                    Object reason = errorMap.get("reason");
+                                    errorDetail = reason != null ? reason.toString() : errorMap.toString();
+                                } else {
+                                    errorDetail = errorObj != null ? errorObj.toString() : "Unknown error";
                                 }
-
-                                Object datarowsObj = pplResult.get("datarows");
-                                if (!(datarowsObj instanceof List)) {
-                                    throw new IllegalStateException("Invalid PPL response format: missing or invalid datarows");
-                                }
-
-                                @SuppressWarnings("unchecked")
-                                List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
-                                if (dataRows.isEmpty()) {
-                                    log.warn("PPL query returned no data rows for the specified criteria");
-                                }
-                                listener.onResponse(rowParser.apply(dataRows));
-                            } catch (Exception parseError) {
-                                listener
-                                    .onFailure(
-                                        new RuntimeException(
-                                            "Failed to parse PPL response: "
-                                                + parseError.getMessage()
-                                                + ". Raw response: "
-                                                + result.substring(0, Math.min(200, result.length())),
-                                            parseError
-                                        )
-                                    );
+                                throw new RuntimeException("PPL query error: " + errorDetail);
                             }
+
+                            Object datarowsObj = pplResult.get("datarows");
+                            if (!(datarowsObj instanceof List)) {
+                                throw new IllegalStateException("Invalid PPL response format: missing or invalid datarows");
+                            }
+
+                            @SuppressWarnings("unchecked")
+                            List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
+                            if (dataRows.isEmpty()) {
+                                log.warn("PPL query returned no data rows for the specified criteria");
+                            }
+                            listener.onResponse(rowParser.apply(dataRows));
                         }
                     }, error -> {
                         try {
