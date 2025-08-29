@@ -72,7 +72,7 @@ public class ClusteringHelper {
             finalCentroids = processTwoPhaseClusteringForLargeDataset(vectors, indexTraceIdMap);
         } else {
             // Small dataset - use hierarchical clustering directly
-            finalCentroids = performHierarchicalClustering(vectors, indexTraceIdMap);
+            finalCentroids = performClustering(vectors, indexTraceIdMap);
         }
 
         log
@@ -133,7 +133,7 @@ public class ClusteringHelper {
         } catch (Exception e) {
             log.warn("K-means clustering failed, falling back to hierarchical clustering only: {}", e.getMessage());
             // Fallback to hierarchical clustering only
-            finalCentroids = performHierarchicalClustering(vectors, indexTraceIdMap);
+            finalCentroids = performClustering(vectors, indexTraceIdMap);
         }
 
         return finalCentroids;
@@ -174,7 +174,7 @@ public class ClusteringHelper {
         Map<Integer, String> clusterIndexTraceIdMap = createTraceIdMapping(kMeansCluster, indexTraceIdMap);
 
         // Apply hierarchical clustering within this K-means cluster
-        return performHierarchicalClustering(clusterVectors, clusterIndexTraceIdMap);
+        return performClustering(clusterVectors, clusterIndexTraceIdMap);
     }
 
     /**
@@ -312,17 +312,6 @@ public class ClusteringHelper {
             }
         }
         return result;
-    }
-
-    /**
-     * Perform hierarchical clustering on a subset of vectors
-     *
-     * @param vectors Input vectors for clustering
-     * @param indexTraceIdMap Mapping from vector index to trace ID
-     * @return List of trace IDs representing cluster centroids
-     */
-    private List<String> performHierarchicalClustering(double[][] vectors, Map<Integer, String> indexTraceIdMap) {
-        return performClustering(vectors, indexTraceIdMap);
     }
 
     /**

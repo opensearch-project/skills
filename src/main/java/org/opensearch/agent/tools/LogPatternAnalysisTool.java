@@ -283,15 +283,15 @@ public class LogPatternAnalysisTool implements Tool {
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
         try {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
-            log.info("Starting log pattern analysis with parameters: {}", parameters.keySet());
+            log.debug("Starting log pattern analysis with parameters: {}", parameters.keySet());
             AnalysisParameters params = new AnalysisParameters(parameters);
             params.validate();
 
             if (params.hasTraceField() && params.hasBaseTime()) {
-                log.info("Performing log sequence analysis for index: {}", params.index);
+                log.debug("Performing log sequence analysis for index: {}", params.index);
                 logSequenceAnalysis(params, listener);
             } else if (params.hasBaseTime()) {
-                log.info("Performing log pattern analysis for index: {}", params.index);
+                log.debug("Performing log pattern analysis for index: {}", params.index);
                 logPatternDiffAnalysis(params, listener);
             } else {
                 logInsight(params, listener);
@@ -306,13 +306,24 @@ public class LogPatternAnalysisTool implements Tool {
     }
 
     private <T> void logSequenceAnalysis(AnalysisParameters params, ActionListener<T> listener) {
-        // Step 1: Analyze base time range
-        analyzeBaseTimeRange(params, ActionListener.wrap(baseResult -> {
-            log.info("Base time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
+        // Step 1: Analyze selection time range
+        analyzeSelectionTimeRange(params, ActionListener.wrap(selectionResult -> {
+            log.debug("Base time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
 
-            // Step 2: Analyze selection time range
-            analyzeSelectionTimeRange(params, ActionListener.wrap(selectionResult -> {
-                log.info("Selection time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
+            if (selectionResult.tracePatternMap.isEmpty()) {
+                Map<String, Map<String, String>> emptyResult = buildFinalResult(
+                    List.of(),
+                    List.of(),
+                    Collections.emptyMap(),
+                    Collections.emptyMap()
+                );
+                listener.onResponse((T) gson.toJson(emptyResult));
+                return;
+            }
+
+            // Step 2: Analyze base time range
+            analyzeBaseTimeRange(params, ActionListener.wrap(baseResult -> {
+                log.debug("Selection time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
 
                 // Step 3: Generate comparison result
                 generateSequenceComparisonResult(baseResult, selectionResult, listener);
@@ -662,7 +673,7 @@ public class LogPatternAnalysisTool implements Tool {
                     Map<String, Object> finalResult = new HashMap<>();
                     finalResult.put("patternMapDifference", topDiffs);
 
-                    log.info("Pattern analysis completed: {} differences found", patternDifferences.size());
+                    log.debug("Pattern analysis completed: {} differences found", patternDifferences.size());
                     listener.onResponse((T) gson.toJson(finalResult));
                 }, listener::onFailure));
 
@@ -726,7 +737,7 @@ public class LogPatternAnalysisTool implements Tool {
             .format(
                 Locale.ROOT,
                 "source=%s | where %s>'%s' and %s<'%s' | where match(%s, '%s') | patterns %s method=brain "
-                    + "mode=aggregation max_sample_count=2"
+                    + "mode=aggregation max_sample_count=2 "
                     + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
                     + "| sort -pattern_count | head 5",
                 params.index,
@@ -822,7 +833,10 @@ public class LogPatternAnalysisTool implements Tool {
         throw new RuntimeException("PPL execution failed: " + fullErrorMessage, error);
     }
 
-    private double jacCardSimilarity(String pattern1, String pattern2) {
+    private double jaccardSimilarity(String pattern1, String pattern2) {
+        if (Strings.isEmpty(pattern1) && Strings.isEmpty(pattern2)) {
+            return 1.0;
+        }
         if (Strings.isEmpty(pattern1) || Strings.isEmpty(pattern2)) {
             return 0.0;
         }
@@ -830,19 +844,12 @@ public class LogPatternAnalysisTool implements Tool {
         Set<String> set1 = new HashSet<>(Arrays.asList(pattern1.split("\\s+")));
         Set<String> set2 = new HashSet<>(Arrays.asList(pattern2.split("\\s+")));
 
-        // Calculate intersection
-        Set<String> intersection = new HashSet<>(set1);
-        intersection.retainAll(set2);
-
         // Calculate union
         Set<String> union = new HashSet<>(set1);
         union.addAll(set2);
 
-        if (union.isEmpty()) {
-            return 0.0;
-        }
-
-        return (double) intersection.size() / union.size();
+        int intersectionSize = set1.size() + set2.size() - union.size();
+        return (double) intersectionSize / union.size();
     }
 
     private void mergeSimilarPatterns(Map<String, Double> patternMap) {
@@ -866,7 +873,7 @@ public class LogPatternAnalysisTool implements Tool {
                     continue;
                 }
 
-                if (jacCardSimilarity(pattern1, pattern2) > LOG_PATTERN_THRESHOLD) {
+                if (jaccardSimilarity(pattern1, pattern2) > LOG_PATTERN_THRESHOLD) {
                     // Merge pattern2 into pattern1
                     double count1 = patternMap.getOrDefault(pattern1, 0.0);
                     double count2 = patternMap.getOrDefault(pattern2, 0.0);
