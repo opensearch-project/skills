@@ -1,0 +1,10 @@
+{
+  "name": "Test_log_pattern_analysis_tool_flow_agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "LogPatternAnalysisTool",
+      "parameters": {}
+    }
+  ]
+}
