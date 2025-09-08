@@ -5,9 +5,16 @@
 
 package org.opensearch.agent.tools;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.gson.JsonElement;
-import lombok.SneakyThrows;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.lucene.search.TotalHits;
 import org.hamcrest.MatcherAssert;
 import org.junit.Before;
@@ -28,15 +35,10 @@ import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.google.common.collect.ImmutableMap;
+import com.google.gson.JsonElement;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
+import lombok.SneakyThrows;
 
 public class DataDistributionToolTests {
 

@@ -5,11 +5,19 @@
 
 package org.opensearch.agent.tools;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.gson.reflect.TypeToken;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.log4j.Log4j2;
+import static org.opensearch.agent.tools.utils.ToolHelper.getPPLTransportActionListener;
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
+import static org.opensearch.ml.common.utils.StringUtils.gson;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.json.JSONObject;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
@@ -30,18 +38,12 @@ import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.ppl.domain.PPLQueryRequest;
 import org.opensearch.transport.client.Client;
 
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import com.google.common.collect.ImmutableMap;
+import com.google.gson.reflect.TypeToken;
 
-import static org.opensearch.agent.tools.utils.ToolHelper.getPPLTransportActionListener;
-import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
-import static org.opensearch.ml.common.utils.StringUtils.gson;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Usage:

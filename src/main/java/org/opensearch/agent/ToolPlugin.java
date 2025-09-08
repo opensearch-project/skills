@@ -48,13 +48,13 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
 
     @Override
     public List<RestHandler> getRestHandlers(
-            Settings settings,
-            RestController restController,
-            ClusterSettings clusterSettings,
-            IndexScopedSettings indexScopedSettings,
-            SettingsFilter settingsFilter,
-            IndexNameExpressionResolver indexNameExpressionResolver,
-            Supplier<DiscoveryNodes> nodesInCluster
+        Settings settings,
+        RestController restController,
+        ClusterSettings clusterSettings,
+        IndexScopedSettings indexScopedSettings,
+        SettingsFilter settingsFilter,
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        Supplier<DiscoveryNodes> nodesInCluster
     ) {
         restControllerRef.set(restController);
         return Collections.emptyList();
@@ -63,17 +63,17 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
     @SneakyThrows
     @Override
     public Collection<Object> createComponents(
-            Client client,
-            ClusterService clusterService,
-            ThreadPool threadPool,
-            ResourceWatcherService resourceWatcherService,
-            ScriptService scriptService,
-            NamedXContentRegistry xContentRegistry,
-            Environment environment,
-            NodeEnvironment nodeEnvironment,
-            NamedWriteableRegistry namedWriteableRegistry,
-            IndexNameExpressionResolver indexNameExpressionResolver,
-            Supplier<RepositoriesService> repositoriesServiceSupplier
+        Client client,
+        ClusterService clusterService,
+        ThreadPool threadPool,
+        ResourceWatcherService resourceWatcherService,
+        ScriptService scriptService,
+        NamedXContentRegistry xContentRegistry,
+        Environment environment,
+        NodeEnvironment nodeEnvironment,
+        NamedWriteableRegistry namedWriteableRegistry,
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         PPLTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
@@ -95,33 +95,33 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
     @Override
     public List<Tool.Factory<? extends Tool>> getToolFactories() {
         return List
-                .of(
-                        PPLTool.Factory.getInstance(),
-                        NeuralSparseSearchTool.Factory.getInstance(),
-                        VectorDBTool.Factory.getInstance(),
-                        RAGTool.Factory.getInstance(),
-                        SearchAlertsTool.Factory.getInstance(),
-                        SearchAnomalyDetectorsTool.Factory.getInstance(),
-                        SearchAnomalyResultsTool.Factory.getInstance(),
-                        SearchMonitorsTool.Factory.getInstance(),
-                        CreateAlertTool.Factory.getInstance(),
-                        CreateAnomalyDetectorTool.Factory.getInstance(),
-                        LogPatternTool.Factory.getInstance(),
-                        WebSearchTool.Factory.getInstance(),
-                        LogPatternAnalysisTool.Factory.getInstance(),
-                        DataDistributionTool.Factory.getInstance()
-                );
+            .of(
+                PPLTool.Factory.getInstance(),
+                NeuralSparseSearchTool.Factory.getInstance(),
+                VectorDBTool.Factory.getInstance(),
+                RAGTool.Factory.getInstance(),
+                SearchAlertsTool.Factory.getInstance(),
+                SearchAnomalyDetectorsTool.Factory.getInstance(),
+                SearchAnomalyResultsTool.Factory.getInstance(),
+                SearchMonitorsTool.Factory.getInstance(),
+                CreateAlertTool.Factory.getInstance(),
+                CreateAnomalyDetectorTool.Factory.getInstance(),
+                LogPatternTool.Factory.getInstance(),
+                WebSearchTool.Factory.getInstance(),
+                LogPatternAnalysisTool.Factory.getInstance(),
+                DataDistributionTool.Factory.getInstance()
+            );
     }
 
     @Override
     public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
         FixedExecutorBuilder websearchCrawlThread = new FixedExecutorBuilder(
-                settings,
-                WEBSEARCH_CRAWLER_THREADPOOL,
-                Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
-                100,
-                SKILLS_THREAD_POOL_PREFIX,
-                false
+            settings,
+            WEBSEARCH_CRAWLER_THREADPOOL,
+            Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+            100,
+            SKILLS_THREAD_POOL_PREFIX,
+            false
         );
 
         return List.of(websearchCrawlThread);

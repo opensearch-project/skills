@@ -5,18 +5,19 @@
 
 package org.opensearch.integTest;
 
-import lombok.SneakyThrows;
-import org.hamcrest.MatcherAssert;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import static org.hamcrest.Matchers.containsString;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 
-import static org.hamcrest.Matchers.containsString;
+import org.hamcrest.MatcherAssert;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import lombok.SneakyThrows;
 
 public class DataDistributionToolIT extends BaseAgentToolsIT {
 
