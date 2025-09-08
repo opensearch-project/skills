@@ -15,6 +15,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -466,7 +467,7 @@ public class DataDistributionTool implements Tool {
         // Try parsing with zone first
         try {
             if (timeString.endsWith("Z")) {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'");
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'", Locale.ROOT);
                 ZonedDateTime dateTime = ZonedDateTime.parse(timeString, formatter.withZone(ZoneOffset.UTC));
                 return dateTime.format(DateTimeFormatter.ISO_INSTANT);
             }
@@ -476,9 +477,9 @@ public class DataDistributionTool implements Tool {
 
         // Try parsing as local time without zone
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
             LocalDateTime localDateTime = LocalDateTime.parse(timeString, formatter);
-            ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneOffset.UTC);
+            ZonedDateTime zonedDateTime = localDateTime.atOffset(ZoneOffset.UTC).toZonedDateTime();
             return zonedDateTime.format(DateTimeFormatter.ISO_INSTANT);
         } catch (DateTimeParseException e) {
             log.debug("Failed to parse as local time: {}", e.getMessage());
@@ -628,11 +629,11 @@ public class DataDistributionTool implements Tool {
         try {
             // Parse ISO format and convert to PPL format
             ZonedDateTime dateTime = ZonedDateTime.parse(timeString);
-            return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT));
         } catch (DateTimeParseException e) {
             // Try parsing as local time without zone
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
                 LocalDateTime localDateTime = LocalDateTime.parse(timeString, formatter);
                 return localDateTime.format(formatter);
             } catch (DateTimeParseException e2) {
