@@ -1,0 +1,10 @@
+{
+  "name": "Test_data_distribution_tool_flow_agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "DataDistributionTool",
+      "parameters": {}
+    }
+  ]
+}

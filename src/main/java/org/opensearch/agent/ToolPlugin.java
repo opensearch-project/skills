@@ -11,19 +11,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-import org.opensearch.agent.tools.CreateAlertTool;
-import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
-import org.opensearch.agent.tools.LogPatternAnalysisTool;
-import org.opensearch.agent.tools.LogPatternTool;
-import org.opensearch.agent.tools.NeuralSparseSearchTool;
-import org.opensearch.agent.tools.PPLTool;
-import org.opensearch.agent.tools.RAGTool;
-import org.opensearch.agent.tools.SearchAlertsTool;
-import org.opensearch.agent.tools.SearchAnomalyDetectorsTool;
-import org.opensearch.agent.tools.SearchAnomalyResultsTool;
-import org.opensearch.agent.tools.SearchMonitorsTool;
-import org.opensearch.agent.tools.VectorDBTool;
-import org.opensearch.agent.tools.WebSearchTool;
+import org.opensearch.agent.tools.*;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
@@ -60,13 +48,13 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
 
     @Override
     public List<RestHandler> getRestHandlers(
-        Settings settings,
-        RestController restController,
-        ClusterSettings clusterSettings,
-        IndexScopedSettings indexScopedSettings,
-        SettingsFilter settingsFilter,
-        IndexNameExpressionResolver indexNameExpressionResolver,
-        Supplier<DiscoveryNodes> nodesInCluster
+            Settings settings,
+            RestController restController,
+            ClusterSettings clusterSettings,
+            IndexScopedSettings indexScopedSettings,
+            SettingsFilter settingsFilter,
+            IndexNameExpressionResolver indexNameExpressionResolver,
+            Supplier<DiscoveryNodes> nodesInCluster
     ) {
         restControllerRef.set(restController);
         return Collections.emptyList();
@@ -75,17 +63,17 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
     @SneakyThrows
     @Override
     public Collection<Object> createComponents(
-        Client client,
-        ClusterService clusterService,
-        ThreadPool threadPool,
-        ResourceWatcherService resourceWatcherService,
-        ScriptService scriptService,
-        NamedXContentRegistry xContentRegistry,
-        Environment environment,
-        NodeEnvironment nodeEnvironment,
-        NamedWriteableRegistry namedWriteableRegistry,
-        IndexNameExpressionResolver indexNameExpressionResolver,
-        Supplier<RepositoriesService> repositoriesServiceSupplier
+            Client client,
+            ClusterService clusterService,
+            ThreadPool threadPool,
+            ResourceWatcherService resourceWatcherService,
+            ScriptService scriptService,
+            NamedXContentRegistry xContentRegistry,
+            Environment environment,
+            NodeEnvironment nodeEnvironment,
+            NamedWriteableRegistry namedWriteableRegistry,
+            IndexNameExpressionResolver indexNameExpressionResolver,
+            Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         PPLTool.Factory.getInstance().init(client);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
@@ -100,38 +88,40 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
         WebSearchTool.Factory.getInstance().init(threadPool);
         LogPatternAnalysisTool.Factory.getInstance().init(client);
+        DataDistributionTool.Factory.getInstance().init(client);
         return Collections.emptyList();
     }
 
     @Override
     public List<Tool.Factory<? extends Tool>> getToolFactories() {
         return List
-            .of(
-                PPLTool.Factory.getInstance(),
-                NeuralSparseSearchTool.Factory.getInstance(),
-                VectorDBTool.Factory.getInstance(),
-                RAGTool.Factory.getInstance(),
-                SearchAlertsTool.Factory.getInstance(),
-                SearchAnomalyDetectorsTool.Factory.getInstance(),
-                SearchAnomalyResultsTool.Factory.getInstance(),
-                SearchMonitorsTool.Factory.getInstance(),
-                CreateAlertTool.Factory.getInstance(),
-                CreateAnomalyDetectorTool.Factory.getInstance(),
-                LogPatternTool.Factory.getInstance(),
-                WebSearchTool.Factory.getInstance(),
-                LogPatternAnalysisTool.Factory.getInstance()
-            );
+                .of(
+                        PPLTool.Factory.getInstance(),
+                        NeuralSparseSearchTool.Factory.getInstance(),
+                        VectorDBTool.Factory.getInstance(),
+                        RAGTool.Factory.getInstance(),
+                        SearchAlertsTool.Factory.getInstance(),
+                        SearchAnomalyDetectorsTool.Factory.getInstance(),
+                        SearchAnomalyResultsTool.Factory.getInstance(),
+                        SearchMonitorsTool.Factory.getInstance(),
+                        CreateAlertTool.Factory.getInstance(),
+                        CreateAnomalyDetectorTool.Factory.getInstance(),
+                        LogPatternTool.Factory.getInstance(),
+                        WebSearchTool.Factory.getInstance(),
+                        LogPatternAnalysisTool.Factory.getInstance(),
+                        DataDistributionTool.Factory.getInstance()
+                );
     }
 
     @Override
     public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
         FixedExecutorBuilder websearchCrawlThread = new FixedExecutorBuilder(
-            settings,
-            WEBSEARCH_CRAWLER_THREADPOOL,
-            Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
-            100,
-            SKILLS_THREAD_POOL_PREFIX,
-            false
+                settings,
+                WEBSEARCH_CRAWLER_THREADPOOL,
+                Math.max(1, OpenSearchExecutors.allocatedProcessors(settings) - 1),
+                100,
+                SKILLS_THREAD_POOL_PREFIX,
+                false
         );
 
         return List.of(websearchCrawlThread);
