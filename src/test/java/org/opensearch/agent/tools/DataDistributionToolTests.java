@@ -912,14 +912,14 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithValidMapping() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createTestDataForFieldAnalysis();
-        
+
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
             .getDeclaredMethod("getUsefulFields", List.class, String.class);
         getUsefulFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
         List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
-        
+
         assertNotNull(usefulFields);
         assertFalse(usefulFields.isEmpty());
         assertTrue(usefulFields.contains("status"));
@@ -976,14 +976,14 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithHighCardinalityFields() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createHighCardinalityTestData();
-        
+
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
             .getDeclaredMethod("getUsefulFields", List.class, String.class);
         getUsefulFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
         List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
-        
+
         assertNotNull(usefulFields);
         assertFalse(usefulFields.contains("unique_id"));
         assertTrue(usefulFields.contains("status"));
@@ -994,24 +994,24 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithEmptyData() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> emptyData = List.of();
-        
+
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
             .getDeclaredMethod("getUsefulFields", List.class, String.class);
         getUsefulFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
         List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, emptyData, "test_index");
-        
+
         assertNotNull(usefulFields);
         assertTrue(usefulFields.size() > 0);
     }
 
     private List<Map<String, Object>> createTestDataForFieldAnalysis() {
         List<Map<String, Object>> data = new ArrayList<>();
-        String[] statuses = {"error", "info", "warning"};
-        String[] hosts = {"server-01", "server-02"};
-        String[] services = {"auth", "payment"};
-        
+        String[] statuses = { "error", "info", "warning" };
+        String[] hosts = { "server-01", "server-02" };
+        String[] services = { "auth", "payment" };
+
         for (int i = 0; i < 10; i++) {
             Map<String, Object> doc = new HashMap<>();
             doc.put("status", statuses[i % statuses.length]);
@@ -1027,8 +1027,8 @@ public class DataDistributionToolTests {
 
     private List<Map<String, Object>> createHighCardinalityTestData() {
         List<Map<String, Object>> data = new ArrayList<>();
-        String[] statuses = {"error", "info"};
-        
+        String[] statuses = { "error", "info" };
+
         for (int i = 0; i < 20; i++) {
             Map<String, Object> doc = new HashMap<>();
             doc.put("status", statuses[i % statuses.length]);
@@ -1043,16 +1043,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithTermQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("status", Map.of("term", "error"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("term"));
         assertTrue(queryBuilder.toString().contains("status"));
@@ -1063,16 +1063,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithRangeQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("level", Map.of("range", Map.of("gte", 3, "lte", 5)));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("range"));
         assertTrue(queryBuilder.toString().contains("level"));
@@ -1082,16 +1082,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithMatchQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("message", Map.of("match", "test message"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("match"));
         assertTrue(queryBuilder.toString().contains("message"));
@@ -1101,16 +1101,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithExistsQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("status", Map.of("exists", true));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("exists"));
         assertTrue(queryBuilder.toString().contains("status"));
@@ -1120,16 +1120,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithDirectTermQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("status", "error");
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("term"));
         assertTrue(queryBuilder.toString().contains("status"));
@@ -1140,16 +1140,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithMatchPhraseQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("message", Map.of("match_phrase", "exact phrase"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("match_phrase"));
     }
@@ -1158,16 +1158,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithPrefixQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("host", Map.of("prefix", "server"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("prefix"));
     }
@@ -1176,16 +1176,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithWildcardQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("host", Map.of("wildcard", "server*"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("wildcard"));
     }
@@ -1194,16 +1194,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithWildcardMapQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("host", Map.of("wildcard", Map.of("value", "server*")));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("wildcard"));
     }
@@ -1212,16 +1212,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithRegexpQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("host", Map.of("regexp", "server-[0-9]+"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("regexp"));
     }
@@ -1230,16 +1230,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithRegexpMapQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("host", Map.of("regexp", Map.of("value", "server-[0-9]+")));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("regexp"));
     }
@@ -1248,16 +1248,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithComplexRangeQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("level", Map.of("range", Map.of("gt", 1, "lt", 10)));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
         assertTrue(queryBuilder.toString().contains("range"));
     }
@@ -1266,16 +1266,16 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testBuildQueryFromMapWithUnsupportedOperator() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
             .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
         buildQueryMethod.setAccessible(true);
-        
+
         Map<String, Object> filterMap = Map.of("status", Map.of("unsupported_op", "value"));
         org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-        
+
         buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-        
+
         assertNotNull(queryBuilder);
     }
 
@@ -1283,26 +1283,26 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testGroupNumericKeysWithManyNumericValues() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method groupNumericKeysMethod = DataDistributionTool.class
             .getDeclaredMethod("groupNumericKeys", Map.class, Map.class);
         groupNumericKeysMethod.setAccessible(true);
-        
+
         Map<String, Double> selectionDist = new HashMap<>();
         Map<String, Double> baselineDist = new HashMap<>();
-        
+
         for (int i = 1; i <= 15; i++) {
             selectionDist.put(String.valueOf(i), 0.1);
             baselineDist.put(String.valueOf(i + 5), 0.1);
         }
-        
+
         Object result = groupNumericKeysMethod.invoke(tool, selectionDist, baselineDist);
-        
+
         assertNotNull(result);
         java.lang.reflect.Method groupedSelectionDistMethod = result.getClass().getDeclaredMethod("groupedSelectionDist");
         @SuppressWarnings("unchecked")
         Map<String, Double> groupedSelection = (Map<String, Double>) groupedSelectionDistMethod.invoke(result);
-        
+
         assertEquals(5, groupedSelection.size());
         assertTrue(groupedSelection.keySet().stream().allMatch(key -> key.contains("-")));
     }
@@ -1311,21 +1311,21 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testGroupNumericKeysWithFewNumericValues() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method groupNumericKeysMethod = DataDistributionTool.class
             .getDeclaredMethod("groupNumericKeys", Map.class, Map.class);
         groupNumericKeysMethod.setAccessible(true);
-        
+
         Map<String, Double> selectionDist = Map.of("1", 0.3, "2", 0.4, "3", 0.3);
         Map<String, Double> baselineDist = Map.of("1", 0.2, "2", 0.5, "3", 0.3);
-        
+
         Object result = groupNumericKeysMethod.invoke(tool, selectionDist, baselineDist);
-        
+
         assertNotNull(result);
         java.lang.reflect.Method groupedSelectionDistMethod = result.getClass().getDeclaredMethod("groupedSelectionDist");
         @SuppressWarnings("unchecked")
         Map<String, Double> groupedSelection = (Map<String, Double>) groupedSelectionDistMethod.invoke(result);
-        
+
         assertEquals(selectionDist, groupedSelection);
     }
 
@@ -1333,27 +1333,27 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testGroupNumericKeysWithNonNumericValues() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method groupNumericKeysMethod = DataDistributionTool.class
             .getDeclaredMethod("groupNumericKeys", Map.class, Map.class);
         groupNumericKeysMethod.setAccessible(true);
-        
+
         Map<String, Double> selectionDist = new HashMap<>();
         Map<String, Double> baselineDist = new HashMap<>();
-        
+
         for (int i = 1; i <= 15; i++) {
             selectionDist.put(String.valueOf(i), 0.1);
         }
         selectionDist.put("error", 0.2);
         selectionDist.put("warning", 0.3);
-        
+
         Object result = groupNumericKeysMethod.invoke(tool, selectionDist, baselineDist);
-        
+
         assertNotNull(result);
         java.lang.reflect.Method groupedSelectionDistMethod = result.getClass().getDeclaredMethod("groupedSelectionDist");
         @SuppressWarnings("unchecked")
         Map<String, Double> groupedSelection = (Map<String, Double>) groupedSelectionDistMethod.invoke(result);
-        
+
         assertEquals(selectionDist, groupedSelection);
     }
 
@@ -1361,14 +1361,13 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testGetNumberFieldsWithValidMapping() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
-        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getNumberFields", String.class);
+
+        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", String.class);
         getNumberFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
         java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, "test_index");
-        
+
         assertNotNull(numberFields);
         assertTrue(numberFields.contains("level"));
         assertFalse(numberFields.contains("status"));
