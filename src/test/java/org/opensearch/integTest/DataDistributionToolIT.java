@@ -311,4 +311,127 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         assertNotNull(result);
         assertTrue(result.contains("singleAnalysis"));
     }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolWithRangeFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"filter\": \"[\\\"{'range': {'response_time': {'gte': 150.0}}}\\\"]\"}}",
+                    TEST_DATA_INDEX_NAME
+                )
+        );
+        System.out.println("Range Filter result: " + result);
+        assertNotNull(result);
+        assertTrue(result.contains("singleAnalysis"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolWithMatchFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"filter\": \"[\\\"{'match': {'status': 'error'}}\\\"]\"}}",
+                    TEST_DATA_INDEX_NAME
+                )
+        );
+        System.out.println("Match Filter result: " + result);
+        assertNotNull(result);
+        assertTrue(result.contains("singleAnalysis"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolWithExistsFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"filter\": \"[\\\"{'exists': {'field': 'response_time'}}\\\"]\"}}",
+                    TEST_DATA_INDEX_NAME
+                )
+        );
+        System.out.println("Exists Filter result: " + result);
+        assertNotNull(result);
+        assertTrue(result.contains("singleAnalysis"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolInvalidFilterFormat() {
+        Exception exception = assertThrows(
+            Exception.class,
+            () -> executeAgent(
+                agentId,
+                String
+                    .format(
+                        Locale.ROOT,
+                        "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"filter\": \"invalid-json\"}}",
+                        TEST_DATA_INDEX_NAME
+                    )
+            )
+        );
+        MatcherAssert.assertThat(exception.getMessage(), containsString("Invalid 'filter' parameter"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolInvalidSizeParameter() {
+        Exception exception = assertThrows(
+            Exception.class,
+            () -> executeAgent(
+                agentId,
+                String
+                    .format(
+                        Locale.ROOT,
+                        "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"size\": \"not-a-number\"}}",
+                        TEST_DATA_INDEX_NAME
+                    )
+            )
+        );
+        MatcherAssert.assertThat(exception.getMessage(), containsString("Invalid 'size' parameter"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolInvalidTimeFormat() {
+        Exception exception = assertThrows(
+            Exception.class,
+            () -> executeAgent(
+                agentId,
+                String
+                    .format(
+                        Locale.ROOT,
+                        "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"invalid-time-format\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\"}}",
+                        TEST_DATA_INDEX_NAME
+                    )
+            )
+        );
+        MatcherAssert.assertThat(exception.getMessage(), containsString("Unable to parse time string"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDataDistributionToolPPLWithComplexQuery() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"queryType\": \"ppl\", \"ppl\": \"source=%s | where level > 2\"}}",
+                    TEST_DATA_INDEX_NAME,
+                    TEST_DATA_INDEX_NAME
+                )
+        );
+        System.out.println("PPL Complex Query result: " + result);
+        assertNotNull(result);
+        assertTrue(result.contains("singleAnalysis"));
+    }
 }
