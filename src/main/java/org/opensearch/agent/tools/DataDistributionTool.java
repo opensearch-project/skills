@@ -847,16 +847,14 @@ public class DataDistributionTool implements Tool {
      * @return List of field names suitable for distribution analysis
      */
     private List<String> getUsefulFields(List<Map<String, Object>> data, String index) {
-        GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
-
         try {
-            // Using synchronous call for simplicity - in production should be async
+            GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
             var getMappingsActionFuture = client.admin().indices().getMappings(getMappingsRequest);
             if (getMappingsActionFuture == null) {
                 log.warn("Failed to get mappings for index: {}, using data-based field detection", index);
                 return getFieldsFromData(data);
             }
-            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet().getMappings();
+            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet(5000).getMappings();
             if (mappings.isEmpty()) {
                 log.warn("No mappings found for index: {}, using data-based field detection", index);
                 return getFieldsFromData(data);
@@ -1033,7 +1031,7 @@ public class DataDistributionTool implements Tool {
             if (getMappingsActionFuture == null) {
                 return Set.of();
             }
-            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet().getMappings();
+            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet(5000).getMappings();
             if (mappings.isEmpty()) {
                 return Set.of();
             }
