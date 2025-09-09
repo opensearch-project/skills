@@ -6,10 +6,18 @@
 package org.opensearch.agent.tools;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.*;
+import static org.jsoup.helper.Validate.fail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.ArrayList;
@@ -205,14 +213,24 @@ public class DataDistributionToolTests {
                         "dsl"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("DSL Single Analysis Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify the analysis contains field distribution data
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
-                    assertTrue(singleAnalysis.getAsJsonArray().size() > 0);
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should contain at least one field analysis", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each field analysis has required structure (SummaryDataItem)
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field analysis should be a JSON object", fieldAnalysis.isJsonObject());
+                        assertTrue("Field analysis should have 'field' property", fieldAnalysis.getAsJsonObject().has("field"));
+                        assertTrue("Field analysis should have 'divergence' property", fieldAnalysis.getAsJsonObject().has("divergence"));
+                        assertTrue("Field analysis should have 'topChanges' property", fieldAnalysis.getAsJsonObject().has("topChanges"));
+                        assertNotNull("Field name should not be null", fieldAnalysis.getAsJsonObject().get("field").getAsString());
+                        assertTrue("TopChanges should be a JSON array", fieldAnalysis.getAsJsonObject().get("topChanges").isJsonArray());
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -239,13 +257,18 @@ public class DataDistributionToolTests {
                         "[\"{'term': {'status': 'error'}}\"]"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("DSL With Filter Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify filter was applied (should still have analysis data)
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should contain field analyses even with filter", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify structure is maintained with filter
+                    JsonElement firstField = singleAnalysis.getAsJsonArray().get(0);
+                    assertTrue("Field analysis should have proper structure with filter", firstField.getAsJsonObject().has("field"));
+                    assertTrue("Field analysis should have topChanges with filter", firstField.getAsJsonObject().has("topChanges"));
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -272,13 +295,26 @@ public class DataDistributionToolTests {
                         "[\"{'term': {'status': 'error'}}\", \"{'range': {'level': {'gte': 3}}}\"]"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("DSL With Multiple Filters Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify multiple filters were applied
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should contain analyses with multiple filters", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each field has proper structure with multiple filters
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        assertTrue(
+                            "Field analysis should maintain structure with multiple filters",
+                            fieldAnalysis.getAsJsonObject().has("field")
+                        );
+                        assertTrue(
+                            "Field analysis should have topChanges with multiple filters",
+                            fieldAnalysis.getAsJsonObject().has("topChanges")
+                        );
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -310,14 +346,22 @@ public class DataDistributionToolTests {
                         "ppl"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("PPL Single Analysis Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify PPL data was processed correctly
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
-                    assertTrue(singleAnalysis.getAsJsonArray().size() > 0);
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("Should have at least one field from PPL response", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each field has proper structure
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field analysis should have field property", fieldAnalysis.getAsJsonObject().has("field"));
+                        assertTrue("Field analysis should have divergence property", fieldAnalysis.getAsJsonObject().has("divergence"));
+                        assertTrue("Field analysis should have topChanges property", fieldAnalysis.getAsJsonObject().has("topChanges"));
+                        assertTrue("TopChanges should be an array", fieldAnalysis.getAsJsonObject().get("topChanges").isJsonArray());
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -350,13 +394,21 @@ public class DataDistributionToolTests {
                         "source=logs-* | where status='error' | stats count() by host"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("PPL Custom Statement Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify custom PPL statement was processed
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("Should have at least one field from custom PPL response", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each field has proper structure
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field analysis should have field property", fieldAnalysis.getAsJsonObject().has("field"));
+                        assertTrue("Field analysis should have divergence property", fieldAnalysis.getAsJsonObject().has("divergence"));
+                        assertTrue("Field analysis should have topChanges property", fieldAnalysis.getAsJsonObject().has("topChanges"));
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -406,14 +458,37 @@ public class DataDistributionToolTests {
                         "dsl"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("Comparison Analysis Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("comparisonAnalysis"));
+                    assertTrue("Response should contain comparisonAnalysis", result.getAsJsonObject().has("comparisonAnalysis"));
 
                     // Verify comparison analysis contains divergence data
                     JsonElement comparisonAnalysis = result.getAsJsonObject().get("comparisonAnalysis");
-                    assertTrue(comparisonAnalysis.isJsonArray());
-                    assertTrue(comparisonAnalysis.getAsJsonArray().size() > 0);
+                    assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+                    assertTrue("comparisonAnalysis should contain field comparisons", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each comparison has required structure (SummaryDataItem)
+                    for (int i = 0; i < comparisonAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldComparison = comparisonAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field comparison should be a JSON object", fieldComparison.isJsonObject());
+                        assertTrue("Field comparison should have 'field' property", fieldComparison.getAsJsonObject().has("field"));
+                        assertTrue(
+                            "Field comparison should have 'divergence' property",
+                            fieldComparison.getAsJsonObject().has("divergence")
+                        );
+                        assertTrue(
+                            "Field comparison should have 'topChanges' property",
+                            fieldComparison.getAsJsonObject().has("topChanges")
+                        );
+
+                        // Verify divergence is a valid number
+                        assertTrue("Divergence should be a number", fieldComparison.getAsJsonObject().get("divergence").isJsonPrimitive());
+                        double divergence = fieldComparison.getAsJsonObject().get("divergence").getAsDouble();
+                        assertTrue("Divergence should be non-negative", divergence >= 0.0);
+
+                        // Verify topChanges structure
+                        JsonElement topChanges = fieldComparison.getAsJsonObject().get("topChanges");
+                        assertTrue("TopChanges should be a JSON array", topChanges.isJsonArray());
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -466,13 +541,25 @@ public class DataDistributionToolTests {
                         "source=logs-* | where level > 1"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("PPL Comparison Analysis Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("comparisonAnalysis"));
+                    assertTrue("Response should contain comparisonAnalysis", result.getAsJsonObject().has("comparisonAnalysis"));
 
                     // Verify comparison shows differences between baseline and selection
                     JsonElement comparisonAnalysis = result.getAsJsonObject().get("comparisonAnalysis");
-                    assertTrue(comparisonAnalysis.isJsonArray());
+                    assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+                    assertTrue("Should have at least one field from PPL comparison", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+                    // Verify each field has proper structure
+                    for (int i = 0; i < comparisonAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldComparison = comparisonAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field comparison should have field property", fieldComparison.getAsJsonObject().has("field"));
+                        assertTrue("Field comparison should have divergence property", fieldComparison.getAsJsonObject().has("divergence"));
+                        assertTrue("Field comparison should have topChanges property", fieldComparison.getAsJsonObject().has("topChanges"));
+
+                        // Verify divergence is a valid number
+                        double divergence = fieldComparison.getAsJsonObject().get("divergence").getAsDouble();
+                        assertTrue("Divergence should be non-negative", divergence >= 0.0);
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
@@ -543,13 +630,24 @@ public class DataDistributionToolTests {
                         "dsl"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    System.out.println("Custom Time Field Response: " + response);
                     JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("singleAnalysis"));
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
 
                     // Verify custom time field was used
                     JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
-                    assertTrue(singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue(
+                        "singleAnalysis should contain field analyses with custom time field",
+                        singleAnalysis.getAsJsonArray().size() > 0
+                    );
+
+                    // Verify that the custom time field doesn't appear in the analysis (it's used for filtering, not analysis)
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        String fieldName = fieldAnalysis.getAsJsonObject().get("field").getAsString();
+                        assertFalse("Custom time field should not appear in analysis results", "custom_timestamp".equals(fieldName));
+                        assertTrue("Field analysis should have topChanges property", fieldAnalysis.getAsJsonObject().has("topChanges"));
+                    }
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }

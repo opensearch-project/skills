@@ -15,7 +15,9 @@ import java.util.Locale;
 import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 import lombok.SneakyThrows;
 
@@ -119,7 +121,6 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         );
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolSingleAnalysis() {
         String result = executeAgent(
@@ -131,12 +132,26 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Parse and validate JSON structure
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("singleAnalysis should contain at least one field analysis", singleAnalysis.getAsJsonArray().size() > 0);
+
+        // Verify structure of first analysis item
+        JsonElement firstItem = singleAnalysis.getAsJsonArray().get(0);
+        assertTrue("Analysis item should be a JSON object", firstItem.isJsonObject());
+        assertTrue("Analysis item should have 'field' property", firstItem.getAsJsonObject().has("field"));
+        assertTrue("Analysis item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
+        assertTrue("Analysis item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolComparisonAnalysis() {
         String result = executeAgent(
@@ -148,12 +163,30 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("comparisonAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain comparisonAnalysis", result.contains("comparisonAnalysis"));
+
+        // Parse and validate JSON structure
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have comparisonAnalysis property", jsonResult.getAsJsonObject().has("comparisonAnalysis"));
+
+        JsonElement comparisonAnalysis = jsonResult.getAsJsonObject().get("comparisonAnalysis");
+        assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+        assertTrue("comparisonAnalysis should contain at least one field comparison", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+        // Verify structure of first comparison item
+        JsonElement firstItem = comparisonAnalysis.getAsJsonArray().get(0);
+        assertTrue("Comparison item should be a JSON object", firstItem.isJsonObject());
+        assertTrue("Comparison item should have 'field' property", firstItem.getAsJsonObject().has("field"));
+        assertTrue("Comparison item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
+        assertTrue("Comparison item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
+
+        // Verify divergence is a valid number
+        double divergence = firstItem.getAsJsonObject().get("divergence").getAsDouble();
+        assertTrue("Divergence should be non-negative", divergence >= 0.0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithFilter() {
         String result = executeAgent(
@@ -165,19 +198,25 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Parse and validate JSON structure with filter applied
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("singleAnalysis should contain field analyses even with filter", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolMissingRequiredParameters() {
         Exception exception = assertThrows(Exception.class, () -> executeAgent(agentId, "{\"parameters\": {\"index\": \"test_index\"}}"));
         MatcherAssert.assertThat(exception.getMessage(), containsString("Missing required parameters"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolInvalidIndex() {
         Exception exception = assertThrows(
@@ -190,7 +229,6 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         MatcherAssert.assertThat(exception.getMessage(), containsString("no such index"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolPPLSingleAnalysis() {
         String result = executeAgent(
@@ -203,12 +241,25 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("PPL Single Analysis result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Parse and validate PPL query results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("PPL singleAnalysis should contain field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+
+        // Verify PPL results have proper structure
+        JsonElement firstItem = singleAnalysis.getAsJsonArray().get(0);
+        assertTrue("PPL analysis item should have 'field' property", firstItem.getAsJsonObject().has("field"));
+        assertTrue("PPL analysis item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
+        assertTrue("PPL analysis item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolPPLComparisonAnalysis() {
         String result = executeAgent(
@@ -221,12 +272,25 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("PPL Comparison Analysis result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("comparisonAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain comparisonAnalysis", result.contains("comparisonAnalysis"));
+
+        // Parse and validate PPL comparison results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have comparisonAnalysis property", jsonResult.getAsJsonObject().has("comparisonAnalysis"));
+
+        JsonElement comparisonAnalysis = jsonResult.getAsJsonObject().get("comparisonAnalysis");
+        assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+        assertTrue("PPL comparisonAnalysis should contain field comparisons", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+        // Verify PPL comparison results have proper structure
+        JsonElement firstItem = comparisonAnalysis.getAsJsonArray().get(0);
+        assertTrue("PPL comparison item should have 'field' property", firstItem.getAsJsonObject().has("field"));
+        assertTrue("PPL comparison item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
+        assertTrue("PPL comparison item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolPPLWithCustomQuery() {
         String result = executeAgent(
@@ -239,12 +303,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("PPL Custom Query result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate custom PPL query results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Custom PPL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithDSLQueryType() {
         String result = executeAgent(
@@ -256,12 +327,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("DSL Query Type result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate DSL query type results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("DSL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithMultipleFilters() {
         String result = executeAgent(
@@ -273,12 +351,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Multiple Filters result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate multiple filters results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Multiple filters should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithCustomSize() {
         String result = executeAgent(
@@ -290,12 +375,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Custom Size result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate custom size parameter results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Custom size should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithCustomTimeField() {
         String result = executeAgent(
@@ -307,12 +399,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Custom Time Field result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate custom time field results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Custom time field should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithRangeFilter() {
         String result = executeAgent(
@@ -324,12 +423,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Range Filter result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate range filter results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Range filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithMatchFilter() {
         String result = executeAgent(
@@ -341,12 +447,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Match Filter result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate match filter results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Match filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolWithExistsFilter() {
         String result = executeAgent(
@@ -358,12 +471,19 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("Exists Filter result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate exists filter results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Exists filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolInvalidFilterFormat() {
         Exception exception = assertThrows(
@@ -381,7 +501,6 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         MatcherAssert.assertThat(exception.getMessage(), containsString("Invalid 'filter' parameter"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolInvalidSizeParameter() {
         Exception exception = assertThrows(
@@ -399,7 +518,6 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         MatcherAssert.assertThat(exception.getMessage(), containsString("Invalid 'size' parameter"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolInvalidTimeFormat() {
         Exception exception = assertThrows(
@@ -417,7 +535,6 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
         MatcherAssert.assertThat(exception.getMessage(), containsString("Unable to parse time string"));
     }
 
-    @Test
     @SneakyThrows
     public void testDataDistributionToolPPLWithComplexQuery() {
         String result = executeAgent(
@@ -430,8 +547,16 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        System.out.println("PPL Complex Query result: " + result);
-        assertNotNull(result);
-        assertTrue(result.contains("singleAnalysis"));
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        // Validate complex PPL query results
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Complex PPL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
     }
 }
