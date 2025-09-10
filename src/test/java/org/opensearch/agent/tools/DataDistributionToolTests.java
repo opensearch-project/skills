@@ -1010,13 +1010,15 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithValidMapping() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createTestDataForFieldAnalysis();
+        Map<String, String> fieldTypes = Map
+            .of("status", "keyword", "level", "integer", "host", "keyword", "service", "keyword", "@timestamp", "date", "message", "text");
 
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getUsefulFields", List.class, String.class);
+            .getDeclaredMethod("getUsefulFields", List.class, Map.class);
         getUsefulFieldsMethod.setAccessible(true);
 
         @SuppressWarnings("unchecked")
-        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
+        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, fieldTypes);
 
         assertNotNull(usefulFields);
         assertFalse(usefulFields.isEmpty());
@@ -1030,18 +1032,17 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetUsefulFieldsWithEmptyMapping() {
-        when(getMappingsResponse.getMappings()).thenReturn(Map.of());
-        
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createTestDataForFieldAnalysis();
-        
+        Map<String, String> emptyFieldTypes = Map.of();
+
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getUsefulFields", List.class, String.class);
+            .getDeclaredMethod("getUsefulFields", List.class, Map.class);
         getUsefulFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
-        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
-        
+        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, emptyFieldTypes);
+
         assertNotNull(usefulFields);
         assertTrue(usefulFields.size() > 0);
         assertFalse(usefulFields.contains("@timestamp"));
@@ -1050,18 +1051,17 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetUsefulFieldsWithMappingException() {
-        when(client.admin().indices().getMappings(any())).thenThrow(new RuntimeException("Mapping retrieval failed"));
-        
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createTestDataForFieldAnalysis();
-        
+        Map<String, String> emptyFieldTypes = Map.of();
+
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getUsefulFields", List.class, String.class);
+            .getDeclaredMethod("getUsefulFields", List.class, Map.class);
         getUsefulFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
-        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
-        
+        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, emptyFieldTypes);
+
         assertNotNull(usefulFields);
         assertTrue(usefulFields.size() > 0);
         assertFalse(usefulFields.contains("@timestamp"));
@@ -1074,17 +1074,20 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithHighCardinalityFields() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> testData = createHighCardinalityTestData();
+        Map<String, String> fieldTypes = Map.of("status", "keyword", "unique_field", "keyword", "@timestamp", "date");
 
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getUsefulFields", List.class, String.class);
+            .getDeclaredMethod("getUsefulFields", List.class, Map.class);
         getUsefulFieldsMethod.setAccessible(true);
 
         @SuppressWarnings("unchecked")
-        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, "test_index");
+        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, testData, fieldTypes);
 
         assertNotNull(usefulFields);
-        assertFalse(usefulFields.contains("unique_id"));
-        assertTrue(usefulFields.contains("status"));
+        // unique_field has high cardinality (20 unique values in 20 documents) so should be excluded
+        assertFalse("High cardinality field unique_field should be excluded", usefulFields.contains("unique_field"));
+        // status has low cardinality (2 unique values) so should be included
+        assertTrue("Low cardinality field status should be included", usefulFields.contains("status"));
     }
 
     @Test
@@ -1092,13 +1095,14 @@ public class DataDistributionToolTests {
     public void testGetUsefulFieldsWithEmptyData() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         List<Map<String, Object>> emptyData = List.of();
+        Map<String, String> fieldTypes = Map.of("status", "keyword", "level", "integer");
 
         java.lang.reflect.Method getUsefulFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getUsefulFields", List.class, String.class);
+            .getDeclaredMethod("getUsefulFields", List.class, Map.class);
         getUsefulFieldsMethod.setAccessible(true);
 
         @SuppressWarnings("unchecked")
-        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, emptyData, "test_index");
+        List<String> usefulFields = (List<String>) getUsefulFieldsMethod.invoke(tool, emptyData, fieldTypes);
 
         assertNotNull(usefulFields);
         assertTrue(usefulFields.size() > 0);
@@ -1130,7 +1134,7 @@ public class DataDistributionToolTests {
         for (int i = 0; i < 20; i++) {
             Map<String, Object> doc = new HashMap<>();
             doc.put("status", statuses[i % statuses.length]);
-            doc.put("unique_id", "id_" + i);
+            doc.put("unique_field", "value_" + i);
             doc.put("@timestamp", "2025-01-15T10:" + String.format("%02d", 30 + i) + ":00Z");
             data.add(doc);
         }
@@ -1459,15 +1463,17 @@ public class DataDistributionToolTests {
     @SneakyThrows
     public void testGetNumberFieldsWithValidMapping() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        Map<String, String> fieldTypes = Map.of("status", "keyword", "level", "integer", "host", "keyword", "response_time", "float");
 
-        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", String.class);
+        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", Map.class);
         getNumberFieldsMethod.setAccessible(true);
 
         @SuppressWarnings("unchecked")
-        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, "test_index");
+        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, fieldTypes);
 
         assertNotNull(numberFields);
         assertTrue(numberFields.contains("level"));
+        assertTrue(numberFields.contains("response_time"));
         assertFalse(numberFields.contains("status"));
         assertFalse(numberFields.contains("host"));
     }
@@ -1475,17 +1481,15 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetNumberFieldsWithEmptyMapping() {
-        when(getMappingsResponse.getMappings()).thenReturn(Map.of());
-        
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
-        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getNumberFields", String.class);
+        Map<String, String> emptyFieldTypes = Map.of();
+
+        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", Map.class);
         getNumberFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
-        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, "test_index");
-        
+        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, emptyFieldTypes);
+
         assertNotNull(numberFields);
         assertTrue(numberFields.isEmpty());
     }
@@ -1493,17 +1497,15 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetNumberFieldsWithMappingException() {
-        when(client.admin().indices().getMappings(any())).thenThrow(new RuntimeException("Mapping failed"));
-        
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
-        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getNumberFields", String.class);
+        Map<String, String> emptyFieldTypes = Map.of();
+
+        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", Map.class);
         getNumberFieldsMethod.setAccessible(true);
-        
+
         @SuppressWarnings("unchecked")
-        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, "test_index");
-        
+        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, emptyFieldTypes);
+
         assertNotNull(numberFields);
         assertTrue(numberFields.isEmpty());
     }
@@ -1511,19 +1513,71 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetNumberFieldsWithNullActionFuture() {
-        when(client.admin().indices().getMappings(any())).thenReturn(null);
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        Map<String, String> emptyFieldTypes = Map.of();
+
+        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class.getDeclaredMethod("getNumberFields", Map.class);
+        getNumberFieldsMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, emptyFieldTypes);
+
+        assertNotNull(numberFields);
+        assertTrue(numberFields.isEmpty());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetFieldTypesWithValidMapping() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class.getDeclaredMethod("getFieldTypes", String.class);
+        getFieldTypesMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
+
+        assertNotNull(fieldTypes);
+        assertFalse(fieldTypes.isEmpty());
+        assertEquals("keyword", fieldTypes.get("status"));
+        assertEquals("integer", fieldTypes.get("level"));
+        assertEquals("keyword", fieldTypes.get("host"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetFieldTypesWithEmptyMapping() {
+        when(getMappingsResponse.getMappings()).thenReturn(Map.of());
         
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         
-        java.lang.reflect.Method getNumberFieldsMethod = DataDistributionTool.class
-            .getDeclaredMethod("getNumberFields", String.class);
-        getNumberFieldsMethod.setAccessible(true);
+        java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class
+            .getDeclaredMethod("getFieldTypes", String.class);
+        getFieldTypesMethod.setAccessible(true);
         
         @SuppressWarnings("unchecked")
-        java.util.Set<String> numberFields = (java.util.Set<String>) getNumberFieldsMethod.invoke(tool, "test_index");
+        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
         
-        assertNotNull(numberFields);
-        assertTrue(numberFields.isEmpty());
+        assertNotNull(fieldTypes);
+        assertTrue(fieldTypes.isEmpty());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetFieldTypesWithMappingException() {
+        when(client.admin().indices().getMappings(any())).thenThrow(new RuntimeException("Mapping failed"));
+        
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class
+            .getDeclaredMethod("getFieldTypes", String.class);
+        getFieldTypesMethod.setAccessible(true);
+        
+        @SuppressWarnings("unchecked")
+        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
+        
+        assertNotNull(fieldTypes);
+        assertTrue(fieldTypes.isEmpty());
     }
 
     @Test

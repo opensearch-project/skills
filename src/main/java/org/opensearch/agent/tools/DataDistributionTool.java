@@ -781,8 +781,9 @@ public class DataDistributionTool implements Tool {
         List<Map<String, Object>> baselineData,
         String index
     ) {
-        List<String> usefulFields = getUsefulFields(selectionData, index);
-        Set<String> numberFields = getNumberFields(index);
+        Map<String, String> fieldTypes = getFieldTypes(index);
+        List<String> usefulFields = getUsefulFields(selectionData, fieldTypes);
+        Set<String> numberFields = getNumberFields(fieldTypes);
         List<FieldAnalysis> analyses = new ArrayList<>();
 
         for (String field : usefulFields) {
@@ -811,8 +812,9 @@ public class DataDistributionTool implements Tool {
      * @return List of summary data items showing distribution patterns
      */
     private List<SummaryDataItem> analyzeSingleDataset(List<Map<String, Object>> data, String index) {
-        List<String> usefulFields = getUsefulFields(data, index);
-        Set<String> numberFields = getNumberFields(index);
+        Map<String, String> fieldTypes = getFieldTypes(index);
+        List<String> usefulFields = getUsefulFields(data, fieldTypes);
+        Set<String> numberFields = getNumberFields(fieldTypes);
         List<FieldAnalysis> analyses = new ArrayList<>();
 
         for (String field : usefulFields) {
@@ -845,83 +847,94 @@ public class DataDistributionTool implements Tool {
     }
 
     /**
-     * Identifies useful fields for analysis based on index mapping and data characteristics
+     * Gets field type mappings from index
      *
-     * @param data Sample data for cardinality analysis
      * @param index Index name for mapping retrieval
-     * @return List of field names suitable for distribution analysis
+     * @return Map of field names to their types
      */
-    private List<String> getUsefulFields(List<Map<String, Object>> data, String index) {
+    private Map<String, String> getFieldTypes(String index) {
         try {
             GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
             var getMappingsActionFuture = client.admin().indices().getMappings(getMappingsRequest);
             if (getMappingsActionFuture == null) {
-                log.warn("Failed to get mappings for index: {}, using data-based field detection", index);
-                return getFieldsFromData(data);
+                return Map.of();
             }
             Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet(5000).getMappings();
             if (mappings.isEmpty()) {
-                log.warn("No mappings found for index: {}, using data-based field detection", index);
-                return getFieldsFromData(data);
+                return Map.of();
             }
 
             MappingMetadata mappingMetadata = mappings.values().iterator().next();
             Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
             if (mappingSource == null) {
-                return List.of();
+                return Map.of();
             }
 
             Map<String, String> fieldsToType = new HashMap<>();
             ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
-
-            Set<String> keywordFields = fieldsToType
-                .entrySet()
-                .stream()
-                .filter(entry -> USEFUL_FIELD_TYPES.contains(entry.getValue()))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-
-            Set<String> numberFields = fieldsToType
-                .entrySet()
-                .stream()
-                .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-
-            Set<String> normalizedFields = keywordFields
-                .stream()
-                .map(field -> field.endsWith(".keyword") ? field.replace(".keyword", "") : field)
-                .collect(Collectors.toSet());
-
-            Map<String, Set<String>> fieldValueSets = new HashMap<>();
-            normalizedFields.forEach(field -> fieldValueSets.put(field, new HashSet<>()));
-
-            int maxCardinality = Math.max(5, data.size() / 4);
-
-            data.forEach(doc -> {
-                normalizedFields.forEach(field -> {
-                    Object value = getFlattenedValue(doc, field);
-                    if (value != null) {
-                        fieldValueSets.get(field).add(gson.toJson(value));
-                    }
-                });
-            });
-
-            return normalizedFields.stream().filter(field -> {
-                int cardinality = fieldValueSets.get(field).size();
-                if (field.toLowerCase(Locale.ROOT).endsWith("id")) {
-                    return cardinality <= 30 && cardinality > 0;
-                }
-                if (numberFields.contains(field)) {
-                    return true;
-                }
-                return cardinality <= maxCardinality && cardinality > 0;
-            }).collect(Collectors.toList());
-
+            return fieldsToType;
         } catch (Exception e) {
-            log.error("Failed to get useful fields for index: {}, using data-based field detection", index, e);
+            log.error("Failed to get field types for index: {}", index, e);
+            return Map.of();
+        }
+    }
+
+    /**
+     * Identifies useful fields for analysis based on index mapping and data characteristics
+     *
+     * @param data Sample data for cardinality analysis
+     * @param fieldTypes Map of field names to their types
+     * @return List of field names suitable for distribution analysis
+     */
+    private List<String> getUsefulFields(List<Map<String, Object>> data, Map<String, String> fieldTypes) {
+        if (fieldTypes.isEmpty()) {
+            log.warn("No field types available, using data-based field detection");
             return getFieldsFromData(data);
         }
+
+        Set<String> keywordFields = fieldTypes
+            .entrySet()
+            .stream()
+            .filter(entry -> USEFUL_FIELD_TYPES.contains(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
+
+        Set<String> numberFields = fieldTypes
+            .entrySet()
+            .stream()
+            .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
+
+        Set<String> normalizedFields = keywordFields
+            .stream()
+            .map(field -> field.endsWith(".keyword") ? field.replace(".keyword", "") : field)
+            .collect(Collectors.toSet());
+
+        Map<String, Set<String>> fieldValueSets = new HashMap<>();
+        normalizedFields.forEach(field -> fieldValueSets.put(field, new HashSet<>()));
+
+        int maxCardinality = Math.max(5, data.size() / 4);
+
+        data.forEach(doc -> {
+            normalizedFields.forEach(field -> {
+                Object value = getFlattenedValue(doc, field);
+                if (value != null) {
+                    fieldValueSets.get(field).add(gson.toJson(value));
+                }
+            });
+        });
+
+        return normalizedFields.stream().filter(field -> {
+            int cardinality = fieldValueSets.get(field).size();
+            if (field.toLowerCase(Locale.ROOT).endsWith("id")) {
+                return cardinality <= 30 && cardinality > 0;
+            }
+            if (numberFields.contains(field)) {
+                return true;
+            }
+            return cardinality <= maxCardinality && cardinality > 0;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -938,6 +951,8 @@ public class DataDistributionTool implements Tool {
         for (String part : parts) {
             if (current instanceof Map) {
                 current = ((Map<?, ?>) current).get(part);
+            } else if (current instanceof List) {
+                return gson.toJson(current);
             } else {
                 return null;
             }
@@ -964,6 +979,9 @@ public class DataDistributionTool implements Tool {
             }
         }
 
+        if (data.isEmpty()) {
+            return new HashMap<>();
+        }
         return counts.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> (double) entry.getValue() / data.size()));
     }
 
@@ -1024,42 +1042,18 @@ public class DataDistributionTool implements Tool {
     }
 
     /**
-     * Gets number fields from index mapping
+     * Gets number fields from field type mappings
      *
-     * @param index Index name
+     * @param fieldTypes Map of field names to their types
      * @return Set of number field names
      */
-    private Set<String> getNumberFields(String index) {
-        try {
-            GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
-            var getMappingsActionFuture = client.admin().indices().getMappings(getMappingsRequest);
-            if (getMappingsActionFuture == null) {
-                return Set.of();
-            }
-            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet(5000).getMappings();
-            if (mappings.isEmpty()) {
-                return Set.of();
-            }
-
-            MappingMetadata mappingMetadata = mappings.values().iterator().next();
-            Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-            if (mappingSource == null) {
-                return Set.of();
-            }
-
-            Map<String, String> fieldsToType = new HashMap<>();
-            ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
-
-            return fieldsToType
-                .entrySet()
-                .stream()
-                .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-        } catch (Exception e) {
-            log.warn("Failed to get number fields for index: {}", index, e);
-            return Set.of();
-        }
+    private Set<String> getNumberFields(Map<String, String> fieldTypes) {
+        return fieldTypes
+            .entrySet()
+            .stream()
+            .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
     }
 
     /**
