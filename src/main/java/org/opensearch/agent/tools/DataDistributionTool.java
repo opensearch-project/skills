@@ -666,34 +666,31 @@ public class DataDistributionTool implements Tool {
 
         String formattedStartTime = formatTimeForPPL(startTime);
         String formattedEndTime = formatTimeForPPL(endTime);
-
-        String whereCommand = String
-            .format(Locale.ROOT, "WHERE `%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
+        String timePredicate = String.format(Locale.ROOT, "`%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
 
         if (Strings.isEmpty(query)) {
-            return whereCommand;
+            return "WHERE " + timePredicate;
         }
 
-        // Split query by pipe and insert WHERE command after first command
         String[] commands = query.split("\\|");
-        List<String> commandList = new ArrayList<>();
-
-        // Add first command
-        if (commands.length > 0) {
-            commandList.add(commands[0].trim());
+        for (int i = 0; i < commands.length; i++) {
+            String cmd = commands[i].trim();
+            if (cmd.regionMatches(true, 0, "where", 0, 5)) {
+                commands[i] = cmd + " AND " + timePredicate;
+                return String.join(" | ", Arrays.stream(commands).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
+            }
         }
 
-        // Add time filter
-        commandList.add(whereCommand);
-
-        // Add remaining commands
+        // No WHERE found: insert after first command
+        List<String> commandList = new ArrayList<>();
+        commandList.add(commands[0].trim());
+        commandList.add("WHERE " + timePredicate);
         for (int i = 1; i < commands.length; i++) {
             String cmd = commands[i].trim();
             if (!cmd.isEmpty()) {
                 commandList.add(cmd);
             }
         }
-
         return String.join(" | ", commandList);
     }
 

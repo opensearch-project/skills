@@ -1525,4 +1525,76 @@ public class DataDistributionToolTests {
         assertNotNull(numberFields);
         assertTrue(numberFields.isEmpty());
     }
+
+    @Test
+    @SneakyThrows
+    public void testGetPPLQueryWithTimeRangeEmptyQuery() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
+            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
+        getPPLQueryWithTimeRangeMethod.setAccessible(true);
+        
+        String result = (String) getPPLQueryWithTimeRangeMethod.invoke(tool, "", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
+        
+        assertEquals("WHERE `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00'", result);
+    }
+
+
+    @Test
+    @SneakyThrows
+    public void testGetPPLQueryWithTimeRangeEmptyTimeField() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
+            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
+        getPPLQueryWithTimeRangeMethod.setAccessible(true);
+        
+        String result = (String) getPPLQueryWithTimeRangeMethod.invoke(tool, "source=logs-*", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "");
+
+        assertEquals("source=logs-*", result);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetPPLQueryWithTimeRangeExistingWhere() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
+            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
+        getPPLQueryWithTimeRangeMethod.setAccessible(true);
+        
+        String result = (String) getPPLQueryWithTimeRangeMethod.invoke(tool, "source=logs-* | where status='error'", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
+        
+        assertEquals("source=logs-* | where status='error' AND `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00'", result);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testGetPPLQueryWithTimeRangeNoExistingWhere() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
+            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
+        getPPLQueryWithTimeRangeMethod.setAccessible(true);
+        
+        String result = (String) getPPLQueryWithTimeRangeMethod.invoke(tool, "source=logs-* | stats count() by status", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
+        
+        assertEquals("source=logs-* | WHERE `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00' | stats count() by status", result);
+    }
+
+
+    @Test
+    @SneakyThrows
+    public void testGetPPLQueryWithTimeRangeMultipleWhereClausesFirstOne() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+        
+        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
+            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
+        getPPLQueryWithTimeRangeMethod.setAccessible(true);
+        
+        String result = (String) getPPLQueryWithTimeRangeMethod.invoke(tool, "source=logs-* | where status='error' | stats count() | where count > 10", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
+        
+        assertEquals("source=logs-* | where status='error' AND `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00' | stats count() | where count > 10", result);
+    }
 }
