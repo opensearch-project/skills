@@ -666,7 +666,8 @@ public class DataDistributionTool implements Tool {
 
         String formattedStartTime = formatTimeForPPL(startTime);
         String formattedEndTime = formatTimeForPPL(endTime);
-        String timePredicate = String.format(Locale.ROOT, "`%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
+        String timePredicate = String
+            .format(Locale.ROOT, "`%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
 
         if (Strings.isEmpty(query)) {
             return "WHERE " + timePredicate;
