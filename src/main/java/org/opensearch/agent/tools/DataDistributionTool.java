@@ -885,19 +885,20 @@ public class DataDistributionTool implements Tool {
             return getFieldsFromData(data);
         }
 
-        Set<String> keywordFields = fieldTypes
-            .entrySet()
-            .stream()
-            .filter(entry -> USEFUL_FIELD_TYPES.contains(entry.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toSet());
+        Set<String> keywordFields = new HashSet<>();
+        Set<String> numberFields = new HashSet<>();
 
-        Set<String> numberFields = fieldTypes
-            .entrySet()
-            .stream()
-            .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toSet());
+        for (Map.Entry<String, String> entry : fieldTypes.entrySet()) {
+            String fieldType = entry.getValue();
+            String fieldName = entry.getKey();
+
+            if (USEFUL_FIELD_TYPES.contains(fieldType)) {
+                keywordFields.add(fieldName);
+            }
+            if (NUMBER_FIELD_TYPES.contains(fieldType)) {
+                numberFields.add(fieldName);
+            }
+        }
 
         Set<String> normalizedFields = keywordFields
             .stream()

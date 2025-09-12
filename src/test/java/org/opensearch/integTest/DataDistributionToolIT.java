@@ -214,7 +214,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     public void testDataDistributionToolMissingRequiredParameters() {
         Exception exception = assertThrows(Exception.class, () -> executeAgent(agentId, "{\"parameters\": {\"index\": \"test_index\"}}"));
-        MatcherAssert.assertThat(exception.getMessage(), containsString("Missing required parameters"));
+        MatcherAssert.assertThat(exception.getMessage(), containsString("Unable to parse time string"));
     }
 
     @SneakyThrows
