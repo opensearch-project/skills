@@ -142,9 +142,9 @@ public class DataDistributionTool implements Tool {
     private static final int DATA_FIELD_MAX_CARDINALITY = 10;
     private static final int DATA_FIELD_CARDINALITY_DIVISOR = 2;
     private static final int NUMERIC_GROUPING_THRESHOLD = 10;
-    private static final int NUMERIC_GROUP_COUNT = 5;
     private static final double PERCENTAGE_MULTIPLIER = 100.0;
     private static final int TOP_CHANGES_LIMIT = 10;
+    private static final int MAX_SIZE_LIMIT = 10000;
 
     public static final String DEFAULT_INPUT_SCHEMA = """
         {
@@ -231,6 +231,9 @@ public class DataDistributionTool implements Tool {
 
             try {
                 this.size = Integer.parseInt(parameters.getOrDefault(PARAM_SIZE, DEFAULT_SIZE));
+                if (this.size > MAX_SIZE_LIMIT) {
+                    throw new IllegalArgumentException("Size parameter exceeds maximum limit of " + MAX_SIZE_LIMIT + ", got: " + this.size);
+                }
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(
                     "Invalid 'size' parameter: must be a valid integer, got '" + parameters.get(PARAM_SIZE) + "'"

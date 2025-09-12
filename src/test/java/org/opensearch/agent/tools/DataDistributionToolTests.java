@@ -862,6 +862,33 @@ public class DataDistributionToolTests {
             );
     }
 
+    @Test
+    @SneakyThrows
+    public void testExecutionWithSizeExceedsMaxLimit() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "size",
+                        "15000"
+                    ),
+                ActionListener.<String>wrap(response -> fail("Should have failed with size exceeding limit"), e -> {
+                    MatcherAssert.assertThat(e.getMessage(), containsString("Size parameter exceeds maximum limit of 10000"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("got: 15000"));
+                })
+            );
+    }
+
     private void setupMockMappings() {
         Map<String, Object> indexMappings = Map
             .of(
