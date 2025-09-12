@@ -347,7 +347,7 @@ public class DataDistributionTool implements Tool {
             listener.onFailure(e);
         } catch (Exception e) {
             log.error("Unexpected error in DataDistributionTool", e);
-            listener.onFailure(new RuntimeException("Failed to execute data distribution analysis: " + e.getMessage(), e));
+            listener.onFailure(e);
         }
     }
 
