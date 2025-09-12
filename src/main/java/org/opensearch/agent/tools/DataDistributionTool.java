@@ -1147,84 +1147,104 @@ public class DataDistributionTool implements Tool {
             Object value = entry.getValue();
 
             if (value instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> nestedMap = (Map<String, Object>) value;
-                for (Map.Entry<String, Object> nestedEntry : nestedMap.entrySet()) {
-                    String operator = nestedEntry.getKey();
-                    Object operatorValue = nestedEntry.getValue();
-
-                    switch (operator) {
-                        case "term":
-                            queryBuilder.must(QueryBuilders.termQuery(field, operatorValue));
-                            break;
-                        case "range":
-                            if (operatorValue instanceof Map) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> rangeMap = (Map<String, Object>) operatorValue;
-                                RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(field);
-                                rangeMap.forEach((rangeOp, rangeVal) -> {
-                                    switch (rangeOp) {
-                                        case "gte":
-                                            rangeQuery.gte(rangeVal);
-                                            break;
-                                        case "lte":
-                                            rangeQuery.lte(rangeVal);
-                                            break;
-                                        case "gt":
-                                            rangeQuery.gt(rangeVal);
-                                            break;
-                                        case "lt":
-                                            rangeQuery.lt(rangeVal);
-                                            break;
-                                    }
-                                });
-                                queryBuilder.must(rangeQuery);
-                            }
-                            break;
-                        case "match":
-                            queryBuilder.must(QueryBuilders.matchQuery(field, operatorValue));
-                            break;
-                        case "match_phrase":
-                            queryBuilder.must(QueryBuilders.matchPhraseQuery(field, operatorValue));
-                            break;
-                        case "prefix":
-                            queryBuilder.must(QueryBuilders.prefixQuery(field, operatorValue.toString()));
-                            break;
-                        case "wildcard":
-                            if (operatorValue instanceof Map) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> wildcardMap = (Map<String, Object>) operatorValue;
-                                Object wildcardValue = wildcardMap.get("value");
-                                if (wildcardValue != null) {
-                                    queryBuilder.must(QueryBuilders.wildcardQuery(field, wildcardValue.toString()));
-                                }
-                            } else {
-                                queryBuilder.must(QueryBuilders.wildcardQuery(field, operatorValue.toString()));
-                            }
-                            break;
-                        case "exists":
-                            queryBuilder.must(QueryBuilders.existsQuery(field));
-                            break;
-                        case "regexp":
-                            if (operatorValue instanceof Map) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> regexpMap = (Map<String, Object>) operatorValue;
-                                Object regexpValue = regexpMap.get("value");
-                                if (regexpValue != null) {
-                                    queryBuilder.must(QueryBuilders.regexpQuery(field, regexpValue.toString()));
-                                }
-                            } else {
-                                queryBuilder.must(QueryBuilders.regexpQuery(field, operatorValue.toString()));
-                            }
-                            break;
-                        default:
-                            log.warn("Unsupported query operator: {}", operator);
-                            break;
-                    }
-                }
+                processNestedQuery(field, (Map<String, Object>) value, queryBuilder);
             } else {
                 queryBuilder.must(QueryBuilders.termQuery(field, value));
             }
+        }
+    }
+
+    /**
+     * Processes nested query conditions for a field
+     *
+     * @param field Field name
+     * @param nestedMap Nested query conditions
+     * @param queryBuilder Query builder to add conditions to
+     */
+    private void processNestedQuery(String field, Map<String, Object> nestedMap, BoolQueryBuilder queryBuilder) {
+        for (Map.Entry<String, Object> nestedEntry : nestedMap.entrySet()) {
+            String operator = nestedEntry.getKey();
+            Object operatorValue = nestedEntry.getValue();
+
+            switch (operator) {
+                case "term" -> queryBuilder.must(QueryBuilders.termQuery(field, operatorValue));
+                case "range" -> processRangeQuery(field, operatorValue, queryBuilder);
+                case "match" -> queryBuilder.must(QueryBuilders.matchQuery(field, operatorValue));
+                case "match_phrase" -> queryBuilder.must(QueryBuilders.matchPhraseQuery(field, operatorValue));
+                case "prefix" -> queryBuilder.must(QueryBuilders.prefixQuery(field, operatorValue.toString()));
+                case "wildcard" -> processWildcardQuery(field, operatorValue, queryBuilder);
+                case "exists" -> queryBuilder.must(QueryBuilders.existsQuery(field));
+                case "regexp" -> processRegexpQuery(field, operatorValue, queryBuilder);
+                default -> log.warn("Unsupported query operator: {}", operator);
+            }
+        }
+    }
+
+    /**
+     * Processes range query conditions
+     *
+     * @param field Field name
+     * @param operatorValue Range conditions
+     * @param queryBuilder Query builder to add conditions to
+     */
+    private void processRangeQuery(String field, Object operatorValue, BoolQueryBuilder queryBuilder) {
+        if (!(operatorValue instanceof Map)) {
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rangeMap = (Map<String, Object>) operatorValue;
+        RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(field);
+
+        rangeMap.forEach((rangeOp, rangeVal) -> {
+            switch (rangeOp) {
+                case "gte" -> rangeQuery.gte(rangeVal);
+                case "lte" -> rangeQuery.lte(rangeVal);
+                case "gt" -> rangeQuery.gt(rangeVal);
+                case "lt" -> rangeQuery.lt(rangeVal);
+            }
+        });
+
+        queryBuilder.must(rangeQuery);
+    }
+
+    /**
+     * Processes wildcard query conditions
+     *
+     * @param field Field name
+     * @param operatorValue Wildcard conditions
+     * @param queryBuilder Query builder to add conditions to
+     */
+    private void processWildcardQuery(String field, Object operatorValue, BoolQueryBuilder queryBuilder) {
+        if (operatorValue instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> wildcardMap = (Map<String, Object>) operatorValue;
+            Object wildcardValue = wildcardMap.get("value");
+            if (wildcardValue != null) {
+                queryBuilder.must(QueryBuilders.wildcardQuery(field, wildcardValue.toString()));
+            }
+        } else {
+            queryBuilder.must(QueryBuilders.wildcardQuery(field, operatorValue.toString()));
+        }
+    }
+
+    /**
+     * Processes regexp query conditions
+     *
+     * @param field Field name
+     * @param operatorValue Regexp conditions
+     * @param queryBuilder Query builder to add conditions to
+     */
+    private void processRegexpQuery(String field, Object operatorValue, BoolQueryBuilder queryBuilder) {
+        if (operatorValue instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> regexpMap = (Map<String, Object>) operatorValue;
+            Object regexpValue = regexpMap.get("value");
+            if (regexpValue != null) {
+                queryBuilder.must(QueryBuilders.regexpQuery(field, regexpValue.toString()));
+            }
+        } else {
+            queryBuilder.must(QueryBuilders.regexpQuery(field, operatorValue.toString()));
         }
     }
 
