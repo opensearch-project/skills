@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.PPLExecuteHelper;
@@ -1061,14 +1062,7 @@ public class DataDistributionTool implements Tool {
         Set<String> allKeys = new HashSet<>(selectionDist.keySet());
         allKeys.addAll(baselineDist.keySet());
 
-        if (allKeys.size() <= NUMERIC_GROUPING_THRESHOLD || !allKeys.stream().allMatch(key -> {
-            try {
-                Double.parseDouble(key);
-                return true;
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        })) {
+        if (allKeys.size() <= NUMERIC_GROUPING_THRESHOLD || allKeys.stream().anyMatch(key -> !NumberUtils.isCreatable(key))) {
             return new GroupedDistributions(selectionDist, baselineDist);
         }
 
