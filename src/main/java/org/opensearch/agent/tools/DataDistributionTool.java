@@ -83,12 +83,20 @@ import lombok.extern.log4j.Log4j2;
  * }
  * 3. Result: analysis of data distribution patterns
  * {
- *   "inference_results": [
+ *   "comparisonAnalysis": [
  *     {
- *       "output": [
+ *       "field": "status",
+ *       "divergence": 0.2,
+ *       "topChanges": [
  *         {
- *           "name": "response",
- *           "result": """{"comparisonAnalysis": [{"field": "status", "divergence": 0.75, "selectionDist": {"error": 0.3}, "baselineDist": {"error": 0.1}}]}"""
+ *           "value": "error",
+ *           "selectionPercentage": 0.3,
+ *           "baselinePercentage": 0.1
+ *         },
+ *         {
+ *           "value": "success",
+ *           "selectionPercentage": 0.7,
+ *           "baselinePercentage": 0.9
  *         }
  *       ]
  *     }
