@@ -670,6 +670,9 @@ public class DataDistributionTool implements Tool {
      * @return PPL query with time range filter added
      */
     private String getPPLQueryWithTimeRange(String query, String startTime, String endTime, String timeField) {
+        if (Strings.isEmpty(query)) {
+            throw new IllegalArgumentException("PPL query cannot be empty");
+        }
         if (Strings.isEmpty(timeField)) {
             return query;
         }
@@ -678,10 +681,6 @@ public class DataDistributionTool implements Tool {
         String formattedEndTime = formatTimeForPPL(endTime);
         String timePredicate = String
             .format(Locale.ROOT, "`%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
-
-        if (Strings.isEmpty(query)) {
-            return "WHERE " + timePredicate;
-        }
 
         String[] commands = query.split("\\|");
         for (int i = 0; i < commands.length; i++) {
