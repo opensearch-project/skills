@@ -106,6 +106,20 @@ public class DataDistributionTool implements Tool {
         "This tool analyzes data distribution differences between time ranges or provides single dataset insights.";
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
 
+    private static final String PARAM_INDEX = "index";
+    private static final String PARAM_TIME_FIELD = "timeField";
+    private static final String PARAM_SELECTION_TIME_RANGE_START = "selectionTimeRangeStart";
+    private static final String PARAM_SELECTION_TIME_RANGE_END = "selectionTimeRangeEnd";
+    private static final String PARAM_BASELINE_TIME_RANGE_START = "baselineTimeRangeStart";
+    private static final String PARAM_BASELINE_TIME_RANGE_END = "baselineTimeRangeEnd";
+    private static final String PARAM_SIZE = "size";
+    private static final String PARAM_QUERY_TYPE = "queryType";
+    private static final String PARAM_FILTER = "filter";
+    private static final String QUERY_TYPE_PPL = "ppl";
+    private static final String QUERY_TYPE_DSL = "dsl";
+    private static final String DEFAULT_SIZE = "1000";
+    private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ss";
+
     private static final Set<String> USEFUL_FIELD_TYPES = Set
         .of("keyword", "boolean", "text", "byte", "short", "integer", "long", "float", "double", "half_float", "scaled_float");
     private static final Set<String> NUMBER_FIELD_TYPES = Set
@@ -187,24 +201,24 @@ public class DataDistributionTool implements Tool {
          * @param parameters Input parameter map from user request
          */
         AnalysisParameters(Map<String, String> parameters) {
-            this.index = parameters.getOrDefault("index", "");
-            this.timeField = parameters.getOrDefault("timeField", DEFAULT_TIME_FIELD);
-            this.selectionTimeRangeStart = parameters.getOrDefault("selectionTimeRangeStart", "");
-            this.selectionTimeRangeEnd = parameters.getOrDefault("selectionTimeRangeEnd", "");
-            this.baselineTimeRangeStart = parameters.getOrDefault("baselineTimeRangeStart", "");
-            this.baselineTimeRangeEnd = parameters.getOrDefault("baselineTimeRangeEnd", "");
+            this.index = parameters.getOrDefault(PARAM_INDEX, "");
+            this.timeField = parameters.getOrDefault(PARAM_TIME_FIELD, DEFAULT_TIME_FIELD);
+            this.selectionTimeRangeStart = parameters.getOrDefault(PARAM_SELECTION_TIME_RANGE_START, "");
+            this.selectionTimeRangeEnd = parameters.getOrDefault(PARAM_SELECTION_TIME_RANGE_END, "");
+            this.baselineTimeRangeStart = parameters.getOrDefault(PARAM_BASELINE_TIME_RANGE_START, "");
+            this.baselineTimeRangeEnd = parameters.getOrDefault(PARAM_BASELINE_TIME_RANGE_END, "");
 
             try {
-                this.size = Integer.parseInt(parameters.getOrDefault("size", "1000"));
+                this.size = Integer.parseInt(parameters.getOrDefault(PARAM_SIZE, DEFAULT_SIZE));
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(
-                    "Invalid 'size' parameter: must be a valid integer, got '" + parameters.get("size") + "'"
+                    "Invalid 'size' parameter: must be a valid integer, got '" + parameters.get(PARAM_SIZE) + "'"
                 );
             }
 
-            this.queryType = parameters.getOrDefault("queryType", "dsl");
+            this.queryType = parameters.getOrDefault(PARAM_QUERY_TYPE, QUERY_TYPE_DSL);
 
-            String filterParam = parameters.getOrDefault("filter", "");
+            String filterParam = parameters.getOrDefault(PARAM_FILTER, "");
             if (Strings.isEmpty(filterParam)) {
                 this.filter = List.of();
             } else {
@@ -219,7 +233,7 @@ public class DataDistributionTool implements Tool {
                 }
             }
 
-            this.ppl = parameters.getOrDefault("ppl", "");
+            this.ppl = parameters.getOrDefault(QUERY_TYPE_PPL, "");
         }
 
         /**
@@ -230,13 +244,13 @@ public class DataDistributionTool implements Tool {
         void validate() {
             List<String> missingParams = new ArrayList<>();
             if (Strings.isEmpty(index))
-                missingParams.add("index");
+                missingParams.add(PARAM_INDEX);
             if (Strings.isEmpty(selectionTimeRangeStart))
-                missingParams.add("selectionTimeRangeStart");
+                missingParams.add(PARAM_SELECTION_TIME_RANGE_START);
             if (Strings.isEmpty(selectionTimeRangeEnd))
-                missingParams.add("selectionTimeRangeEnd");
+                missingParams.add(PARAM_SELECTION_TIME_RANGE_END);
             if (Strings.isEmpty(timeField))
-                missingParams.add("timeField");
+                missingParams.add(PARAM_TIME_FIELD);
             if (!missingParams.isEmpty()) {
                 throw new IllegalArgumentException("Missing required parameters: " + String.join(", ", missingParams));
             }
@@ -322,7 +336,7 @@ public class DataDistributionTool implements Tool {
             AnalysisParameters params = new AnalysisParameters(parameters);
             params.validate();
 
-            if ("ppl".equals(params.queryType)) {
+            if (QUERY_TYPE_PPL.equals(params.queryType)) {
                 executePPLAnalysis(params, listener);
             } else {
                 executeDSLAnalysis(params, listener);
@@ -479,7 +493,7 @@ public class DataDistributionTool implements Tool {
 
         // Try parsing as local time without zone
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN, Locale.ROOT);
             LocalDateTime localDateTime = LocalDateTime.parse(timeString, formatter);
             ZonedDateTime zonedDateTime = localDateTime.atOffset(ZoneOffset.UTC).toZonedDateTime();
             return zonedDateTime.format(DateTimeFormatter.ISO_INSTANT);
@@ -635,7 +649,7 @@ public class DataDistributionTool implements Tool {
         } catch (DateTimeParseException e) {
             // Try parsing as local time without zone
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN, Locale.ROOT);
                 LocalDateTime localDateTime = LocalDateTime.parse(timeString, formatter);
                 return localDateTime.format(formatter);
             } catch (DateTimeParseException e2) {
