@@ -963,6 +963,10 @@ public class DataDistributionTool implements Tool {
      * @return Map of field values to their relative frequencies
      */
     private Map<String, Double> calculateFieldDistribution(List<Map<String, Object>> data, String field) {
+        if (data.isEmpty()) {
+            return new HashMap<>();
+        }
+
         Map<String, Integer> counts = new HashMap<>();
 
         for (Map<String, Object> doc : data) {
@@ -971,10 +975,6 @@ public class DataDistributionTool implements Tool {
                 String strValue = String.valueOf(value);
                 counts.merge(strValue, 1, Integer::sum);
             }
-        }
-
-        if (data.isEmpty()) {
-            return new HashMap<>();
         }
         return counts.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> (double) entry.getValue() / data.size()));
     }
