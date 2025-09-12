@@ -1067,36 +1067,46 @@ public class DataDistributionTool implements Tool {
         }
 
         List<Double> numericKeys = allKeys.stream().map(Double::parseDouble).sorted().collect(Collectors.toList());
+        Function<Double, String> getGroupLabel = getDoubleStringFunction(numericKeys);
+        // Group the keys and aggregate the values
+        Map<String, Double> groupedSelectionDist = numericKeys
+            .stream()
+            .collect(
+                Collectors
+                    .groupingBy(getGroupLabel, Collectors.summingDouble(numKey -> selectionDist.getOrDefault(String.valueOf(numKey), 0.0)))
+            );
+        Map<String, Double> groupedBaselineDist = numericKeys
+            .stream()
+            .collect(
+                Collectors
+                    .groupingBy(getGroupLabel, Collectors.summingDouble(numKey -> baselineDist.getOrDefault(String.valueOf(numKey), 0.0)))
+            );
+        // Ensure all groups are present in both maps (in case some have zero values)
+        Set<String> allGroups = new HashSet<>();
+        allGroups.addAll(groupedSelectionDist.keySet());
+        allGroups.addAll(groupedBaselineDist.keySet());
+        allGroups.forEach(group -> {
+            groupedSelectionDist.putIfAbsent(group, 0.0);
+            groupedBaselineDist.putIfAbsent(group, 0.0);
+        });
+
+        return new GroupedDistributions(groupedSelectionDist, groupedBaselineDist);
+    }
+
+    private static Function<Double, String> getDoubleStringFunction(List<Double> numericKeys) {
         double min = numericKeys.get(0);
         double max = numericKeys.get(numericKeys.size() - 1);
         double range = max - min;
-        int numGroups = NUMERIC_GROUP_COUNT;
+        int numGroups = 5;
         double groupSize = range / numGroups;
-
-        Map<String, Double> groupedSelectionDist = new HashMap<>();
-        Map<String, Double> groupedBaselineDist = new HashMap<>();
-
-        for (int i = 0; i < numGroups; i++) {
-            double lowerBound = min + i * groupSize;
-            double upperBound = i == numGroups - 1 ? max : min + (i + 1) * groupSize;
-            String groupLabel = String.format(Locale.ROOT, "%.1f-%.1f", lowerBound, upperBound);
-
-            groupedSelectionDist.put(groupLabel, 0.0);
-            groupedBaselineDist.put(groupLabel, 0.0);
-
-            for (double numKey : numericKeys) {
-                boolean belongs = i == numGroups - 1
-                    ? numKey >= lowerBound && numKey <= upperBound
-                    : numKey >= lowerBound && numKey < upperBound;
-                if (belongs) {
-                    String strKey = String.valueOf(numKey);
-                    groupedSelectionDist.merge(groupLabel, selectionDist.getOrDefault(strKey, 0.0), Double::sum);
-                    groupedBaselineDist.merge(groupLabel, baselineDist.getOrDefault(strKey, 0.0), Double::sum);
-                }
-            }
-        }
-
-        return new GroupedDistributions(groupedSelectionDist, groupedBaselineDist);
+        // Create a function to determine which group a key belongs to
+        Function<Double, String> getGroupLabel = numKey -> {
+            int groupIndex = numKey == max ? numGroups - 1 : (int) ((numKey - min) / groupSize);
+            double lowerBound = min + groupIndex * groupSize;
+            double upperBound = groupIndex == numGroups - 1 ? max : min + (groupIndex + 1) * groupSize;
+            return String.format(Locale.ROOT, "%.1f-%.1f", lowerBound, upperBound);
+        };
+        return getGroupLabel;
     }
 
     /**
