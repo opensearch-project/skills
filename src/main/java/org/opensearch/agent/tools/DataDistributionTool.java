@@ -354,7 +354,7 @@ public class DataDistributionTool implements Tool {
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
         try {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
-            log.info("Starting data distribution analysis with parameters: {}", parameters.keySet());
+            log.debug("Starting data distribution analysis with parameters: {}", parameters.keySet());
             AnalysisParameters params = new AnalysisParameters(parameters);
 
             if (QUERY_TYPE_PPL.equals(params.queryType)) {
@@ -972,7 +972,7 @@ public class DataDistributionTool implements Tool {
      * @return Map of field values to their relative frequencies
      */
     private Map<String, Double> calculateFieldDistribution(List<Map<String, Object>> data, String field) {
-        if (data.isEmpty()) {
+        if (data == null || data.isEmpty()) {
             return new HashMap<>();
         }
 

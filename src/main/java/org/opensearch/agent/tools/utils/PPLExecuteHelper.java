@@ -104,7 +104,7 @@ public class PPLExecuteHelper {
             @SuppressWarnings("unchecked")
             List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
             if (dataRows.isEmpty()) {
-                log.warn("PPL query returned no data rows for the specified criteria");
+                log.debug("PPL query returned no data rows for the specified criteria");
             }
             return rowParser.apply(dataRows);
         };
