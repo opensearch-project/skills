@@ -575,7 +575,7 @@ public class DataDistributionToolTests {
                 ActionListener
                     .<String>wrap(
                         response -> fail("Should have failed with invalid parameters"),
-                        e -> MatcherAssert.assertThat(e.getMessage(), containsString("Missing required parameters"))
+                        e -> MatcherAssert.assertThat(e.getMessage(), containsString("Invalid time format"))
                     )
             );
     }

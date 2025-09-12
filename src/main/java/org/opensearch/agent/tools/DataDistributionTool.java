@@ -335,7 +335,6 @@ public class DataDistributionTool implements Tool {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
             log.info("Starting data distribution analysis with parameters: {}", parameters.keySet());
             AnalysisParameters params = new AnalysisParameters(parameters);
-            params.validate();
 
             if (QUERY_TYPE_PPL.equals(params.queryType)) {
                 executePPLAnalysis(params, listener);
