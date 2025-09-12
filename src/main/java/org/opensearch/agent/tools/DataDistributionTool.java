@@ -315,6 +315,7 @@ public class DataDistributionTool implements Tool {
         try {
             new AnalysisParameters(map).validate();
         } catch (Exception e) {
+            log.error("Failed to validate the data distribution analysis parameter: {}", e.getMessage());
             return false;
         }
         return true;
