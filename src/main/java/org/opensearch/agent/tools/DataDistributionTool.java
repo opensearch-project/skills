@@ -400,8 +400,9 @@ public class DataDistributionTool implements Tool {
 
             PPLExecuteHelper.executePPLAndParseResult(client, pplQuery, pplResultParser, ActionListener.wrap(data -> {
                 try {
-                    List<SummaryDataItem> result = analyzeSingleDataset(data, params.index);
-                    listener.onResponse((T) gson.toJson(Map.of("singleAnalysis", result)));
+                    analyzeSingleDataset(data, params.index, ActionListener.wrap(result -> {
+                        listener.onResponse((T) gson.toJson(Map.of("singleAnalysis", result)));
+                    }, listener::onFailure));
                 } catch (Exception e) {
                     listener.onFailure(e);
                 }
@@ -441,8 +442,9 @@ public class DataDistributionTool implements Tool {
                     if (baselineData.isEmpty()) {
                         throw new IllegalStateException("No data found for baseline time range");
                     }
-                    List<SummaryDataItem> result = getComparisonDataDistribution(selectionData, baselineData, params.index);
-                    listener.onResponse((T) gson.toJson(Map.of("comparisonAnalysis", result)));
+                    getComparisonDataDistribution(selectionData, baselineData, params.index, ActionListener.wrap(result -> {
+                        listener.onResponse((T) gson.toJson(Map.of("comparisonAnalysis", result)));
+                    }, listener::onFailure));
                 } catch (Exception e) {
                     listener.onFailure(e);
                 }
@@ -463,8 +465,9 @@ public class DataDistributionTool implements Tool {
                 if (data.isEmpty()) {
                     throw new IllegalStateException("No data found for selection time range");
                 }
-                List<SummaryDataItem> result = analyzeSingleDataset(data, params.index);
-                listener.onResponse((T) gson.toJson(Map.of("singleAnalysis", result)));
+                analyzeSingleDataset(data, params.index, ActionListener.wrap(result -> {
+                    listener.onResponse((T) gson.toJson(Map.of("singleAnalysis", result)));
+                }, listener::onFailure));
             } catch (Exception e) {
                 listener.onFailure(e);
             }
@@ -627,8 +630,9 @@ public class DataDistributionTool implements Tool {
                     if (baselineData.isEmpty()) {
                         throw new IllegalStateException("No data found for baseline time range");
                     }
-                    List<SummaryDataItem> result = getComparisonDataDistribution(selectionData, baselineData, params.index);
-                    listener.onResponse((T) gson.toJson(Map.of("comparisonAnalysis", result)));
+                    getComparisonDataDistribution(selectionData, baselineData, params.index, ActionListener.wrap(result -> {
+                        listener.onResponse((T) gson.toJson(Map.of("comparisonAnalysis", result)));
+                    }, listener::onFailure));
                 } catch (Exception e) {
                     listener.onFailure(e);
                 }
@@ -733,34 +737,40 @@ public class DataDistributionTool implements Tool {
      * @param selectionData Data from the selection time period
      * @param baselineData Data from the baseline time period
      * @param index Index name for field mapping retrieval
-     * @return List of summary data items showing distribution differences
+     * @param listener Action listener for handling comparison results
      */
-    private List<SummaryDataItem> getComparisonDataDistribution(
+    private void getComparisonDataDistribution(
         List<Map<String, Object>> selectionData,
         List<Map<String, Object>> baselineData,
-        String index
+        String index,
+        ActionListener<List<SummaryDataItem>> listener
     ) {
-        Map<String, String> fieldTypes = getFieldTypes(index);
-        List<String> usefulFields = getUsefulFields(selectionData, fieldTypes);
-        Set<String> numberFields = getNumberFields(fieldTypes);
-        List<FieldAnalysis> analyses = new ArrayList<>();
+        getFieldTypes(index, ActionListener.wrap(fieldTypes -> {
+            try {
+                List<String> usefulFields = getUsefulFields(selectionData, fieldTypes);
+                Set<String> numberFields = getNumberFields(fieldTypes);
+                List<FieldAnalysis> analyses = new ArrayList<>();
 
-        for (String field : usefulFields) {
-            Map<String, Double> selectionDist = calculateFieldDistribution(selectionData, field);
-            Map<String, Double> baselineDist = calculateFieldDistribution(baselineData, field);
+                for (String field : usefulFields) {
+                    Map<String, Double> selectionDist = calculateFieldDistribution(selectionData, field);
+                    Map<String, Double> baselineDist = calculateFieldDistribution(baselineData, field);
 
-            if (numberFields.contains(field)) {
-                GroupedDistributions grouped = groupNumericKeys(selectionDist, baselineDist);
-                selectionDist = grouped.groupedSelectionDist();
-                baselineDist = grouped.groupedBaselineDist();
+                    if (numberFields.contains(field)) {
+                        GroupedDistributions grouped = groupNumericKeys(selectionDist, baselineDist);
+                        selectionDist = grouped.groupedSelectionDist();
+                        baselineDist = grouped.groupedBaselineDist();
+                    }
+
+                    double divergence = calculateMaxDifference(selectionDist, baselineDist);
+                    analyses.add(new FieldAnalysis(field, divergence, selectionDist, baselineDist));
+                }
+
+                analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
+                listener.onResponse(formatComparisonSummary(analyses, 10));
+            } catch (Exception e) {
+                listener.onFailure(e);
             }
-
-            double divergence = calculateMaxDifference(selectionDist, baselineDist);
-            analyses.add(new FieldAnalysis(field, divergence, selectionDist, baselineDist));
-        }
-
-        analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
-        return formatComparisonSummary(analyses, 10);
+        }, listener::onFailure));
     }
 
     /**
@@ -768,29 +778,34 @@ public class DataDistributionTool implements Tool {
      *
      * @param data Dataset to analyze
      * @param index Index name for field mapping retrieval
-     * @return List of summary data items showing distribution patterns
+     * @param listener Action listener for handling single analysis results
      */
-    private List<SummaryDataItem> analyzeSingleDataset(List<Map<String, Object>> data, String index) {
-        Map<String, String> fieldTypes = getFieldTypes(index);
-        List<String> usefulFields = getUsefulFields(data, fieldTypes);
-        Set<String> numberFields = getNumberFields(fieldTypes);
-        List<FieldAnalysis> analyses = new ArrayList<>();
+    private void analyzeSingleDataset(List<Map<String, Object>> data, String index, ActionListener<List<SummaryDataItem>> listener) {
+        getFieldTypes(index, ActionListener.wrap(fieldTypes -> {
+            try {
+                List<String> usefulFields = getUsefulFields(data, fieldTypes);
+                Set<String> numberFields = getNumberFields(fieldTypes);
+                List<FieldAnalysis> analyses = new ArrayList<>();
 
-        for (String field : usefulFields) {
-            Map<String, Double> selectionDist = calculateFieldDistribution(data, field);
-            Map<String, Double> baselineDist = new HashMap<>();
+                for (String field : usefulFields) {
+                    Map<String, Double> selectionDist = calculateFieldDistribution(data, field);
+                    Map<String, Double> baselineDist = new HashMap<>();
 
-            if (numberFields.contains(field)) {
-                GroupedDistributions grouped = groupNumericKeys(selectionDist, baselineDist);
-                selectionDist = grouped.groupedSelectionDist();
+                    if (numberFields.contains(field)) {
+                        GroupedDistributions grouped = groupNumericKeys(selectionDist, baselineDist);
+                        selectionDist = grouped.groupedSelectionDist();
+                    }
+
+                    double divergence = calculateMaxDifference(selectionDist, baselineDist);
+                    analyses.add(new FieldAnalysis(field, divergence, selectionDist, baselineDist));
+                }
+
+                analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
+                listener.onResponse(formatComparisonSummary(analyses, 30));
+            } catch (Exception e) {
+                listener.onFailure(e);
             }
-
-            double divergence = calculateMaxDifference(selectionDist, baselineDist);
-            analyses.add(new FieldAnalysis(field, divergence, selectionDist, baselineDist));
-        }
-
-        analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
-        return formatComparisonSummary(analyses, 30);
+        }, listener::onFailure));
     }
 
     /**
@@ -809,32 +824,40 @@ public class DataDistributionTool implements Tool {
      * Gets field type mappings from index
      *
      * @param index Index name for mapping retrieval
-     * @return Map of field names to their types
+     * @param listener Action listener for handling field types result
      */
-    private Map<String, String> getFieldTypes(String index) {
+    private void getFieldTypes(String index, ActionListener<Map<String, String>> listener) {
         try {
             GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
-            var getMappingsActionFuture = client.admin().indices().getMappings(getMappingsRequest);
-            if (getMappingsActionFuture == null) {
-                return Map.of();
-            }
-            Map<String, MappingMetadata> mappings = getMappingsActionFuture.actionGet(5000).getMappings();
-            if (mappings.isEmpty()) {
-                return Map.of();
-            }
+            client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(response -> {
+                try {
+                    Map<String, MappingMetadata> mappings = response.getMappings();
+                    if (mappings.isEmpty()) {
+                        listener.onResponse(Map.of());
+                        return;
+                    }
 
-            MappingMetadata mappingMetadata = mappings.values().iterator().next();
-            Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-            if (mappingSource == null) {
-                return Map.of();
-            }
+                    MappingMetadata mappingMetadata = mappings.values().iterator().next();
+                    Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+                    if (mappingSource == null) {
+                        listener.onResponse(Map.of());
+                        return;
+                    }
 
-            Map<String, String> fieldsToType = new HashMap<>();
-            ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
-            return fieldsToType;
+                    Map<String, String> fieldsToType = new HashMap<>();
+                    ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
+                    listener.onResponse(fieldsToType);
+                } catch (Exception e) {
+                    log.error("Failed to process field types for index: {}", index, e);
+                    listener.onResponse(Map.of());
+                }
+            }, e -> {
+                log.error("Failed to get field types for index: {}", index, e);
+                listener.onResponse(Map.of());
+            }));
         } catch (Exception e) {
-            log.error("Failed to get field types for index: {}", index, e);
-            return Map.of();
+            log.error("Failed to create getMappings request for index: {}", index, e);
+            listener.onResponse(Map.of());
         }
     }
 

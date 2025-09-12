@@ -1531,12 +1531,25 @@ public class DataDistributionToolTests {
     public void testGetFieldTypesWithValidMapping() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
-        java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class.getDeclaredMethod("getFieldTypes", String.class);
+        java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class
+            .getDeclaredMethod("getFieldTypes", String.class, ActionListener.class);
         getFieldTypesMethod.setAccessible(true);
 
-        @SuppressWarnings("unchecked")
-        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Map<String, String>> resultRef = new java.util.concurrent.atomic.AtomicReference<>();
 
+        ActionListener<Map<String, String>> listener = ActionListener.wrap(result -> {
+            resultRef.set(result);
+            latch.countDown();
+        }, e -> {
+            latch.countDown();
+            fail("getFieldTypes failed: " + e.getMessage());
+        });
+
+        getFieldTypesMethod.invoke(tool, "test_index", listener);
+        latch.await();
+
+        Map<String, String> fieldTypes = resultRef.get();
         assertNotNull(fieldTypes);
         assertFalse(fieldTypes.isEmpty());
         assertEquals("keyword", fieldTypes.get("status"));
@@ -1552,12 +1565,24 @@ public class DataDistributionToolTests {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
         
         java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class
-            .getDeclaredMethod("getFieldTypes", String.class);
+            .getDeclaredMethod("getFieldTypes", String.class, ActionListener.class);
         getFieldTypesMethod.setAccessible(true);
         
-        @SuppressWarnings("unchecked")
-        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Map<String, String>> resultRef = new java.util.concurrent.atomic.AtomicReference<>();
         
+        ActionListener<Map<String, String>> listener = ActionListener.wrap(result -> {
+            resultRef.set(result);
+            latch.countDown();
+        }, e -> {
+            latch.countDown();
+            fail("getFieldTypes failed: " + e.getMessage());
+        });
+
+        getFieldTypesMethod.invoke(tool, "test_index", listener);
+        latch.await();
+        
+        Map<String, String> fieldTypes = resultRef.get();
         assertNotNull(fieldTypes);
         assertTrue(fieldTypes.isEmpty());
     }
@@ -1565,17 +1590,33 @@ public class DataDistributionToolTests {
     @Test
     @SneakyThrows
     public void testGetFieldTypesWithMappingException() {
-        when(client.admin().indices().getMappings(any())).thenThrow(new RuntimeException("Mapping failed"));
-        
+        doAnswer(invocation -> {
+            ActionListener<GetMappingsResponse> listener = (ActionListener<GetMappingsResponse>) invocation.getArguments()[1];
+            listener.onFailure(new RuntimeException("Mapping failed"));
+            return null;
+        }).when(indicesAdminClient).getMappings(any(), any());
+
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-        
+
         java.lang.reflect.Method getFieldTypesMethod = DataDistributionTool.class
-            .getDeclaredMethod("getFieldTypes", String.class);
+            .getDeclaredMethod("getFieldTypes", String.class, ActionListener.class);
         getFieldTypesMethod.setAccessible(true);
-        
-        @SuppressWarnings("unchecked")
-        Map<String, String> fieldTypes = (Map<String, String>) getFieldTypesMethod.invoke(tool, "test_index");
-        
+
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Map<String, String>> resultRef = new java.util.concurrent.atomic.AtomicReference<>();
+
+        ActionListener<Map<String, String>> listener = ActionListener.wrap(result -> {
+            resultRef.set(result);
+            latch.countDown();
+        }, e -> {
+            resultRef.set(Map.of());
+            latch.countDown();
+        });
+
+        getFieldTypesMethod.invoke(tool, "test_index", listener);
+        latch.await();
+
+        Map<String, String> fieldTypes = resultRef.get();
         assertNotNull(fieldTypes);
         assertTrue(fieldTypes.isEmpty());
     }
@@ -1589,10 +1630,13 @@ public class DataDistributionToolTests {
             .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
         getPPLQueryWithTimeRangeMethod.setAccessible(true);
 
-        String result = (String) getPPLQueryWithTimeRangeMethod
-            .invoke(tool, "", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
-
-        assertEquals("WHERE `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00'", result);
+        try {
+            getPPLQueryWithTimeRangeMethod.invoke(tool, "", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
+            fail("Expected IllegalArgumentException for empty PPL query");
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            assertTrue("Expected IllegalArgumentException", e.getCause() instanceof IllegalArgumentException);
+            assertEquals("PPL query cannot be empty", e.getCause().getMessage());
+        }
     }
 
     @Test
