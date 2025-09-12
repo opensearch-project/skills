@@ -125,6 +125,18 @@ public class DataDistributionTool implements Tool {
     private static final Set<String> NUMBER_FIELD_TYPES = Set
         .of("byte", "short", "integer", "long", "float", "double", "half_float", "scaled_float");
 
+    private static final int DEFAULT_COMPARISON_RESULT_LIMIT = 10;
+    private static final int DEFAULT_SINGLE_ANALYSIS_RESULT_LIMIT = 30;
+    private static final int MIN_CARDINALITY_DIVISOR = 4;
+    private static final int MIN_CARDINALITY_BASE = 5;
+    private static final int ID_FIELD_MAX_CARDINALITY = 30;
+    private static final int DATA_FIELD_MAX_CARDINALITY = 10;
+    private static final int DATA_FIELD_CARDINALITY_DIVISOR = 2;
+    private static final int NUMERIC_GROUPING_THRESHOLD = 10;
+    private static final int NUMERIC_GROUP_COUNT = 5;
+    private static final double PERCENTAGE_MULTIPLIER = 100.0;
+    private static final int TOP_CHANGES_LIMIT = 10;
+
     public static final String DEFAULT_INPUT_SCHEMA = """
         {
             "type": "object",
@@ -765,7 +777,7 @@ public class DataDistributionTool implements Tool {
                 }
 
                 analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
-                listener.onResponse(formatComparisonSummary(analyses, 10));
+                listener.onResponse(formatComparisonSummary(analyses, DEFAULT_COMPARISON_RESULT_LIMIT));
             } catch (Exception e) {
                 listener.onFailure(e);
             }
@@ -800,7 +812,7 @@ public class DataDistributionTool implements Tool {
                 }
 
                 analyses.sort(Comparator.comparingDouble((FieldAnalysis a) -> a.divergence).reversed());
-                listener.onResponse(formatComparisonSummary(analyses, 30));
+                listener.onResponse(formatComparisonSummary(analyses, DEFAULT_SINGLE_ANALYSIS_RESULT_LIMIT));
             } catch (Exception e) {
                 listener.onFailure(e);
             }
@@ -895,7 +907,7 @@ public class DataDistributionTool implements Tool {
         Map<String, Set<String>> fieldValueSets = new HashMap<>();
         normalizedFields.forEach(field -> fieldValueSets.put(field, new HashSet<>()));
 
-        int maxCardinality = Math.max(5, data.size() / 4);
+        int maxCardinality = Math.max(MIN_CARDINALITY_BASE, data.size() / MIN_CARDINALITY_DIVISOR);
 
         data.forEach(doc -> {
             normalizedFields.forEach(field -> {
@@ -909,7 +921,7 @@ public class DataDistributionTool implements Tool {
         return normalizedFields.stream().filter(field -> {
             int cardinality = fieldValueSets.get(field).size();
             if (field.toLowerCase(Locale.ROOT).endsWith("id")) {
-                return cardinality <= 30 && cardinality > 0;
+                return cardinality <= ID_FIELD_MAX_CARDINALITY && cardinality > 0;
             }
             if (numberFields.contains(field)) {
                 return true;
@@ -1017,7 +1029,7 @@ public class DataDistributionTool implements Tool {
                     }
                 }
                 int cardinality = values.size();
-                return cardinality > 0 && cardinality <= Math.max(10, data.size() / 2);
+                return cardinality > 0 && cardinality <= Math.max(DATA_FIELD_MAX_CARDINALITY, data.size() / DATA_FIELD_CARDINALITY_DIVISOR);
             })
             .collect(Collectors.toList());
     }
@@ -1048,7 +1060,7 @@ public class DataDistributionTool implements Tool {
         Set<String> allKeys = new HashSet<>(selectionDist.keySet());
         allKeys.addAll(baselineDist.keySet());
 
-        if (allKeys.size() <= 10 || !allKeys.stream().allMatch(key -> {
+        if (allKeys.size() <= NUMERIC_GROUPING_THRESHOLD || !allKeys.stream().allMatch(key -> {
             try {
                 Double.parseDouble(key);
                 return true;
@@ -1063,7 +1075,7 @@ public class DataDistributionTool implements Tool {
         double min = numericKeys.get(0);
         double max = numericKeys.get(numericKeys.size() - 1);
         double range = max - min;
-        int numGroups = 5;
+        int numGroups = NUMERIC_GROUP_COUNT;
         double groupSize = range / numGroups;
 
         Map<String, Double> groupedSelectionDist = new HashMap<>();
@@ -1105,8 +1117,10 @@ public class DataDistributionTool implements Tool {
             allKeys.addAll(diff.baselineDist.keySet());
 
             List<ChangeItem> changes = allKeys.stream().map(value -> {
-                double selectionPercentage = Math.round(diff.selectionDist.getOrDefault(value, 0.0) * 100.0) / 100.0;
-                double baselinePercentage = Math.round(diff.baselineDist.getOrDefault(value, 0.0) * 100.0) / 100.0;
+                double selectionPercentage = Math.round(diff.selectionDist.getOrDefault(value, 0.0) * PERCENTAGE_MULTIPLIER)
+                    / PERCENTAGE_MULTIPLIER;
+                double baselinePercentage = Math.round(diff.baselineDist.getOrDefault(value, 0.0) * PERCENTAGE_MULTIPLIER)
+                    / PERCENTAGE_MULTIPLIER;
                 return new ChangeItem(value, selectionPercentage, baselinePercentage);
             }).collect(Collectors.toList());
 
@@ -1119,7 +1133,7 @@ public class DataDistributionTool implements Tool {
                             Math.max(a.baselinePercentage, a.selectionPercentage)
                         )
                 )
-                .limit(10)
+                .limit(TOP_CHANGES_LIMIT)
                 .collect(Collectors.toList());
 
             return new SummaryDataItem(diff.field, diff.divergence, topChanges);
