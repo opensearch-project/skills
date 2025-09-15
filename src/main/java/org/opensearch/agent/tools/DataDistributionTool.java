@@ -997,7 +997,7 @@ public class DataDistributionTool implements Tool {
         return allKeys.stream().mapToDouble(key -> {
             double selectionVal = selectionDist.getOrDefault(key, 0.0);
             double baselineVal = baselineDist.getOrDefault(key, 0.0);
-            return selectionVal - baselineVal;
+            return Math.abs(selectionVal - baselineVal);
         }).max().orElse(Double.NEGATIVE_INFINITY);
     }
 
