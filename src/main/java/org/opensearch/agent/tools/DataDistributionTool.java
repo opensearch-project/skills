@@ -717,7 +717,7 @@ public class DataDistributionTool implements Tool {
         try {
             // Parse ISO format and convert to PPL format
             ZonedDateTime dateTime = ZonedDateTime.parse(timeString);
-            return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT));
+            return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT));
         } catch (DateTimeParseException e) {
             // Try parsing as local time without zone
             try {

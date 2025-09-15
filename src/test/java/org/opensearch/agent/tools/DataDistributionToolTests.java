@@ -1375,6 +1375,44 @@ public class DataDistributionToolTests {
 
     @Test
     @SneakyThrows
+    public void testBuildQueryFromMapWithTermsQuery() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        Map<String, Object> filterMap = Map.of("terms", Map.of("status", List.of("error", "warning")));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        assertTrue(queryBuilder.toString().contains("terms"));
+        assertTrue(queryBuilder.toString().contains("status"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildQueryFromMapWithMultiMatchQuery() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        Map<String, Object> filterMap = Map
+            .of("multi_match", Map.of("query", "error message", "fields", List.of("message", "description")));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        assertTrue(queryBuilder.toString().contains("multi_match"));
+    }
+
+    @Test
+    @SneakyThrows
     public void testBuildQueryFromMapWithComplexRangeQuery() {
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
@@ -2021,6 +2059,68 @@ public class DataDistributionToolTests {
 
     @Test
     @SneakyThrows
+    public void testDSLWithFilterArrayTermsQueries() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'terms': {'status': ['error', 'warning']}}\", \"{'terms': {'level': [3, 4, 5]}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Terms filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayMultiMatchQueries() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'multi_match': {'query': 'error timeout', 'fields': ['message', 'description']}}\", \"{'multi_match': {'query': 'connection failed', 'fields': ['error_msg', 'details']}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Multi-match filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
     public void testDSLWithFilterArrayInvalidFilter() {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
@@ -2468,6 +2568,68 @@ public class DataDistributionToolTests {
 
     @Test
     @SneakyThrows
+    public void testDSLWithRawDSLTermsQuery() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"terms\": {\"status\": [\"error\", \"warning\"]}}"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Terms query DSL should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithRawDSLMultiMatchQuery() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"multi_match\": {\"query\": \"error timeout\", \"fields\": [\"message\", \"description\"]}}"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Multi-match query DSL should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
     public void testDSLQueryPrecedenceOverFilter() {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
@@ -2498,5 +2660,85 @@ public class DataDistributionToolTests {
                     assertTrue("DSL should take precedence over filter", singleAnalysis.getAsJsonArray().size() > 0);
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildQueryFromMapWithTermsQueryNonListValue() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        // Test terms query with non-list value (should be ignored)
+        Map<String, Object> filterMap = Map.of("terms", Map.of("status", "error"));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        // Should not contain terms query since value is not a list
+        assertFalse(queryBuilder.toString().contains("terms"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildQueryFromMapWithMultiMatchQueryMissingFields() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        // Test multi_match query with missing fields (should be ignored)
+        Map<String, Object> filterMap = Map.of("multi_match", Map.of("query", "error message"));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        // Should not contain multi_match query since fields is missing
+        assertFalse(queryBuilder.toString().contains("multi_match"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildQueryFromMapWithMultiMatchQueryMissingQuery() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        // Test multi_match query with missing query (should be ignored)
+        Map<String, Object> filterMap = Map.of("multi_match", Map.of("fields", List.of("message", "description")));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        // Should not contain multi_match query since query is missing
+        assertFalse(queryBuilder.toString().contains("multi_match"));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildQueryFromMapWithMultiMatchQueryNonListFields() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
+            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
+        buildQueryMethod.setAccessible(true);
+
+        // Test multi_match query with non-list fields (should be ignored)
+        Map<String, Object> filterMap = Map.of("multi_match", Map.of("query", "error message", "fields", "message"));
+        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
+
+        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
+
+        assertNotNull(queryBuilder);
+        // Should not contain multi_match query since fields is not a list
+        assertFalse(queryBuilder.toString().contains("multi_match"));
     }
 }
