@@ -732,7 +732,7 @@ public class DataDistributionTool implements Tool {
     }
 
     /**
-     * Adds time range filter to PPL query, similar to JavaScript version
+     * Adds time range filter to PPL query
      *
      * @param query PPL query string (can be empty)
      * @param startTime Start time for filtering
@@ -754,24 +754,20 @@ public class DataDistributionTool implements Tool {
             .format(Locale.ROOT, "`%s` >= '%s' AND `%s` <= '%s'", timeField, formattedStartTime, timeField, formattedEndTime);
 
         String[] commands = query.split("\\|");
-        for (int i = 0; i < commands.length; i++) {
-            String cmd = commands[i].trim();
-            if (cmd.regionMatches(true, 0, "where", 0, 5)) {
-                commands[i] = cmd + " AND " + timePredicate;
-                return String.join(" | ", Arrays.stream(commands).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
-            }
-        }
-
-        // No WHERE found: insert after first command
         List<String> commandList = new ArrayList<>();
+
+        // Always insert time filter right after first command (safest approach)
         commandList.add(commands[0].trim());
         commandList.add("WHERE " + timePredicate);
+
+        // Add remaining commands
         for (int i = 1; i < commands.length; i++) {
             String cmd = commands[i].trim();
             if (!cmd.isEmpty()) {
                 commandList.add(cmd);
             }
         }
+
         return String.join(" | ", commandList);
     }
 

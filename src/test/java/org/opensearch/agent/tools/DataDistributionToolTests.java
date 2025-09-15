@@ -1732,7 +1732,7 @@ public class DataDistributionToolTests {
             .invoke(tool, "source=logs-* | where status='error'", "2025-01-15 10:00:00", "2025-01-15 11:00:00", "@timestamp");
 
         assertEquals(
-            "source=logs-* | where status='error' AND `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00'",
+            "source=logs-* | WHERE `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00' | where status='error'",
             result
         );
     }
@@ -1751,30 +1751,6 @@ public class DataDistributionToolTests {
 
         assertEquals(
             "source=logs-* | WHERE `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00' | stats count() by status",
-            result
-        );
-    }
-
-    @Test
-    @SneakyThrows
-    public void testGetPPLQueryWithTimeRangeMultipleWhereClausesFirstOne() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method getPPLQueryWithTimeRangeMethod = DataDistributionTool.class
-            .getDeclaredMethod("getPPLQueryWithTimeRange", String.class, String.class, String.class, String.class);
-        getPPLQueryWithTimeRangeMethod.setAccessible(true);
-
-        String result = (String) getPPLQueryWithTimeRangeMethod
-            .invoke(
-                tool,
-                "source=logs-* | where status='error' | stats count() | where count > 10",
-                "2025-01-15 10:00:00",
-                "2025-01-15 11:00:00",
-                "@timestamp"
-            );
-
-        assertEquals(
-            "source=logs-* | where status='error' AND `@timestamp` >= '2025-01-15 10:00:00' AND `@timestamp` <= '2025-01-15 11:00:00' | stats count() | where count > 10",
             result
         );
     }
