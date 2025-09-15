@@ -925,8 +925,7 @@ public class DataDistributionTool implements Tool {
             int cardinality = fieldValueSets.get(field).size();
             if (field.toLowerCase(Locale.ROOT).endsWith("id")) {
                 return cardinality <= ID_FIELD_MAX_CARDINALITY && cardinality > 0;
-            }
-            if (numberFields.contains(field)) {
+            } else if (numberFields.contains(field)) {
                 return true;
             }
             return cardinality <= maxCardinality && cardinality > 0;
