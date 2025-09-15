@@ -402,32 +402,7 @@ public class DataDistributionTool implements Tool {
                 params.ppl
             );
 
-            Function<Map<String, Object>, List<Map<String, Object>>> pplResultParser = pplResult -> {
-                Object datarowsObj = pplResult.get("datarows");
-                Object schemaObj = pplResult.get("schema");
-
-                if (!(datarowsObj instanceof List) || !(schemaObj instanceof List)) {
-                    return List.of();
-                }
-
-                @SuppressWarnings("unchecked")
-                List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> schema = (List<Map<String, Object>>) schemaObj;
-
-                List<Map<String, Object>> result = new ArrayList<>();
-                for (List<Object> row : dataRows) {
-                    Map<String, Object> doc = new HashMap<>();
-                    for (int i = 0; i < Math.min(row.size(), schema.size()); i++) {
-                        String columnName = (String) schema.get(i).get("name");
-                        if (columnName != null) {
-                            doc.put(columnName, row.get(i));
-                        }
-                    }
-                    result.add(doc);
-                }
-                return result;
-            };
+            Function<Map<String, Object>, List<Map<String, Object>>> pplResultParser = this::parsePPLResult;
 
             PPLExecuteHelper.executePPLAndParseResult(client, pplQuery, pplResultParser, ActionListener.wrap(data -> {
                 try {
@@ -661,32 +636,7 @@ public class DataDistributionTool implements Tool {
             params.ppl
         );
 
-        Function<Map<String, Object>, List<Map<String, Object>>> pplResultParser = pplResult -> {
-            Object datarowsObj = pplResult.get("datarows");
-            Object schemaObj = pplResult.get("schema");
-
-            if (!(datarowsObj instanceof List) || !(schemaObj instanceof List)) {
-                return List.of();
-            }
-
-            @SuppressWarnings("unchecked")
-            List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> schema = (List<Map<String, Object>>) schemaObj;
-
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (List<Object> row : dataRows) {
-                Map<String, Object> doc = new HashMap<>();
-                for (int i = 0; i < Math.min(row.size(), schema.size()); i++) {
-                    String columnName = (String) schema.get(i).get("name");
-                    if (columnName != null) {
-                        doc.put(columnName, row.get(i));
-                    }
-                }
-                result.add(doc);
-            }
-            return result;
-        };
+        Function<Map<String, Object>, List<Map<String, Object>>> pplResultParser = this::parsePPLResult;
 
         PPLExecuteHelper.executePPLAndParseResult(client, selectionQuery, pplResultParser, ActionListener.wrap(selectionData -> {
             PPLExecuteHelper.executePPLAndParseResult(client, baselineQuery, pplResultParser, ActionListener.wrap(baselineData -> {
@@ -1491,6 +1441,39 @@ public class DataDistributionTool implements Tool {
         } else {
             queryBuilder.must(QueryBuilders.regexpQuery(field, operatorValue.toString()));
         }
+    }
+
+    /**
+     * Parses PPL query result into list of documents
+     *
+     * @param pplResult PPL query result containing datarows and schema
+     * @return List of documents as maps
+     */
+    private List<Map<String, Object>> parsePPLResult(Map<String, Object> pplResult) {
+        Object datarowsObj = pplResult.get("datarows");
+        Object schemaObj = pplResult.get("schema");
+
+        if (!(datarowsObj instanceof List) || !(schemaObj instanceof List)) {
+            return List.of();
+        }
+
+        @SuppressWarnings("unchecked")
+        List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> schema = (List<Map<String, Object>>) schemaObj;
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (List<Object> row : dataRows) {
+            Map<String, Object> doc = new HashMap<>();
+            for (int i = 0; i < Math.min(row.size(), schema.size()); i++) {
+                String columnName = (String) schema.get(i).get("name");
+                if (columnName != null) {
+                    doc.put(columnName, row.get(i));
+                }
+            }
+            result.add(doc);
+        }
+        return result;
     }
 
     /**
