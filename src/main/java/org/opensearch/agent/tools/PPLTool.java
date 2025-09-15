@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
@@ -86,6 +88,9 @@ public class PPLTool implements WithModelTool {
 
     private static final String DEFAULT_DESCRIPTION =
         "\"Use this tool when user ask question based on the data in the cluster or parse user statement about which index to use in a conversion.\nAlso use this tool when question only contains index information.\n1. If uesr question contain both question and index name, the input parameters are {'question': UserQuestion, 'index': IndexName}.\n2. If user question contain only question, the input parameter is {'question': UserQuestion}.\n3. If uesr question contain only index name, find the original human input from the conversation histroy and formulate parameter as {'question': UserQuestion, 'index': IndexName}\nThe index name should be exactly as stated in user's input.";
+
+    private static final String TABLE_INFO_KEY = "table_info";
+    private static final String MAPPING_KEY = "mappings";
 
     @Setter
     private String name = TYPE;
@@ -226,11 +231,14 @@ public class PPLTool implements WithModelTool {
                 );
             }
         }
-        ActionListener<String> actionsAfterTableinfo = ActionListener.wrap(tableInfo -> {
+        ActionListener<Map<String, String>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
+            String tableInfo = indexInfo.get(TABLE_INFO_KEY);
+            String mappings = indexInfo.get(MAPPING_KEY);
             String prompt = constructPrompt(tableInfo, question.strip(), indices);
+            Map<String, String> reformattedInput = Map.of("prompt", prompt, "mappings", mappings, "os_version", Version.CURRENT.toString(), "current_time", Instant.now().toString(), "datasourceType", parameters.getOrDefault("type", "Opensearch"));
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Map.of("prompt", prompt, "mappings", "", "os_version", Version.CURRENT.toString(), "datasourceType", parameters.getOrDefault("type", "Opensearch")))
+                .parameters(Map.of("prompt", gson.toJson(reformattedInput)))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
@@ -301,7 +309,7 @@ public class PPLTool implements WithModelTool {
                     transferS3SchemaFormat(schema),
                     (Map<String, Object>) samples.get(0)
                 );
-                actionsAfterTableinfo.onResponse(tableInfo);
+                actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, tableInfo, MAPPING_KEY, gson.toJson(schema)));
             } catch (Exception e) {
                 log.info("fail to get table info for s3");
                 actionsAfterTableinfo.onFailure(e);
@@ -310,7 +318,8 @@ public class PPLTool implements WithModelTool {
         }
 
         CountDownLatch latch = new CountDownLatch(indices.size());
-        ConcurrentLinkedQueue<String> tableInfos = new ConcurrentLinkedQueue<>();
+        ConcurrentHashMap<String, String> tableInfos = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, Object> mappingInfos = new ConcurrentHashMap<>();
         for (String index: indices) {
             GetMappingsRequest getMappingsRequest = buildGetMappingRequest(index);
             client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
@@ -322,12 +331,23 @@ public class PPLTool implements WithModelTool {
                 SearchRequest searchRequest = buildSearchRequest(firstIndexName);
                 client.search(searchRequest, ActionListener.wrap(searchResponse -> {
                     SearchHit[] searchHits = searchResponse.getHits().getHits();
-                    String tableInfo = constructTableInfo(searchHits, mappings);
-                    tableInfos.add(tableInfo);
+                    Map<String, Object> finalMappings = new HashMap<>();
+                    if (mappings.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "The querying index doesn't have mapping metadata, please add data to it or using another index."
+                        );
+                    }
+                    for (MappingMetadata mappingMetadata : mappings.values()) {
+                        Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+                        MergeRuleHelper.merge(mappingSource, finalMappings);
+                    }
+                    String tableInfo = constructTableInfo(searchHits, finalMappings);
+                    tableInfos.put(index, tableInfo);
+                    mappingInfos.put(index, finalMappings);
                     latch.countDown();
                     if (latch.getCount() == 0) {
                         String mergedTableInfo = mergeTableInfo(tableInfos);
-                        actionsAfterTableinfo.onResponse(mergedTableInfo);
+                        actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, gson.toJson(mappingInfos)));
                     }
                 }, e -> {
                     log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
@@ -534,17 +554,7 @@ public class PPLTool implements WithModelTool {
 
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
-        if (mappings.keySet().size() == 0) {
-            throw new IllegalArgumentException(
-                "The querying index doesn't have mapping metadata, please add data to it or using another index."
-            );
-        }
-        Map<String, Object> allFields = new HashMap<>();
-        for (MappingMetadata mappingMetadata : mappings.values()) {
-            Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-            MergeRuleHelper.merge(mappingSource, allFields);
-        }
+    private String constructTableInfo(SearchHit[] searchHits, Map<String, Object> allFields) throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
         ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
 
@@ -668,25 +678,28 @@ public class PPLTool implements WithModelTool {
     }
 
     private List<String> getIndexNameFromParameters(Map<String, String> parameters, String key) {
-        Object indexName = parameters.getOrDefault(key, "");
-        if (indexName instanceof  String) {
-            return List.of(((String) indexName).trim());
+        if (!parameters.containsKey(key)) {
+            return List.of();
         }
-        if (indexName instanceof List) {
-            return ((List<?>) indexName).stream()
+        String indexName = parameters.get(key);
+        try {
+            List<String> list = gson.fromJson(indexName, List.class);
+            return list.stream()
                     .map(Object::toString)
                     .map(String::trim)
                     .collect(Collectors.toList());
+        } catch (Exception e) {
+            return List.of(indexName.trim());
         }
-        return List.of();
     }
 
-    private String mergeTableInfo(ConcurrentLinkedQueue<String> tableInfos) {
-        String mergedTableInfo = "";
-        for (String tableInfo: tableInfos){
-            mergedTableInfo += tableInfo;
+    private String mergeTableInfo(ConcurrentHashMap<String, String> tableInfos) {
+        StringBuilder mergedTableInfo = new StringBuilder();
+        for (Map.Entry<String, String> entry: tableInfos.entrySet()){
+            mergedTableInfo.append(entry.getKey()).append("\n");
+            mergedTableInfo.append(entry.getValue()).append("\n");
         }
-        return mergedTableInfo;
+        return mergedTableInfo.toString();
     }
 
     private Map<String, Object> transferS3SchemaFormat(Map<String, Object> originalSchema) {
