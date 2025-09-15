@@ -1740,4 +1740,763 @@ public class DataDistributionToolTests {
             result
         );
     }
+
+    // ========== DSL Query Format Tests ==========
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithRawDSLQuery() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"bool\": {\"must\": [{\"term\": {\"status\": \"error\"}}]}}"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("singleAnalysis should contain field analyses with raw DSL", singleAnalysis.getAsJsonArray().size() > 0);
+
+                    for (int i = 0; i < singleAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldAnalysis = singleAnalysis.getAsJsonArray().get(i);
+                        assertTrue(
+                            "Field analysis should have proper structure with raw DSL",
+                            fieldAnalysis.getAsJsonObject().has("field")
+                        );
+                        assertTrue("Field analysis should have topChanges with raw DSL", fieldAnalysis.getAsJsonObject().has("topChanges"));
+                    }
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithComplexRawDSLQuery() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        String complexDSL = """
+            {
+                "bool": {
+                    "must": [
+                        {"term": {"status": "error"}},
+                        {"range": {"level": {"gte": 3}}}
+                    ],
+                    "should": [
+                        {"match": {"message": "timeout"}},
+                        {"wildcard": {"host": "server-*"}}
+                    ],
+                    "minimum_should_match": 1
+                }
+            }
+            """;
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        complexDSL
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+                    assertTrue("Complex DSL should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithInvalidRawDSLQuery() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "invalid-json-query"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    // Should fallback to time range only query when DSL parsing fails
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue(
+                        "Response should contain singleAnalysis even with invalid DSL",
+                        result.getAsJsonObject().has("singleAnalysis")
+                    );
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArraySingleFilter() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'term': {'status': 'error'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Single filter should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayComplexFilters() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'term': {'status': 'error'}}\", \"{'range': {'level': {'gte': 3, 'lte': 5}}}\", \"{'wildcard': {'host': 'server-*'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Complex filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayMatchQueries() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'match': {'message': 'error timeout'}}\", \"{'match_phrase': {'service': 'payment service'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Match query filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayExistsAndPrefixQueries() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'exists': {'field': 'error_code'}}\", \"{'prefix': {'host': 'prod'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Exists and prefix filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayRegexpQueries() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'regexp': {'host': 'server-[0-9]+'}}\", \"{'wildcard': {'service': '*payment*'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Regexp and wildcard filters should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithFilterArrayInvalidFilter() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'term': {'status': 'error'}}\", \"invalid-json-filter\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    // Should continue processing valid filters and ignore invalid ones
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue(
+                        "Response should contain singleAnalysis even with some invalid filters",
+                        result.getAsJsonObject().has("singleAnalysis")
+                    );
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLComparisonWithRawDSLQuery() {
+        SearchHit[] baselineHits = createBaselineHits();
+        SearchHit[] selectionHits = createSelectionHits();
+
+        SearchHits baselineSearchHits = new SearchHits(baselineHits, new TotalHits(baselineHits.length, TotalHits.Relation.EQUAL_TO), 1.0f);
+        SearchHits selectionSearchHits = new SearchHits(
+            selectionHits,
+            new TotalHits(selectionHits.length, TotalHits.Relation.EQUAL_TO),
+            1.0f
+        );
+
+        when(searchResponse.getHits()).thenReturn(selectionSearchHits).thenReturn(baselineSearchHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = (ActionListener<SearchResponse>) invocation.getArguments()[1];
+            listener.onResponse(searchResponse);
+            return null;
+        }).when(client).search(any(), any());
+
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "baselineTimeRangeStart",
+                        "2025-01-15 08:00:00",
+                        "baselineTimeRangeEnd",
+                        "2025-01-15 09:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"bool\": {\"must\": [{\"term\": {\"status\": \"error\"}}]}}"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain comparisonAnalysis", result.getAsJsonObject().has("comparisonAnalysis"));
+
+                    JsonElement comparisonAnalysis = result.getAsJsonObject().get("comparisonAnalysis");
+                    assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+                    assertTrue("Raw DSL comparison should produce results", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+                    for (int i = 0; i < comparisonAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldComparison = comparisonAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field comparison should have divergence", fieldComparison.getAsJsonObject().has("divergence"));
+                        assertTrue("Field comparison should have topChanges", fieldComparison.getAsJsonObject().has("topChanges"));
+                    }
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLComparisonWithFilterArray() {
+        SearchHit[] baselineHits = createBaselineHits();
+        SearchHit[] selectionHits = createSelectionHits();
+
+        SearchHits baselineSearchHits = new SearchHits(baselineHits, new TotalHits(baselineHits.length, TotalHits.Relation.EQUAL_TO), 1.0f);
+        SearchHits selectionSearchHits = new SearchHits(
+            selectionHits,
+            new TotalHits(selectionHits.length, TotalHits.Relation.EQUAL_TO),
+            1.0f
+        );
+
+        when(searchResponse.getHits()).thenReturn(selectionSearchHits).thenReturn(baselineSearchHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = (ActionListener<SearchResponse>) invocation.getArguments()[1];
+            listener.onResponse(searchResponse);
+            return null;
+        }).when(client).search(any(), any());
+
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "baselineTimeRangeStart",
+                        "2025-01-15 08:00:00",
+                        "baselineTimeRangeEnd",
+                        "2025-01-15 09:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[\"{'term': {'status': 'error'}}\", \"{'range': {'level': {'gte': 3}}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain comparisonAnalysis", result.getAsJsonObject().has("comparisonAnalysis"));
+
+                    JsonElement comparisonAnalysis = result.getAsJsonObject().get("comparisonAnalysis");
+                    assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
+                    assertTrue("Filter array comparison should produce results", comparisonAnalysis.getAsJsonArray().size() > 0);
+
+                    for (int i = 0; i < comparisonAnalysis.getAsJsonArray().size(); i++) {
+                        JsonElement fieldComparison = comparisonAnalysis.getAsJsonArray().get(i);
+                        assertTrue("Field comparison should have divergence", fieldComparison.getAsJsonObject().has("divergence"));
+                        assertTrue("Field comparison should have topChanges", fieldComparison.getAsJsonObject().has("topChanges"));
+                    }
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithBothRawDSLAndFilterArray() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"bool\": {\"must\": [{\"term\": {\"status\": \"error\"}}]}}",
+                        "filter",
+                        "[\"{'range': {'level': {'gte': 3}}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    // When both dsl and filter are provided, dsl should take precedence
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Both DSL and filter should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    // ========== Query Format Validation Tests ==========
+
+    @Test
+    @SneakyThrows
+    public void testValidateFilterArrayFormat() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        // Valid filter array formats
+        assertTrue(
+            "Single filter should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "filter",
+                            "[\"{'term': {'status': 'error'}}\"]"
+                        )
+                )
+        );
+
+        assertTrue(
+            "Multiple filters should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "filter",
+                            "[\"{'term': {'status': 'error'}}\", \"{'range': {'level': {'gte': 3}}}\"]"
+                        )
+                )
+        );
+
+        assertTrue(
+            "Empty filter array should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "filter",
+                            "[]"
+                        )
+                )
+        );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testValidateRawDSLFormat() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        // Valid DSL formats
+        assertTrue(
+            "Simple DSL should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "dsl",
+                            "{\"term\": {\"status\": \"error\"}}"
+                        )
+                )
+        );
+
+        assertTrue(
+            "Complex DSL should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "dsl",
+                            "{\"bool\": {\"must\": [{\"term\": {\"status\": \"error\"}}], \"filter\": [{\"range\": {\"level\": {\"gte\": 3}}}]}}"
+                        )
+                )
+        );
+
+        assertTrue(
+            "Empty DSL should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "dsl",
+                            ""
+                        )
+                )
+        );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testValidateBothDSLAndFilterFormats() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        // Both DSL and filter provided should be valid
+        assertTrue(
+            "Both DSL and filter should be valid",
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "dsl",
+                            "{\"term\": {\"status\": \"error\"}}",
+                            "filter",
+                            "[\"{'range': {'level': {'gte': 3}}}\"]"
+                        )
+                )
+        );
+    }
+
+    // ========== Edge Cases and Error Handling Tests ==========
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithEmptyFilterArray() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis with empty filter", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Empty filter should still produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithMalformedFilterJSON() {
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "filter",
+                        "[malformed-json]"
+                    ),
+                ActionListener.<String>wrap(response -> fail("Should have failed with malformed filter JSON"), e -> {
+                    MatcherAssert.assertThat(e.getMessage(), containsString("Invalid 'filter' parameter"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("must be a valid JSON array of strings"));
+                })
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLWithBoolQueryInRawDSL() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        String boolDSL = """
+            {
+                "bool": {
+                    "must": [
+                        {"term": {"status": "error"}}
+                    ],
+                    "should": [
+                        {"match": {"message": "timeout"}},
+                        {"match": {"message": "connection"}}
+                    ],
+                    "must_not": [
+                        {"term": {"level": 1}}
+                    ],
+                    "filter": [
+                        {"range": {"@timestamp": {"gte": "2025-01-15T09:00:00Z"}}}
+                    ],
+                    "minimum_should_match": 1
+                }
+            }
+            """;
+
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        boolDSL
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("Bool query DSL should produce analysis results", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testDSLQueryPrecedenceOverFilter() {
+        mockSearchResponse();
+        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
+
+        // When both dsl and filter are provided, dsl should take precedence
+        tool
+            .run(
+                ImmutableMap
+                    .of(
+                        "index",
+                        "test_index",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "queryType",
+                        "dsl",
+                        "dsl",
+                        "{\"term\": {\"status\": \"error\"}}",
+                        "filter",
+                        "[\"{'term': {'status': 'info'}}\"]"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue("Response should contain singleAnalysis", result.getAsJsonObject().has("singleAnalysis"));
+
+                    JsonElement singleAnalysis = result.getAsJsonObject().get("singleAnalysis");
+                    assertTrue("DSL should take precedence over filter", singleAnalysis.getAsJsonArray().size() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
 }

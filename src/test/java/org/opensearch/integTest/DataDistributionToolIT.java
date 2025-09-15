@@ -461,6 +461,29 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
     }
 
     @SneakyThrows
+    public void testDataDistributionToolWithRawDSLQuery() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 11:00:00\", \"dsl\": \"{\\\"bool\\\": {\\\"must\\\": [{\\\"term\\\": {\\\"status\\\": \\\"error\\\"}}]}}\"}}",
+                    TEST_DATA_INDEX_NAME
+                )
+        );
+        assertNotNull("Result should not be null", result);
+        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
+
+        JsonElement jsonResult = JsonParser.parseString(result);
+        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
+        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+
+        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
+        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
+        assertTrue("Raw DSL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+    }
+
+    @SneakyThrows
     public void testDataDistributionToolWithExistsFilter() {
         String result = executeAgent(
             agentId,

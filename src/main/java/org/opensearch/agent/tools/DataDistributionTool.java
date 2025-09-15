@@ -78,6 +78,7 @@ import lombok.extern.log4j.Log4j2;
  *     "size": 1000,
  *     "queryType": "dsl",
  *     "filter": ["{'term': {'status': 'error'}}", "{'range': {'response_time': {'gte': 100}}}"],
+ *     "dsl": "{\"bool\": {\"must\": [{\"term\": {\"status\": \"error\"}}]}}",
  *     "ppl": "source index where a=0"
  *   }
  * }
@@ -124,6 +125,7 @@ public class DataDistributionTool implements Tool {
     private static final String PARAM_SIZE = "size";
     private static final String PARAM_QUERY_TYPE = "queryType";
     private static final String PARAM_FILTER = "filter";
+    private static final String PARAM_DSL = "dsl";
     private static final String QUERY_TYPE_PPL = "ppl";
     private static final String QUERY_TYPE_DSL = "dsl";
     private static final String DEFAULT_SIZE = "1000";
@@ -189,6 +191,10 @@ public class DataDistributionTool implements Tool {
                     },
                     "description": "Additional DSL query conditions for filtering (optional)"
                 },
+                "dsl": {
+                    "type": "string",
+                    "description": "Complete raw DSL query as JSON string (optional)"
+                },
                 "ppl": {
                     "type": "string",
                     "description": "Complete PPL statement without time information (optional)"
@@ -214,6 +220,7 @@ public class DataDistributionTool implements Tool {
         final int size;
         final String queryType;
         final List<String> filter;
+        final String dsl;
         final String ppl;
 
         /**
@@ -257,6 +264,7 @@ public class DataDistributionTool implements Tool {
                 }
             }
 
+            this.dsl = parameters.getOrDefault(PARAM_DSL, "");
             this.ppl = parameters.getOrDefault(QUERY_TYPE_PPL, "");
         }
 
@@ -556,21 +564,57 @@ public class DataDistributionTool implements Tool {
         try {
             String formattedStartTime = formatTimeString(startTime);
             String formattedEndTime = formatTimeString(endTime);
-            BoolQueryBuilder query = QueryBuilders
-                .boolQuery()
-                .filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
+            BoolQueryBuilder query;
 
-            // Add additional filters if provided
-            if (!params.filter.isEmpty()) {
-                for (String filterStr : params.filter) {
-                    try {
-                        Map<String, Object> filterMap = gson.fromJson(filterStr, new TypeToken<Map<String, Object>>() {
-                        }.getType());
-                        BoolQueryBuilder filterQuery = QueryBuilders.boolQuery();
-                        buildQueryFromMap(filterMap, filterQuery);
-                        query.must(filterQuery);
-                    } catch (Exception e) {
-                        log.warn("Failed to parse filter parameter: {}", filterStr, e);
+            // Use raw DSL query if provided
+            if (!Strings.isEmpty(params.dsl)) {
+                try {
+                    Map<String, Object> dslMap = gson.fromJson(params.dsl, new TypeToken<Map<String, Object>>() {
+                    }.getType());
+                    query = QueryBuilders.boolQuery();
+
+                    // Handle DSL query structure - check if it has "query" wrapper
+                    if (dslMap.containsKey("query")) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> queryMap = (Map<String, Object>) dslMap.get("query");
+                        log.debug("Processing DSL query with wrapper: {}", queryMap);
+
+                        // Build the DSL query directly into the main query
+                        buildQueryFromMap(queryMap, query);
+
+                        // Add time range filter
+                        query.filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
+                    } else {
+                        log.debug("Processing DSL query without wrapper: {}", dslMap);
+                        buildQueryFromMap(dslMap, query);
+                        // Add time range filter to the raw DSL query
+                        query.filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
+                    }
+
+                    log.debug("Final DSL query: {}", query.toString());
+                } catch (Exception e) {
+                    log.warn("Failed to parse raw DSL query: {}, falling back to time range only", params.dsl, e);
+                    query = QueryBuilders
+                        .boolQuery()
+                        .filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
+                }
+            } else {
+                query = QueryBuilders
+                    .boolQuery()
+                    .filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
+
+                // Add additional filters if provided
+                if (!params.filter.isEmpty()) {
+                    for (String filterStr : params.filter) {
+                        try {
+                            Map<String, Object> filterMap = gson.fromJson(filterStr, new TypeToken<Map<String, Object>>() {
+                            }.getType());
+                            BoolQueryBuilder filterQuery = QueryBuilders.boolQuery();
+                            buildQueryFromMap(filterMap, filterQuery);
+                            query.must(filterQuery);
+                        } catch (Exception e) {
+                            log.warn("Failed to parse filter parameter: {}", filterStr, e);
+                        }
                     }
                 }
             }
@@ -1163,14 +1207,187 @@ public class DataDistributionTool implements Tool {
      * @param queryBuilder Query builder to add conditions to
      */
     private void buildQueryFromMap(Map<String, Object> filterMap, BoolQueryBuilder queryBuilder) {
+        log.debug("Building query from map: {}", filterMap);
+
         for (Map.Entry<String, Object> entry : filterMap.entrySet()) {
-            String field = entry.getKey();
+            String key = entry.getKey();
             Object value = entry.getValue();
 
-            if (value instanceof Map) {
-                processNestedQuery(field, (Map<String, Object>) value, queryBuilder);
-            } else {
-                queryBuilder.must(QueryBuilders.termQuery(field, value));
+            log.debug("Processing query key: {}, value: {}", key, value);
+
+            // Handle special query types
+            switch (key) {
+                case "match_all" -> {
+                    // {"match_all": {}}
+                    log.debug("Adding match_all query");
+                    queryBuilder.must(QueryBuilders.matchAllQuery());
+                }
+                case "match_none" -> {
+                    // {"match_none": {}}
+                    log.debug("Adding match_none query");
+                    queryBuilder.mustNot(QueryBuilders.matchAllQuery());
+                }
+                case "bool" -> {
+                    if (value instanceof Map) {
+                        log.debug("Processing bool query: {}", value);
+                        processBoolQuery((Map<String, Object>) value, queryBuilder);
+                    }
+                }
+                case "term" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        log.debug("Adding term query: {}", valueMap);
+                        // {"term": {"field": "value"}}
+                        for (Map.Entry<String, Object> termEntry : valueMap.entrySet()) {
+                            log.debug("Term query - field: {}, value: {}", termEntry.getKey(), termEntry.getValue());
+                            queryBuilder.must(QueryBuilders.termQuery(termEntry.getKey(), termEntry.getValue()));
+                        }
+                    }
+                }
+                case "wildcard" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        log.debug("Adding wildcard query: {}", valueMap);
+                        // {"wildcard": {"field": "pattern"}}
+                        for (Map.Entry<String, Object> wildcardEntry : valueMap.entrySet()) {
+                            log.debug("Wildcard query - field: {}, pattern: {}", wildcardEntry.getKey(), wildcardEntry.getValue());
+                            queryBuilder.must(QueryBuilders.wildcardQuery(wildcardEntry.getKey(), wildcardEntry.getValue().toString()));
+                        }
+                    }
+                }
+                case "range" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"range": {"field": {"gte": 1, "lte": 10}}}
+                        for (Map.Entry<String, Object> rangeEntry : valueMap.entrySet()) {
+                            String field = rangeEntry.getKey();
+                            Object rangeValue = rangeEntry.getValue();
+                            if (rangeValue instanceof Map) {
+                                processRangeQuery(field, rangeValue, queryBuilder);
+                            }
+                        }
+                    }
+                }
+                case "match" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"match": {"field": "value"}}
+                        for (Map.Entry<String, Object> matchEntry : valueMap.entrySet()) {
+                            queryBuilder.must(QueryBuilders.matchQuery(matchEntry.getKey(), matchEntry.getValue()));
+                        }
+                    }
+                }
+                case "match_phrase" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"match_phrase": {"field": "value"}}
+                        for (Map.Entry<String, Object> matchPhraseEntry : valueMap.entrySet()) {
+                            queryBuilder.must(QueryBuilders.matchPhraseQuery(matchPhraseEntry.getKey(), matchPhraseEntry.getValue()));
+                        }
+                    }
+                }
+                case "prefix" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"prefix": {"field": "value"}}
+                        for (Map.Entry<String, Object> prefixEntry : valueMap.entrySet()) {
+                            queryBuilder.must(QueryBuilders.prefixQuery(prefixEntry.getKey(), prefixEntry.getValue().toString()));
+                        }
+                    }
+                }
+                case "exists" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"exists": {"field": "fieldname"}}
+                        Object fieldValue = valueMap.get("field");
+                        if (fieldValue != null) {
+                            queryBuilder.must(QueryBuilders.existsQuery(fieldValue.toString()));
+                        }
+                    }
+                }
+                case "regexp" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"regexp": {"field": "pattern"}}
+                        for (Map.Entry<String, Object> regexpEntry : valueMap.entrySet()) {
+                            queryBuilder.must(QueryBuilders.regexpQuery(regexpEntry.getKey(), regexpEntry.getValue().toString()));
+                        }
+                    }
+                }
+                case "terms" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // {"terms": {"field": ["value1", "value2"]}}
+                        for (Map.Entry<String, Object> termsEntry : valueMap.entrySet()) {
+                            if (termsEntry.getValue() instanceof List) {
+                                queryBuilder.must(QueryBuilders.termsQuery(termsEntry.getKey(), (List<?>) termsEntry.getValue()));
+                            }
+                        }
+                    }
+                }
+                case "multi_match" -> {
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        Object queryValue = valueMap.get("query");
+                        Object fieldsValue = valueMap.get("fields");
+                        if (queryValue != null && fieldsValue instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<String> fields = (List<String>) fieldsValue;
+                            queryBuilder.must(QueryBuilders.multiMatchQuery(queryValue, fields.toArray(new String[0])));
+                        }
+                    }
+                }
+                default -> {
+                    // Handle direct field-value pairs or unknown query types
+                    if (value instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) value;
+                        // This might be a field with nested operators like {"field": {"term": "value"}}
+                        processNestedQuery(key, valueMap, queryBuilder);
+                    } else {
+                        // Direct field-value mapping
+                        queryBuilder.must(QueryBuilders.termQuery(key, value));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Processes bool query conditions
+     *
+     * @param boolMap Bool query conditions
+     * @param queryBuilder Query builder to add conditions to
+     */
+    private void processBoolQuery(Map<String, Object> boolMap, BoolQueryBuilder queryBuilder) {
+        for (Map.Entry<String, Object> boolEntry : boolMap.entrySet()) {
+            String boolType = boolEntry.getKey();
+            Object boolValue = boolEntry.getValue();
+
+            if (boolValue instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> clauses = (List<Map<String, Object>>) boolValue;
+                for (Map<String, Object> clause : clauses) {
+                    BoolQueryBuilder subQuery = QueryBuilders.boolQuery();
+                    buildQueryFromMap(clause, subQuery);
+                    switch (boolType) {
+                        case "must" -> queryBuilder.must(subQuery);
+                        case "should" -> queryBuilder.should(subQuery);
+                        case "must_not" -> queryBuilder.mustNot(subQuery);
+                        case "filter" -> queryBuilder.filter(subQuery);
+                        default -> log.warn("Unsupported bool query type: {}", boolType);
+                    }
+                }
             }
         }
     }
@@ -1196,7 +1413,18 @@ public class DataDistributionTool implements Tool {
                 case "wildcard" -> processWildcardQuery(field, operatorValue, queryBuilder);
                 case "exists" -> queryBuilder.must(QueryBuilders.existsQuery(field));
                 case "regexp" -> processRegexpQuery(field, operatorValue, queryBuilder);
-                default -> log.warn("Unsupported query operator: {}", operator);
+                default -> {
+                    // Handle direct field-value mapping for nested structures
+                    if (operatorValue instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valueMap = (Map<String, Object>) operatorValue;
+                        BoolQueryBuilder nestedQuery = QueryBuilders.boolQuery();
+                        buildQueryFromMap(Map.of(operator, valueMap), nestedQuery);
+                        queryBuilder.must(nestedQuery);
+                    } else {
+                        log.warn("Unsupported query operator: {}", operator);
+                    }
+                }
             }
         }
     }
