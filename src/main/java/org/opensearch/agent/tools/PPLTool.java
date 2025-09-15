@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -211,9 +210,10 @@ public class PPLTool implements WithModelTool {
         Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         final String tenantId = parameters.get(TENANT_ID_FIELD);
         extractFromChatParameters(parameters);
-        List<String> indices = Optional.ofNullable(getIndexNameFromParameters(parameters, "index"))
-                .filter(list -> !list.isEmpty())
-                .orElseGet(() -> getIndexNameFromParameters(parameters, this.previousToolKey + ".output"));
+        List<String> indices = Optional
+            .ofNullable(getIndexNameFromParameters(parameters, "index"))
+            .filter(list -> !list.isEmpty())
+            .orElseGet(() -> getIndexNameFromParameters(parameters, this.previousToolKey + ".output"));
         if (indices.isEmpty()) {
             throw new IllegalArgumentException(
                 "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
@@ -223,10 +223,10 @@ public class PPLTool implements WithModelTool {
         if (StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
         }
-        for (String index: indices) {
+        for (String index : indices) {
             if (index.startsWith(".")) {
                 throw new IllegalArgumentException(
-                        "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                    "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
                         + index
                 );
             }
@@ -235,7 +235,19 @@ public class PPLTool implements WithModelTool {
             String tableInfo = indexInfo.get(TABLE_INFO_KEY);
             String mappings = indexInfo.get(MAPPING_KEY);
             String prompt = constructPrompt(tableInfo, question.strip(), indices);
-            Map<String, String> reformattedInput = Map.of("prompt", prompt, "mappings", mappings, "os_version", Version.CURRENT.toString(), "current_time", Instant.now().toString(), "datasourceType", parameters.getOrDefault("type", "Opensearch"));
+            Map<String, String> reformattedInput = Map
+                .of(
+                    "prompt",
+                    prompt,
+                    "mappings",
+                    mappings,
+                    "os_version",
+                    Version.CURRENT.toString(),
+                    "current_time",
+                    Instant.now().toString(),
+                    "datasourceType",
+                    parameters.getOrDefault("type", "Opensearch")
+                );
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
                 .parameters(Map.of("prompt", gson.toJson(reformattedInput)))
@@ -320,7 +332,7 @@ public class PPLTool implements WithModelTool {
         CountDownLatch latch = new CountDownLatch(indices.size());
         ConcurrentHashMap<String, String> tableInfos = new ConcurrentHashMap<>();
         ConcurrentHashMap<String, Object> mappingInfos = new ConcurrentHashMap<>();
-        for (String index: indices) {
+        for (String index : indices) {
             GetMappingsRequest getMappingsRequest = buildGetMappingRequest(index);
             client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
                 Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
@@ -334,7 +346,7 @@ public class PPLTool implements WithModelTool {
                     Map<String, Object> finalMappings = new HashMap<>();
                     if (mappings.isEmpty()) {
                         throw new IllegalArgumentException(
-                                "The querying index doesn't have mapping metadata, please add data to it or using another index."
+                            "The querying index doesn't have mapping metadata, please add data to it or using another index."
                         );
                     }
                     for (MappingMetadata mappingMetadata : mappings.values()) {
@@ -358,11 +370,11 @@ public class PPLTool implements WithModelTool {
                 String errorMessage = e.getMessage();
                 if (errorMessage.contains("no such index")) {
                     listener
-                            .onFailure(
-                                    new IllegalArgumentException(
-                                            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
-                                    )
-                            );
+                        .onFailure(
+                            new IllegalArgumentException(
+                                "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                            )
+                        );
                 } else {
                     listener.onFailure(e);
                 }
@@ -684,10 +696,7 @@ public class PPLTool implements WithModelTool {
         String indexName = parameters.get(key);
         try {
             List<String> list = gson.fromJson(indexName, List.class);
-            return list.stream()
-                    .map(Object::toString)
-                    .map(String::trim)
-                    .collect(Collectors.toList());
+            return list.stream().map(Object::toString).map(String::trim).collect(Collectors.toList());
         } catch (Exception e) {
             return List.of(indexName.trim());
         }
@@ -695,7 +704,7 @@ public class PPLTool implements WithModelTool {
 
     private String mergeTableInfo(ConcurrentHashMap<String, String> tableInfos) {
         StringBuilder mergedTableInfo = new StringBuilder();
-        for (Map.Entry<String, String> entry: tableInfos.entrySet()){
+        for (Map.Entry<String, String> entry : tableInfos.entrySet()) {
             mergedTableInfo.append(entry.getKey()).append("\n");
             mergedTableInfo.append(entry.getValue()).append("\n");
         }
