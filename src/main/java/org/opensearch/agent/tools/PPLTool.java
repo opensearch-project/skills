@@ -239,7 +239,7 @@ public class PPLTool implements WithModelTool {
                     "prompt",
                     prompt,
                     "mappings",
-                        indexInfo.get(MAPPING_KEY),
+                    indexInfo.get(MAPPING_KEY),
                     "os_version",
                     Version.CURRENT.toString(),
                     "current_time",
