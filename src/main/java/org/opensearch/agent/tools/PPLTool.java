@@ -231,16 +231,15 @@ public class PPLTool implements WithModelTool {
                 );
             }
         }
-        ActionListener<Map<String, String>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
-            String tableInfo = indexInfo.get(TABLE_INFO_KEY);
-            String mappings = indexInfo.get(MAPPING_KEY);
+        ActionListener<Map<String, Object>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
+            String tableInfo = indexInfo.get(TABLE_INFO_KEY).toString();
             String prompt = constructPrompt(tableInfo, question.strip(), indices);
-            Map<String, String> reformattedInput = Map
+            Map<String, Object> reformattedInput = Map
                 .of(
                     "prompt",
                     prompt,
                     "mappings",
-                    mappings,
+                        indexInfo.get(MAPPING_KEY),
                     "os_version",
                     Version.CURRENT.toString(),
                     "current_time",
@@ -250,7 +249,7 @@ public class PPLTool implements WithModelTool {
                 );
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Map.of("prompt", gson.toJson(reformattedInput)))
+                .parameters(Map.of("prompt", gson.toJson(gson.toJson(reformattedInput))))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
@@ -359,7 +358,7 @@ public class PPLTool implements WithModelTool {
                     latch.countDown();
                     if (latch.getCount() == 0) {
                         String mergedTableInfo = mergeTableInfo(tableInfos);
-                        actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, gson.toJson(mappingInfos)));
+                        actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, mappingInfos));
                     }
                 }, e -> {
                     log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
