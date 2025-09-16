@@ -82,6 +82,8 @@ public class PPLTool implements WithModelTool {
 
     public static final String TYPE = "PPLTool";
 
+    public static final String NO_ESCAPE_PARAMS = "no_escape_params";
+
     @Setter
     private Client client;
 
@@ -249,7 +251,7 @@ public class PPLTool implements WithModelTool {
                 );
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Map.of("prompt", gson.toJson(gson.toJson(reformattedInput))))
+                .parameters(Map.of("prompt", formatString(reformattedInput), NO_ESCAPE_PARAMS, "prompt"))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
@@ -747,5 +749,10 @@ public class PPLTool implements WithModelTool {
         Matcher matcher = pattern.matcher(input);
 
         return matcher.replaceAll("");
+    }
+
+    public String formatString(Map<String, Object> targetMap) {
+        String mapString = gson.toJson(gson.toJson(targetMap));
+        return mapString.substring(1, mapString.length() - 1);
     }
 }
