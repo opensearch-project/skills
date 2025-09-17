@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
+import static org.opensearch.ml.common.utils.ToolUtils.NO_ESCAPE_PARAMS;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -81,8 +82,6 @@ import lombok.extern.log4j.Log4j2;
 public class PPLTool implements WithModelTool {
 
     public static final String TYPE = "PPLTool";
-
-    public static final String NO_ESCAPE_PARAMS = "no_escape_params";
 
     @Setter
     private Client client;
