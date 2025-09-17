@@ -16,11 +16,6 @@ import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import lombok.SneakyThrows;
 
 public class DataDistributionToolIT extends BaseAgentToolsIT {
@@ -135,61 +130,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -204,37 +147,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray comparisonAnalysis = jsonResult.getAsJsonArray("comparisonAnalysis");
-
-        for (JsonElement element : comparisonAnalysis) {
-            JsonObject fieldComparison = element.getAsJsonObject();
-            String fieldName = fieldComparison.get("field").getAsString();
-            JsonArray topChanges = fieldComparison.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-                    double baselinePercentage = changeObj.get("baselinePercentage").getAsDouble();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-
-                    if ("error".equals(value)) {
-                        assertEquals(0.0, baselinePercentage, 0.01);
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("success".equals(value)) {
-                        assertEquals(0.667, baselinePercentage, 0.01);
-                        assertEquals(0.0, selectionPercentage, 0.01);
-                    } else if ("info".equals(value)) {
-                        assertEquals(0.333, baselinePercentage, 0.01);
-                        assertEquals(0.0, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        assertEquals(0.0, baselinePercentage, 0.01);
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            }
-        }
+        String expectedResult =
+            "{\"comparisonAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"success\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.67},{\"value\":\"info\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"1\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.67},{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.33},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"110.8\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"95.2\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"120.5\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.33},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -249,39 +164,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -315,61 +200,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2.0\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4.0\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -385,37 +218,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray comparisonAnalysis = jsonResult.getAsJsonArray("comparisonAnalysis");
-
-        for (JsonElement element : comparisonAnalysis) {
-            JsonObject fieldComparison = element.getAsJsonObject();
-            String fieldName = fieldComparison.get("field").getAsString();
-            JsonArray topChanges = fieldComparison.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-                    double baselinePercentage = changeObj.get("baselinePercentage").getAsDouble();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-
-                    if ("error".equals(value)) {
-                        assertEquals(0.0, baselinePercentage, 0.01);
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("success".equals(value)) {
-                        assertEquals(0.667, baselinePercentage, 0.01);
-                        assertEquals(0.0, selectionPercentage, 0.01);
-                    } else if ("info".equals(value)) {
-                        assertEquals(0.333, baselinePercentage, 0.01);
-                        assertEquals(0.0, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        assertEquals(0.0, baselinePercentage, 0.01);
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            }
-        }
+        String expectedResult =
+            "{\"comparisonAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"success\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.67},{\"value\":\"info\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"1.0\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.67},{\"value\":\"3.0\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2.0\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.33},{\"value\":\"4.0\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"110.8\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"95.2\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"120.5\",\"selectionPercentage\":0.0,\"baselinePercentage\":0.33},{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.33},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -431,58 +236,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4.0\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -497,61 +253,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -566,58 +270,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -632,61 +287,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -701,61 +304,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -770,58 +321,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -836,58 +338,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -902,58 +355,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -968,61 +372,9 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.75, selectionPercentage, 0.01);
-                    } else if ("warning".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("4".equals(value) || "2".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.5, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.25, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.25, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75,\"baselinePercentage\":0.0},{\"value\":\"warning\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"2\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"4\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"server-03\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"250.3\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.25,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 
     @SneakyThrows
@@ -1089,57 +441,8 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                 )
         );
 
-        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
-        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
-
-        for (JsonElement element : singleAnalysis) {
-            JsonObject fieldAnalysis = element.getAsJsonObject();
-            String fieldName = fieldAnalysis.get("field").getAsString();
-            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
-
-            if ("status".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("error".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(1.0, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("level".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("3".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("4".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("host".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    String value = changeObj.get("value").getAsString();
-
-                    if ("server-01".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.667, selectionPercentage, 0.01);
-                    } else if ("server-02".equals(value)) {
-                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                        assertEquals(0.333, selectionPercentage, 0.01);
-                    }
-                }
-            } else if ("response_time".equals(fieldName)) {
-                for (JsonElement change : topChanges) {
-                    JsonObject changeObj = change.getAsJsonObject();
-                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
-                    assertEquals(0.333, selectionPercentage, 0.01);
-                }
-            }
-        }
+        String expectedResult =
+            "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0,\"baselinePercentage\":0.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"4.0\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67,\"baselinePercentage\":0.0},{\"value\":\"server-02\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"180.7\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0},{\"value\":\"300.5\",\"selectionPercentage\":0.33,\"baselinePercentage\":0.0}]}]}";
+        assertEquals(expectedResult, result);
     }
 }
