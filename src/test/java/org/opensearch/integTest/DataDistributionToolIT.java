@@ -16,7 +16,9 @@ import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import lombok.SneakyThrows;
@@ -132,24 +134,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Parse and validate JSON structure
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("singleAnalysis should contain at least one field analysis", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
 
-        // Verify structure of first analysis item
-        JsonElement firstItem = singleAnalysis.getAsJsonArray().get(0);
-        assertTrue("Analysis item should be a JSON object", firstItem.isJsonObject());
-        assertTrue("Analysis item should have 'field' property", firstItem.getAsJsonObject().has("field"));
-        assertTrue("Analysis item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
-        assertTrue("Analysis item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -163,28 +203,38 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain comparisonAnalysis", result.contains("comparisonAnalysis"));
 
-        // Parse and validate JSON structure
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have comparisonAnalysis property", jsonResult.getAsJsonObject().has("comparisonAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray comparisonAnalysis = jsonResult.getAsJsonArray("comparisonAnalysis");
 
-        JsonElement comparisonAnalysis = jsonResult.getAsJsonObject().get("comparisonAnalysis");
-        assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
-        assertTrue("comparisonAnalysis should contain at least one field comparison", comparisonAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : comparisonAnalysis) {
+            JsonObject fieldComparison = element.getAsJsonObject();
+            String fieldName = fieldComparison.get("field").getAsString();
+            JsonArray topChanges = fieldComparison.getAsJsonArray("topChanges");
 
-        // Verify structure of first comparison item
-        JsonElement firstItem = comparisonAnalysis.getAsJsonArray().get(0);
-        assertTrue("Comparison item should be a JSON object", firstItem.isJsonObject());
-        assertTrue("Comparison item should have 'field' property", firstItem.getAsJsonObject().has("field"));
-        assertTrue("Comparison item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
-        assertTrue("Comparison item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+                    double baselinePercentage = changeObj.get("baselinePercentage").getAsDouble();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
 
-        // Verify divergence is a valid number
-        double divergence = firstItem.getAsJsonObject().get("divergence").getAsDouble();
-        assertTrue("Divergence should be non-negative", divergence >= 0.0);
+                    if ("error".equals(value)) {
+                        assertEquals(0.0, baselinePercentage, 0.01);
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("success".equals(value)) {
+                        assertEquals(0.667, baselinePercentage, 0.01);
+                        assertEquals(0.0, selectionPercentage, 0.01);
+                    } else if ("info".equals(value)) {
+                        assertEquals(0.333, baselinePercentage, 0.01);
+                        assertEquals(0.0, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        assertEquals(0.0, baselinePercentage, 0.01);
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -198,17 +248,40 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Parse and validate JSON structure with filter applied
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("singleAnalysis should contain field analyses even with filter", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -241,23 +314,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Parse and validate PPL query results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("PPL singleAnalysis should contain field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
 
-        // Verify PPL results have proper structure
-        JsonElement firstItem = singleAnalysis.getAsJsonArray().get(0);
-        assertTrue("PPL analysis item should have 'field' property", firstItem.getAsJsonObject().has("field"));
-        assertTrue("PPL analysis item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
-        assertTrue("PPL analysis item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -272,23 +384,38 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain comparisonAnalysis", result.contains("comparisonAnalysis"));
 
-        // Parse and validate PPL comparison results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have comparisonAnalysis property", jsonResult.getAsJsonObject().has("comparisonAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray comparisonAnalysis = jsonResult.getAsJsonArray("comparisonAnalysis");
 
-        JsonElement comparisonAnalysis = jsonResult.getAsJsonObject().get("comparisonAnalysis");
-        assertTrue("comparisonAnalysis should be a JSON array", comparisonAnalysis.isJsonArray());
-        assertTrue("PPL comparisonAnalysis should contain field comparisons", comparisonAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : comparisonAnalysis) {
+            JsonObject fieldComparison = element.getAsJsonObject();
+            String fieldName = fieldComparison.get("field").getAsString();
+            JsonArray topChanges = fieldComparison.getAsJsonArray("topChanges");
 
-        // Verify PPL comparison results have proper structure
-        JsonElement firstItem = comparisonAnalysis.getAsJsonArray().get(0);
-        assertTrue("PPL comparison item should have 'field' property", firstItem.getAsJsonObject().has("field"));
-        assertTrue("PPL comparison item should have 'divergence' property", firstItem.getAsJsonObject().has("divergence"));
-        assertTrue("PPL comparison item should have 'topChanges' property", firstItem.getAsJsonObject().has("topChanges"));
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+                    double baselinePercentage = changeObj.get("baselinePercentage").getAsDouble();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+
+                    if ("error".equals(value)) {
+                        assertEquals(0.0, baselinePercentage, 0.01);
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("success".equals(value)) {
+                        assertEquals(0.667, baselinePercentage, 0.01);
+                        assertEquals(0.0, selectionPercentage, 0.01);
+                    } else if ("info".equals(value)) {
+                        assertEquals(0.333, baselinePercentage, 0.01);
+                        assertEquals(0.0, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        assertEquals(0.0, baselinePercentage, 0.01);
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -303,17 +430,59 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate custom PPL query results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Custom PPL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -327,17 +496,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate DSL query type results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("DSL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -351,17 +565,59 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate multiple filters results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Multiple filters should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -375,17 +631,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate custom size parameter results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Custom size should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -399,17 +700,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate custom time field results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Custom time field should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -423,17 +769,59 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate range filter results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Range filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -447,17 +835,59 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate match filter results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Match filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -471,16 +901,59 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Raw DSL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -494,17 +967,62 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate exists filter results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Exists filter should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.75, selectionPercentage, 0.01);
+                    } else if ("warning".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("4".equals(value) || "2".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.5, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value) || "server-03".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.25, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.25, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 
     @SneakyThrows
@@ -570,16 +1088,58 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     TEST_DATA_INDEX_NAME
                 )
         );
-        assertNotNull("Result should not be null", result);
-        assertTrue("Result should contain singleAnalysis", result.contains("singleAnalysis"));
 
-        // Validate complex PPL query results
-        JsonElement jsonResult = JsonParser.parseString(result);
-        assertTrue("Result should be a JSON object", jsonResult.isJsonObject());
-        assertTrue("Result should have singleAnalysis property", jsonResult.getAsJsonObject().has("singleAnalysis"));
+        JsonObject jsonResult = JsonParser.parseString(result).getAsJsonObject();
+        JsonArray singleAnalysis = jsonResult.getAsJsonArray("singleAnalysis");
 
-        JsonElement singleAnalysis = jsonResult.getAsJsonObject().get("singleAnalysis");
-        assertTrue("singleAnalysis should be a JSON array", singleAnalysis.isJsonArray());
-        assertTrue("Complex PPL query should return field analyses", singleAnalysis.getAsJsonArray().size() > 0);
+        for (JsonElement element : singleAnalysis) {
+            JsonObject fieldAnalysis = element.getAsJsonObject();
+            String fieldName = fieldAnalysis.get("field").getAsString();
+            JsonArray topChanges = fieldAnalysis.getAsJsonArray("topChanges");
+
+            if ("status".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("error".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(1.0, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("level".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("3".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("4".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("host".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    String value = changeObj.get("value").getAsString();
+
+                    if ("server-01".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.667, selectionPercentage, 0.01);
+                    } else if ("server-02".equals(value)) {
+                        double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                        assertEquals(0.333, selectionPercentage, 0.01);
+                    }
+                }
+            } else if ("response_time".equals(fieldName)) {
+                for (JsonElement change : topChanges) {
+                    JsonObject changeObj = change.getAsJsonObject();
+                    double selectionPercentage = changeObj.get("selectionPercentage").getAsDouble();
+                    assertEquals(0.333, selectionPercentage, 0.01);
+                }
+            }
+        }
     }
 }
