@@ -20,7 +20,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.jsoup.Connection;
@@ -29,6 +28,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.opensearch.agent.ToolPlugin;
+import org.opensearch.agent.httpclient.HttpClientFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
@@ -91,7 +91,7 @@ public class WebSearchTool implements Tool {
     private Map<String, Object> attributes;
 
     public WebSearchTool(ThreadPool threadPool) {
-        this.httpClient = HttpClients.createDefault();
+        this.httpClient = HttpClientFactory.getCloseableHttpClient();
         this.threadPool = threadPool;
         this.attributes = new HashMap<>();
         attributes.put(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
@@ -160,15 +160,21 @@ public class WebSearchTool implements Tool {
                             listener.onFailure(new IllegalArgumentException("Unsupported search engine: %s".formatted(engine)));
                             return;
                         }
-                        CloseableHttpResponse res = httpClient.execute(getRequest);
-                        if (res.getCode() >= HttpStatus.SC_BAD_REQUEST) {
-                            listener
-                                .onFailure(
-                                    new IllegalArgumentException("Web search failed: %d %s".formatted(res.getCode(), res.getReasonPhrase()))
-                                );
-                        } else {
-                            String responseString = EntityUtils.toString(res.getEntity());
-                            parseResponse(responseString, authorization, parsedNextPage, engine, customResUrlJsonpath, listener);
+                        try (CloseableHttpResponse res = httpClient.execute(getRequest)) {
+                            if (res.getCode() >= HttpStatus.SC_BAD_REQUEST) {
+                                listener
+                                    .onFailure(
+                                        new IllegalArgumentException(
+                                            "Web search failed: %d %s".formatted(res.getCode(), res.getReasonPhrase())
+                                        )
+                                    );
+                            } else {
+                                String responseString = EntityUtils.toString(res.getEntity());
+                                parseResponse(responseString, authorization, parsedNextPage, engine, customResUrlJsonpath, listener);
+                            }
+                        } catch (Exception e) {
+                            log.error("Unexpected exception in httpclient", e);
+                            listener.onFailure(new IllegalStateException("Web search failed: %s".formatted(e.getMessage())));
                         }
                     }
                 } catch (Exception e) {
