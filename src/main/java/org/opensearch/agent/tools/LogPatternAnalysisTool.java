@@ -5,7 +5,6 @@
 
 package org.opensearch.agent.tools;
 
-import static org.opensearch.agent.tools.utils.ToolHelper.getPPLTransportActionListener;
 import static org.opensearch.agent.tools.utils.clustering.HierarchicalAgglomerativeClustering.calculateCosineSimilarity;
 import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
@@ -28,20 +27,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.json.JSONObject;
+import org.opensearch.agent.tools.utils.PPLExecuteHelper;
 import org.opensearch.agent.tools.utils.clustering.ClusteringHelper;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.utils.ToolUtils;
-import org.opensearch.sql.plugin.transport.PPLQueryAction;
-import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
-import org.opensearch.sql.ppl.domain.PPLQueryRequest;
 import org.opensearch.transport.client.Client;
-
-import com.google.common.collect.ImmutableMap;
-import com.google.gson.reflect.TypeToken;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -386,7 +379,7 @@ public class LogPatternAnalysisTool implements Tool {
             return new PatternAnalysisResult(tracePatternMap, patternCountMap, patternVectors);
         };
 
-        executePPLAndParseResult(ppl, rowParser, listener);
+        PPLExecuteHelper.executePPLAndParseResult(client, ppl, PPLExecuteHelper.dataRowsParser(rowParser), listener);
     }
 
     private String buildLogPatternPPL(
@@ -638,53 +631,76 @@ public class LogPatternAnalysisTool implements Tool {
         };
 
         log.debug("Executing base time range pattern PPL: {}", baseTimeRangeLogPatternPPL);
-        executePPLAndParseResult(baseTimeRangeLogPatternPPL, dataRowsParser, ActionListener.wrap(basePatterns -> {
-            try {
-                mergeSimilarPatterns(basePatterns);
+        PPLExecuteHelper
+            .executePPLAndParseResult(
+                client,
+                baseTimeRangeLogPatternPPL,
+                PPLExecuteHelper.dataRowsParser(dataRowsParser),
+                ActionListener.wrap(basePatterns -> {
+                    try {
+                        mergeSimilarPatterns(basePatterns);
 
-                log.debug("Base patterns processed: {} patterns", basePatterns.size());
+                        log.debug("Base patterns processed: {} patterns", basePatterns.size());
 
-                // Step 2: Generate log patterns for selection time range
-                String selectionTimeRangeLogPatternPPL = buildLogPatternPPL(
-                    params.index,
-                    params.timeField,
-                    params.logFieldName,
-                    params.selectionTimeRangeStart,
-                    params.selectionTimeRangeEnd
-                );
+                        // Step 2: Generate log patterns for selection time range
+                        String selectionTimeRangeLogPatternPPL = buildLogPatternPPL(
+                            params.index,
+                            params.timeField,
+                            params.logFieldName,
+                            params.selectionTimeRangeStart,
+                            params.selectionTimeRangeEnd
+                        );
 
-                log.debug("Executing selection time range pattern PPL: {}", selectionTimeRangeLogPatternPPL);
-                executePPLAndParseResult(selectionTimeRangeLogPatternPPL, dataRowsParser, ActionListener.wrap(selectionPatterns -> {
-                    mergeSimilarPatterns(selectionPatterns);
+                        log.debug("Executing selection time range pattern PPL: {}", selectionTimeRangeLogPatternPPL);
+                        PPLExecuteHelper
+                            .executePPLAndParseResult(
+                                client,
+                                selectionTimeRangeLogPatternPPL,
+                                PPLExecuteHelper.dataRowsParser(dataRowsParser),
+                                ActionListener.wrap(selectionPatterns -> {
+                                    mergeSimilarPatterns(selectionPatterns);
 
-                    log.debug("Selection patterns processed: {} patterns", selectionPatterns.size());
+                                    log.debug("Selection patterns processed: {} patterns", selectionPatterns.size());
 
-                    // Step 3: Calculate pattern differences
-                    List<PatternDiffResult> patternDifferences = calculatePatternDifferences(basePatterns, selectionPatterns);
+                                    // Step 3: Calculate pattern differences
+                                    List<PatternDiffResult> patternDifferences = calculatePatternDifferences(
+                                        basePatterns,
+                                        selectionPatterns
+                                    );
 
-                    // Step 4: Sort the difference and get top 10
-                    List<PatternDiffResult> topDiffs = Stream
-                        .concat(
-                            patternDifferences.stream().filter(diff -> !Objects.isNull(diff.lift)).sorted(comparator).limit(10),
-                            patternDifferences.stream().filter(diff -> Objects.isNull(diff.lift)).sorted(comparator).limit(10)
-                        )
-                        .collect(Collectors.toList());
+                                    // Step 4: Sort the difference and get top 10
+                                    List<PatternDiffResult> topDiffs = Stream
+                                        .concat(
+                                            patternDifferences
+                                                .stream()
+                                                .filter(diff -> !Objects.isNull(diff.lift))
+                                                .sorted(comparator)
+                                                .limit(10),
+                                            patternDifferences
+                                                .stream()
+                                                .filter(diff -> Objects.isNull(diff.lift))
+                                                .sorted(comparator)
+                                                .limit(10)
+                                        )
+                                        .collect(Collectors.toList());
 
-                    Map<String, Object> finalResult = new HashMap<>();
-                    finalResult.put("patternMapDifference", topDiffs);
+                                    Map<String, Object> finalResult = new HashMap<>();
+                                    finalResult.put("patternMapDifference", topDiffs);
 
-                    log.debug("Pattern analysis completed: {} differences found", patternDifferences.size());
-                    listener.onResponse((T) gson.toJson(finalResult));
-                }, listener::onFailure));
+                                    log.debug("Pattern analysis completed: {} differences found", patternDifferences.size());
+                                    listener.onResponse((T) gson.toJson(finalResult));
+                                }, listener::onFailure)
+                            );
 
-            } catch (Exception e) {
-                log.error("Failed to process base pattern response", e);
-                listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
-            }
-        }, error -> {
-            log.error("Failed to execute pattern analysis", error);
-            listener.onFailure(new RuntimeException("Analysis failed: " + error.getMessage(), error));
-        }));
+                    } catch (Exception e) {
+                        log.error("Failed to process base pattern response", e);
+                        listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
+                    }
+                }, error -> {
+                    log.error("Failed to execute pattern analysis", error);
+                    listener.onFailure(new RuntimeException("Analysis failed: " + error.getMessage(), error));
+                })
+            );
     }
 
     private <T> void logInsight(AnalysisParameters params, ActionListener<T> listener) {
@@ -763,19 +779,25 @@ public class LogPatternAnalysisTool implements Tool {
             return patternWithSamplesList;
         };
 
-        executePPLAndParseResult(selectionTimeRangeLogPatternPPL, dataRowsParser, ActionListener.wrap(logInsights -> {
-            try {
-                Map<String, Object> finalResult = new HashMap<>();
-                finalResult.put("logInsights", logInsights);
-                listener.onResponse((T) gson.toJson(finalResult));
-            } catch (Exception e) {
-                log.error("Failed to process base pattern response", e);
-                listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
-            }
-        }, error -> {
-            log.error("Failed to execute log insights analysis", error);
-            listener.onFailure(new RuntimeException("Log insights analysis failed: " + error.getMessage(), error));
-        }));
+        PPLExecuteHelper
+            .executePPLAndParseResult(
+                client,
+                selectionTimeRangeLogPatternPPL,
+                PPLExecuteHelper.dataRowsParser(dataRowsParser),
+                ActionListener.wrap(logInsights -> {
+                    try {
+                        Map<String, Object> finalResult = new HashMap<>();
+                        finalResult.put("logInsights", logInsights);
+                        listener.onResponse((T) gson.toJson(finalResult));
+                    } catch (Exception e) {
+                        log.error("Failed to process base pattern response", e);
+                        listener.onFailure(new RuntimeException("Failed to process base patterns: " + e.getMessage(), e));
+                    }
+                }, error -> {
+                    log.error("Failed to execute log insights analysis", error);
+                    listener.onFailure(new RuntimeException("Log insights analysis failed: " + error.getMessage(), error));
+                })
+            );
     }
 
     private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime) {
@@ -822,15 +844,6 @@ public class LogPatternAnalysisTool implements Tool {
         }
 
         return differences;
-    }
-
-    private void handlePPLError(Throwable error) {
-        String errorMsg = error.getMessage();
-        String errorType = error.getClass().getSimpleName();
-        log.error("PPL execution failed [{}]: {}", errorType, errorMsg);
-        String errorString = error.toString();
-        String fullErrorMessage = errorMsg != null ? errorMsg : errorString;
-        throw new RuntimeException("PPL execution failed: " + fullErrorMessage, error);
     }
 
     private double jaccardSimilarity(String pattern1, String pattern2) {
@@ -912,69 +925,6 @@ public class LogPatternAnalysisTool implements Tool {
         // Replace repeated <*> with single <*> using compiled pattern
         pattern = REPEATED_WILDCARDS_PATTERN.matcher(pattern).replaceAll("<*>");
         return pattern;
-    }
-
-    private <T> void executePPLAndParseResult(String ppl, Function<List<List<Object>>, T> rowParser, ActionListener<T> listener) {
-        try {
-            JSONObject jsonContent = new JSONObject(ImmutableMap.of("query", ppl));
-            PPLQueryRequest pplQueryRequest = new PPLQueryRequest(ppl, jsonContent, null, "jdbc");
-            TransportPPLQueryRequest transportPPLQueryRequest = new TransportPPLQueryRequest(pplQueryRequest);
-
-            client
-                .execute(
-                    PPLQueryAction.INSTANCE,
-                    transportPPLQueryRequest,
-                    getPPLTransportActionListener(ActionListener.wrap(transportPPLQueryResponse -> {
-                        String result = transportPPLQueryResponse.getResult();
-                        if (Strings.isEmpty(result)) {
-                            listener.onFailure(new RuntimeException("Empty PPL response"));
-                        } else {
-                            Map<String, Object> pplResult = gson.fromJson(result, new TypeToken<Map<String, Object>>() {
-                            }.getType());
-                            if (pplResult.containsKey("error")) {
-                                Object errorObj = pplResult.get("error");
-                                String errorDetail;
-                                if (errorObj instanceof Map) {
-                                    Map<?, ?> errorMap = (Map<?, ?>) errorObj;
-                                    Object reason = errorMap.get("reason");
-                                    errorDetail = reason != null ? reason.toString() : errorMap.toString();
-                                } else {
-                                    errorDetail = errorObj != null ? errorObj.toString() : "Unknown error";
-                                }
-                                throw new RuntimeException("PPL query error: " + errorDetail);
-                            }
-
-                            Object datarowsObj = pplResult.get("datarows");
-                            if (!(datarowsObj instanceof List)) {
-                                throw new IllegalStateException("Invalid PPL response format: missing or invalid datarows");
-                            }
-
-                            @SuppressWarnings("unchecked")
-                            List<List<Object>> dataRows = (List<List<Object>>) datarowsObj;
-                            if (dataRows.isEmpty()) {
-                                log.warn("PPL query returned no data rows for the specified criteria");
-                            }
-                            listener.onResponse(rowParser.apply(dataRows));
-                        }
-                    }, error -> {
-                        try {
-                            handlePPLError(error);
-                        } catch (Exception handledException) {
-                            listener.onFailure(handledException);
-                        }
-                    }))
-                );
-        } catch (Exception e) {
-            String errorMessage = String
-                .format(
-                    Locale.ROOT,
-                    "Failed to execute PPL query: %s. Query: %s",
-                    e.getMessage(),
-                    ppl.substring(0, Math.min(100, ppl.length()))
-                );
-            log.error(errorMessage, e);
-            listener.onFailure(new RuntimeException(errorMessage, e));
-        }
     }
 
     public static class Factory implements Tool.Factory<LogPatternAnalysisTool> {
