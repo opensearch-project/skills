@@ -233,6 +233,10 @@ public class PPLTool implements WithModelTool {
             }
         }
         ActionListener<Map<String, Object>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
+            if (!indexInfo.containsKey(TABLE_INFO_KEY) || !indexInfo.containsKey(MAPPING_KEY)) {
+                log.error("The table info and mappings are missing in: {}", indexInfo);
+                listener.onFailure(new RuntimeException("The table info and mappings are missing in: " + indexInfo));
+            }
             String tableInfo = indexInfo.get(TABLE_INFO_KEY).toString();
             String prompt = constructPrompt(tableInfo, question.strip(), indices);
             Map<String, Object> reformattedInput = Map
@@ -344,11 +348,6 @@ public class PPLTool implements WithModelTool {
                 client.search(searchRequest, ActionListener.wrap(searchResponse -> {
                     SearchHit[] searchHits = searchResponse.getHits().getHits();
                     Map<String, Object> finalMappings = new HashMap<>();
-                    if (mappings.isEmpty()) {
-                        throw new IllegalArgumentException(
-                            "The querying index doesn't have mapping metadata, please add data to it or using another index."
-                        );
-                    }
                     for (MappingMetadata mappingMetadata : mappings.values()) {
                         Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
                         MergeRuleHelper.merge(mappingSource, finalMappings);
@@ -362,7 +361,7 @@ public class PPLTool implements WithModelTool {
                         actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, mappingInfos));
                     }
                 }, e -> {
-                    log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
+                    log.error(String.format(Locale.ROOT, "fail to search index: %s with error: %s", firstIndexName, e.getMessage()), e);
                     listener.onFailure(e);
                 }));
             }, e -> {
