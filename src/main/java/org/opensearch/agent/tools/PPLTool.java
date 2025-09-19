@@ -372,7 +372,7 @@ public class PPLTool implements WithModelTool {
                     listener
                         .onFailure(
                             new IllegalArgumentException(
-                                "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
+                                "Return this final answer to human directly and do not use other tools: 'Please provide the existing index name(s)'. Please try to directly send this message to human to ask for index name"
                             )
                         );
                 } else {
