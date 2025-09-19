@@ -233,7 +233,7 @@ public class PPLTool implements WithModelTool {
             }
         }
         ActionListener<Map<String, Object>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
-            if (!indexInfo.containsKey(TABLE_INFO_KEY) || !indexInfo.containsKey(MAPPING_KEY)) {
+            if (Objects.isNull(indexInfo.get(TABLE_INFO_KEY)) || Objects.isNull(indexInfo.get(MAPPING_KEY))) {
                 log.error("The table info and mappings are missing in: {}", indexInfo);
                 listener.onFailure(new RuntimeException("The table info and mappings are missing in: " + indexInfo));
             }
