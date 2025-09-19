@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -321,6 +322,18 @@ public class PPLToolTests {
                     assertEquals("source=demo| head 1", returnResults.get("ppl"));
                 }, e -> { log.info(e); })
             );
+
+    }
+
+    @Test
+    public void testTool_basic() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool", "head", "-5"));
+        assertEquals(tool.getDescription(), PPLTool.Factory.getInstance().getDefaultDescription());
+        assertEquals(tool.getType(), PPLTool.Factory.getInstance().getDefaultType());
+        assertEquals(null, PPLTool.Factory.getInstance().getDefaultVersion());
+        assertEquals(List.of(COMMON_MODEL_ID_FIELD), PPLTool.Factory.getInstance().getAllModelKeys());
 
     }
 
