@@ -68,35 +68,13 @@ public class SearchAnomalyDetectorsToolTests {
         emptyParams = Collections.emptyMap();
         nonEmptyParams = Map.of("detectorName", "foo");
 
-        testDetector = new AnomalyDetector(
-            "foo-id",
-            1L,
-            "foo-name",
-            "foo-description",
-            "foo-time-field",
-            new ArrayList<String>(Arrays.asList("foo-index")),
-            Collections.emptyList(),
-            null,
-            new IntervalTimeConfiguration(5, ChronoUnit.MINUTES),
-            null,
-            1,
-            Collections.emptyMap(),
-            1,
-            Instant.now(),
-            Collections.emptyList(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        testDetector = Mockito.mock(AnomalyDetector.class);
+        when(testDetector.getId()).thenReturn("foo-id");
+        when(testDetector.getName()).thenReturn("foo-name");
+        when(testDetector.getDetectorType()).thenReturn("SINGLE_ENTITY");
+        when(testDetector.getDescription()).thenReturn("foo-description");
+        when(testDetector.getIndices()).thenReturn(Arrays.asList("foo-index"));
+        when(testDetector.getLastUpdateTime()).thenReturn(Instant.now());
     }
 
     @Test
