@@ -1125,21 +1125,22 @@ public class DataDistributionTool implements Tool {
             List<ChangeItem> changes = allKeys.stream().map(value -> {
                 double selectionPercentage = Math.round(diff.selectionDist.getOrDefault(value, 0.0) * PERCENTAGE_MULTIPLIER)
                     / PERCENTAGE_MULTIPLIER;
-                Double baselinePercentage = hasBaseline ? 
-                    Math.round(diff.baselineDist.getOrDefault(value, 0.0) * PERCENTAGE_MULTIPLIER) / PERCENTAGE_MULTIPLIER : 
-                    null;
+                Double baselinePercentage = hasBaseline
+                    ? Math.round(diff.baselineDist.getOrDefault(value, 0.0) * PERCENTAGE_MULTIPLIER) / PERCENTAGE_MULTIPLIER
+                    : null;
                 return new ChangeItem(value, selectionPercentage, baselinePercentage);
             }).collect(Collectors.toList());
 
             List<ChangeItem> topChanges = changes
                 .stream()
                 .sorted(
-                    (a, b) -> hasBaseline ?
-                        Double.compare(
-                            Math.max(b.baselinePercentage != null ? b.baselinePercentage : 0.0, b.selectionPercentage),
-                            Math.max(a.baselinePercentage != null ? a.baselinePercentage : 0.0, a.selectionPercentage)
-                        ) :
-                        Double.compare(b.selectionPercentage, a.selectionPercentage)
+                    (a, b) -> hasBaseline
+                        ? Double
+                            .compare(
+                                Math.max(b.baselinePercentage != null ? b.baselinePercentage : 0.0, b.selectionPercentage),
+                                Math.max(a.baselinePercentage != null ? a.baselinePercentage : 0.0, a.selectionPercentage)
+                            )
+                        : Double.compare(b.selectionPercentage, a.selectionPercentage)
                 )
                 .limit(TOP_CHANGES_LIMIT)
                 .collect(Collectors.toList());
