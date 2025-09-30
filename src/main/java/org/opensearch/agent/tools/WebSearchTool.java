@@ -8,6 +8,9 @@ package org.opensearch.agent.tools;
 import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,24 +20,25 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpStatus;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.agent.ToolPlugin;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.ml.common.httpclient.MLHttpClientFactory;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.utils.StringUtils;
 import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.threadpool.ThreadPool;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
@@ -45,6 +49,14 @@ import com.jayway.jsonpath.JsonPath;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import software.amazon.awssdk.core.internal.http.async.SimpleHttpContentPublisher;
+import software.amazon.awssdk.http.SdkHttpFullRequest;
+import software.amazon.awssdk.http.SdkHttpFullResponse;
+import software.amazon.awssdk.http.SdkHttpMethod;
+import software.amazon.awssdk.http.SdkHttpResponse;
+import software.amazon.awssdk.http.async.AsyncExecuteRequest;
+import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
+import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
 
 @Log4j2
 @Setter
@@ -86,13 +98,14 @@ public class WebSearchTool implements Tool {
     private String description = DEFAULT_DESCRIPTION;
     @Getter
     private String version;
-    private CloseableHttpClient httpClient;
+    private final SdkAsyncHttpClient httpClient;
 
     private final ThreadPool threadPool;
     private Map<String, Object> attributes;
 
     public WebSearchTool(ThreadPool threadPool) {
-        this.httpClient = HttpClients.createDefault();
+        // Use 1s for connection timeout, 3s for read timeout, 30 for max connections of httpclient.
+        this.httpClient = MLHttpClientFactory.getAsyncHttpClient(Duration.ofSeconds(1), Duration.ofSeconds(3), 30);
         this.threadPool = threadPool;
         this.attributes = new HashMap<>();
         attributes.put(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
@@ -101,8 +114,8 @@ public class WebSearchTool implements Tool {
 
     @Override
     public <T> void run(Map<String, String> originalParameters, ActionListener<T> listener) {
-        Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
         try {
+            Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, attributes);
             // common search parameters
             String query = parameters.getOrDefault("query", parameters.get("question")).replaceAll(" ", "+");
             String engine = parameters.getOrDefault("engine", "google");
@@ -119,62 +132,59 @@ public class WebSearchTool implements Tool {
             String offsetKey = parameters.getOrDefault("offset_key", "offset");
             String limitKey = parameters.getOrDefault("limit_key", "limit");
             String customResUrlJsonpath = parameters.get("custom_res_url_jsonpath");
+
             threadPool.executor(ToolPlugin.WEBSEARCH_CRAWLER_THREADPOOL).submit(() -> {
-                try {
-                    String parsedNextPage = null;
-                    if ("duckduckgo".equalsIgnoreCase(engine)) {
-                        // duckduckgo has different approach to other APIs as it's not a standard public API.
-                        if (nextPage != null) {
-                            fetchDuckDuckGoResult(nextPage, listener);
-                        } else {
-                            fetchDuckDuckGoResult(buildDDGEndpoint(getDefaultEndpoint(engine), query), listener);
-                        }
+                String parsedNextPage;
+                if ("duckduckgo".equalsIgnoreCase(engine)) {
+                    // duckduckgo has different approach to other APIs as it's not a standard public API.
+                    if (nextPage != null) {
+                        fetchDuckDuckGoResult(nextPage, listener);
                     } else {
-                        HttpGet getRequest = null;
-                        if ("google".equalsIgnoreCase(engine)) {
-                            if (nextPage != null) {
-                                getRequest = new HttpGet(nextPage);
-                                parsedNextPage = buildGoogleNextPage(endpoint, engineId, query, apiKey, nextPage);
-                            } else {
-                                getRequest = new HttpGet(buildGoogleUrl(endpoint, engineId, query, apiKey, 0));
-                                parsedNextPage = buildGoogleUrl(endpoint, engineId, query, apiKey, 10);
-                            }
-                        } else if ("bing".equalsIgnoreCase(engine)) {
-                            if (nextPage != null) {
-                                getRequest = new HttpGet(nextPage);
-                                parsedNextPage = buildBingNextPage(endpoint, query, nextPage);
-                            } else {
-                                getRequest = new HttpGet(buildBingUrl(endpoint, query, 0));
-                                parsedNextPage = buildBingUrl(endpoint, query, 10);
-                            }
-                            getRequest.addHeader("Ocp-Apim-Subscription-Key", apiKey);
-                        } else if ("custom".equalsIgnoreCase(engine)) {
-                            if (nextPage != null) {
-                                getRequest = new HttpGet(nextPage);
-                                parsedNextPage = buildCustomNextPage(endpoint, nextPage, queryKey, query, offsetKey, limitKey);
-                            } else {
-                                getRequest = new HttpGet(buildCustomUrl(endpoint, queryKey, query, offsetKey, 0, limitKey));
-                                parsedNextPage = buildCustomUrl(endpoint, queryKey, query, offsetKey, 10, limitKey);
-                            }
-                            getRequest.addHeader("Authorization", authorization);
-                        } else {
-                            // Search engine not supported.
-                            listener.onFailure(new IllegalArgumentException("Unsupported search engine: %s".formatted(engine)));
-                            return;
-                        }
-                        CloseableHttpResponse res = httpClient.execute(getRequest);
-                        if (res.getCode() >= HttpStatus.SC_BAD_REQUEST) {
-                            listener
-                                .onFailure(
-                                    new IllegalArgumentException("Web search failed: %d %s".formatted(res.getCode(), res.getReasonPhrase()))
-                                );
-                        } else {
-                            String responseString = EntityUtils.toString(res.getEntity());
-                            parseResponse(responseString, authorization, parsedNextPage, engine, customResUrlJsonpath, listener);
-                        }
+                        fetchDuckDuckGoResult(buildDDGEndpoint(getDefaultEndpoint(engine), query), listener);
                     }
-                } catch (Exception e) {
-                    listener.onFailure(new IllegalStateException("Web search failed: %s".formatted(e.getMessage())));
+                } else {
+                    SdkHttpFullRequest.Builder builder = SdkHttpFullRequest.builder().method(SdkHttpMethod.GET);
+                    if ("google".equalsIgnoreCase(engine)) {
+                        if (nextPage != null) {
+                            builder.uri(nextPage);
+                            parsedNextPage = buildGoogleNextPage(endpoint, engineId, query, apiKey, nextPage);
+                        } else {
+                            builder.uri(buildGoogleUrl(endpoint, engineId, query, apiKey, 0));
+                            parsedNextPage = buildGoogleUrl(endpoint, engineId, query, apiKey, 10);
+                        }
+                    } else if ("bing".equalsIgnoreCase(engine)) {
+                        if (nextPage != null) {
+                            builder.uri(nextPage);
+                            parsedNextPage = buildBingNextPage(endpoint, query, nextPage);
+                        } else {
+                            builder.uri(buildBingUrl(endpoint, query, 0));
+                            parsedNextPage = buildBingUrl(endpoint, query, 10);
+                        }
+                        builder.putHeader("Ocp-Apim-Subscription-Key", apiKey);
+                    } else if ("custom".equalsIgnoreCase(engine)) {
+                        if (nextPage != null) {
+                            builder.uri(nextPage);
+                            parsedNextPage = buildCustomNextPage(endpoint, nextPage, queryKey, query, offsetKey, limitKey);
+                        } else {
+                            builder.uri(buildCustomUrl(endpoint, queryKey, query, offsetKey, 0, limitKey));
+                            parsedNextPage = buildCustomUrl(endpoint, queryKey, query, offsetKey, 10, limitKey);
+                        }
+                        builder.putHeader("Authorization", authorization);
+                    } else {
+                        // Search engine not supported.
+                        listener.onFailure(new IllegalArgumentException("Unsupported search engine: %s".formatted(engine)));
+                        return;
+                    }
+                    SdkHttpFullRequest getRequest = builder.build();
+                    AsyncExecuteRequest executeRequest = AsyncExecuteRequest
+                        .builder()
+                        .request(getRequest)
+                        .requestContentPublisher(new SimpleHttpContentPublisher(getRequest))
+                        .responseHandler(
+                            new WebSearchResponseHandler<T>(endpoint, authorization, parsedNextPage, engine, customResUrlJsonpath, listener)
+                        )
+                        .build();
+                    httpClient.execute(executeRequest);
                 }
             });
         } catch (Exception e) {
@@ -232,78 +242,6 @@ public class WebSearchTool implements Tool {
     // pagination: https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/page-results#paging-through-search-results
     private String buildBingUrl(String endpoint, String query, int offset) {
         return "%s?q%s&textFormat=HTML&count=10&offset=%d".formatted(endpoint, query, offset);
-    }
-
-    private <T> void parseResponse(
-        String rawResponse,
-        String authorization,
-        String nextPage,
-        String engine,
-        String customResUrlJsonpath,
-        ActionListener<T> listener
-    ) {
-        JsonObject rawJson = JsonParser.parseString(rawResponse).getAsJsonObject();
-        switch (engine.toLowerCase(Locale.ROOT)) {
-            case "google":
-                parseGoogleResults(rawJson, nextPage, listener);
-                break;
-            case "bing":
-                parseBingResults(rawJson, nextPage, listener);
-                break;
-            case "custom":
-                List<String> urls = JsonPath.read(rawResponse, customResUrlJsonpath);
-                parseCustomResults(urls, authorization, nextPage, listener);
-                break;
-            default:
-                listener.onFailure(new RuntimeException("Unsupported search engine: %s".formatted(engine)));
-        }
-    }
-
-    private <T> void parseGoogleResults(JsonObject googleResponse, String nextPage, ActionListener<T> listener) {
-        Map<String, Object> results = new HashMap<>();
-        results.put("next_page", nextPage);
-        // extract search results, each item is a search result:
-        // https://developers.google.com/custom-search/v1/reference/rest/v1/Search#result
-        JsonArray items = googleResponse.getAsJsonArray("items");
-        List<Map<String, String>> crawlResults = new ArrayList<>();
-        for (int i = 0; i < items.size(); i++) {
-            JsonObject item = items.get(i).getAsJsonObject();
-            // extract the actual link for scrawl.
-            String link = item.get("link").getAsString();
-            // extract title and content.
-            Map<String, String> crawlResult = crawlPage(link, null);
-            crawlResults.add(crawlResult);
-        }
-        results.put("items", crawlResults);
-        listener.onResponse((T) StringUtils.gson.toJson(results));
-    }
-
-    private <T> void parseBingResults(JsonObject bingResponse, String nextPage, ActionListener<T> listener) {
-        Map<String, Object> results = new HashMap<>();
-        results.put("next_page", nextPage);
-        List<Map<String, String>> crawlResults = new ArrayList<>();
-        JsonArray values = bingResponse.get("webPages").getAsJsonObject().getAsJsonArray("value");
-        for (int i = 0; i < values.size(); i++) {
-            JsonObject value = values.get(i).getAsJsonObject();
-            String link = value.get("url").getAsString();
-            Map<String, String> crawlResult = crawlPage(link, null);
-            crawlResults.add(crawlResult);
-        }
-        results.put("items", crawlResults);
-        listener.onResponse((T) StringUtils.gson.toJson(results));
-    }
-
-    private <T> void parseCustomResults(List<String> urls, String authorization, String nextPage, ActionListener<T> listener) {
-        Map<String, Object> results = new HashMap<>();
-        results.put("next_page", nextPage);
-        List<Map<String, String>> crawlResults = new ArrayList<>();
-        for (int i = 0; i < urls.size(); i++) {
-            String link = urls.get(i);
-            Map<String, String> crawlResult = crawlPage(link, authorization);
-            crawlResults.add(crawlResult);
-        }
-        results.put("items", crawlResults);
-        listener.onResponse((T) StringUtils.gson.toJson(results));
     }
 
     private <T> void fetchDuckDuckGoResult(String endpoint, ActionListener<T> listener) {
@@ -378,48 +316,6 @@ public class WebSearchTool implements Tool {
         return sb.toString();
     }
 
-    /**
-     * crawl a page and put the page content into the results map if it can be crawled successfully.
-     *
-     * @param url The url to crawl
-     */
-    private Map<String, String> crawlPage(String url, String authorization) {
-        try {
-            Connection connection = Jsoup.connect(url).timeout(10000).userAgent(USER_AGENT);
-            if (authorization != null) {
-                connection.header("Authorization", authorization);
-            }
-            Document doc = connection.get();
-            Elements parentElements = doc.select("body");
-            if (isCaptchaOrLoginPage(doc)) {
-                log.debug("Skipping {} - CAPTCHA required", url);
-                return null;
-            }
-
-            Element bodyElement = parentElements.getFirst();
-            String title = bodyElement.select("title").text();
-            String content = bodyElement.text();
-            return ImmutableMap.of("url", url, "title", title, "content", content);
-        } catch (Exception e) {
-            log.error("Failed to crawl link: {}", url);
-            return null;
-        }
-    }
-
-    private boolean isCaptchaOrLoginPage(Document doc) {
-        String html = doc.html().toLowerCase(Locale.ROOT);
-        // 1. Check for CAPTCHA indicators
-        return !doc.select("input[name*='captcha'], input[id*='captcha']").isEmpty() ||
-        // Google reCAPTCHA markers
-            !doc.select(".g-recaptcha, div[data-sitekey]").isEmpty() ||
-            // CAPTCHA image patterns
-            !doc.select("img[src*='captcha'], img[src*='recaptcha']").isEmpty() ||
-            // Text-based indicators
-            org.apache.commons.lang3.StringUtils.containsIgnoreCase(html, "verify you are human") ||
-            // hCAPTCHA detection
-            !doc.select(".h-captcha").isEmpty();
-    }
-
     @Override
     public String getType() {
         return TYPE;
@@ -480,6 +376,48 @@ public class WebSearchTool implements Tool {
         return false;
     }
 
+    /**
+     * crawl a page and put the page content into the results map if it can be crawled successfully.
+     *
+     * @param url The url to crawl
+     */
+    public Map<String, String> crawlPage(String url, String authorization) {
+        try {
+            Connection connection = Jsoup.connect(url).timeout(10000).userAgent(USER_AGENT);
+            if (authorization != null) {
+                connection.header("Authorization", authorization);
+            }
+            Document doc = connection.get();
+            Elements parentElements = doc.select("body");
+            if (isCaptchaOrLoginPage(doc)) {
+                log.debug("Skipping {} - CAPTCHA required", url);
+                return null;
+            }
+
+            Element bodyElement = parentElements.getFirst();
+            String title = bodyElement.select("title").text();
+            String content = bodyElement.text();
+            return ImmutableMap.of("url", url, "title", title, "content", content);
+        } catch (Exception e) {
+            log.error("Failed to crawl link: {}", url);
+            return null;
+        }
+    }
+
+    private boolean isCaptchaOrLoginPage(Document doc) {
+        String html = doc.html().toLowerCase(Locale.ROOT);
+        // 1. Check for CAPTCHA indicators
+        return !doc.select("input[name*='captcha'], input[id*='captcha']").isEmpty() ||
+        // Google reCAPTCHA markers
+            !doc.select(".g-recaptcha, div[data-sitekey]").isEmpty() ||
+            // CAPTCHA image patterns
+            !doc.select("img[src*='captcha'], img[src*='recaptcha']").isEmpty() ||
+            // Text-based indicators
+            org.apache.commons.lang3.StringUtils.containsIgnoreCase(html, "verify you are human") ||
+            // hCAPTCHA detection
+            !doc.select(".h-captcha").isEmpty();
+    }
+
     public static class Factory implements Tool.Factory<WebSearchTool> {
         private static Factory INSTANCE;
         private ThreadPool threadPool;
@@ -522,6 +460,165 @@ public class WebSearchTool implements Tool {
         @Override
         public Map<String, Object> getDefaultAttributes() {
             return DEFAULT_ATTRIBUTES;
+        }
+    }
+
+    private final class WebSearchResponseHandler<T> implements SdkAsyncHttpResponseHandler {
+        private final String endpoint;
+        private final String authorization;
+        private final String parsedNextPage;
+        private final String engine;
+        private final String customResUrlJsonpath;
+        private final ActionListener<T> listener;
+
+        public WebSearchResponseHandler(
+            String endpoint,
+            String authorization,
+            String parsedNextPage,
+            String engine,
+            String customResUrlJsonpath,
+            ActionListener<T> listener
+        ) {
+            this.endpoint = endpoint;
+            this.authorization = authorization;
+            this.parsedNextPage = parsedNextPage;
+            this.engine = engine;
+            this.customResUrlJsonpath = customResUrlJsonpath;
+            this.listener = listener;
+        }
+
+        @Override
+        public void onHeaders(SdkHttpResponse response) {
+            SdkHttpFullResponse sdkResponse = (SdkHttpFullResponse) response;
+            log.debug("received response headers: " + sdkResponse.headers());
+            int statusCode = sdkResponse.statusCode();
+            if (statusCode < HttpStatus.SC_OK || statusCode > HttpStatus.SC_MULTIPLE_CHOICES) {
+                log
+                    .error(
+                        "Received error from endpoint:{} with status code {}, response headers: {}",
+                        endpoint,
+                        statusCode,
+                        sdkResponse.headers()
+                    );
+                listener
+                    .onFailure(
+                        new OpenSearchStatusException(
+                            String.format(Locale.ROOT, "Failed to fetch results from endpoint: %s", endpoint),
+                            RestStatus.fromCode(statusCode)
+                        )
+                    );
+            }
+        }
+
+        @Override
+        public void onStream(Publisher<ByteBuffer> stream) {
+            stream.subscribe(new Subscriber<>() {
+                private final StringBuilder responseBuilder = new StringBuilder();
+                private Subscription subscription;
+
+                @Override
+                public void onSubscribe(Subscription subscription) {
+                    log.debug("Starting to fetch response...");
+                    this.subscription = subscription;
+                    subscription.request(Long.MAX_VALUE);
+                }
+
+                @Override
+                public void onNext(ByteBuffer byteBuffer) {
+                    responseBuilder.append(StandardCharsets.UTF_8.decode(byteBuffer));
+                    subscription.request(Long.MAX_VALUE);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    log.error("Failed to fetch results from endpoint: {}", endpoint, throwable);
+                    listener.onFailure(new RuntimeException(throwable));
+                }
+
+                @Override
+                public void onComplete() {
+                    log.debug("Successfully fetched results from endpoint: {}", endpoint);
+                    parseResponse(responseBuilder.toString(), authorization, parsedNextPage, engine, customResUrlJsonpath, listener);
+                }
+            });
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            log.error("Failed to fetch results from endpoint: {}", endpoint, error);
+            listener.onFailure(new RuntimeException(error));
+        }
+
+        private <T> void parseResponse(
+            String rawResponse,
+            String authorization,
+            String nextPage,
+            String engine,
+            String customResUrlJsonpath,
+            ActionListener<T> listener
+        ) {
+            JsonObject rawJson = JsonParser.parseString(rawResponse).getAsJsonObject();
+            switch (engine.toLowerCase(Locale.ROOT)) {
+                case "google":
+                    parseGoogleResults(rawJson, nextPage, listener);
+                    break;
+                case "bing":
+                    parseBingResults(rawJson, nextPage, listener);
+                    break;
+                case "custom":
+                    List<String> urls = JsonPath.read(rawResponse, customResUrlJsonpath);
+                    parseCustomResults(urls, authorization, nextPage, listener);
+                    break;
+                default:
+                    listener.onFailure(new RuntimeException("Unsupported search engine: %s".formatted(engine)));
+            }
+        }
+
+        private <T> void parseGoogleResults(JsonObject googleResponse, String nextPage, ActionListener<T> listener) {
+            Map<String, Object> results = new HashMap<>();
+            results.put("next_page", nextPage);
+            // extract search results, each item is a search result:
+            // https://developers.google.com/custom-search/v1/reference/rest/v1/Search#result
+            JsonArray items = googleResponse.getAsJsonArray("items");
+            List<Map<String, String>> crawlResults = new ArrayList<>();
+            for (int i = 0; i < items.size(); i++) {
+                JsonObject item = items.get(i).getAsJsonObject();
+                // extract the actual link for scrawl.
+                String link = item.get("link").getAsString();
+                // extract title and content.
+                Map<String, String> crawlResult = crawlPage(link, null);
+                crawlResults.add(crawlResult);
+            }
+            results.put("items", crawlResults);
+            listener.onResponse((T) StringUtils.gson.toJson(results));
+        }
+
+        private <T> void parseBingResults(JsonObject bingResponse, String nextPage, ActionListener<T> listener) {
+            Map<String, Object> results = new HashMap<>();
+            results.put("next_page", nextPage);
+            List<Map<String, String>> crawlResults = new ArrayList<>();
+            JsonArray values = bingResponse.get("webPages").getAsJsonObject().getAsJsonArray("value");
+            for (int i = 0; i < values.size(); i++) {
+                JsonObject value = values.get(i).getAsJsonObject();
+                String link = value.get("url").getAsString();
+                Map<String, String> crawlResult = crawlPage(link, null);
+                crawlResults.add(crawlResult);
+            }
+            results.put("items", crawlResults);
+            listener.onResponse((T) StringUtils.gson.toJson(results));
+        }
+
+        private <T> void parseCustomResults(List<String> urls, String authorization, String nextPage, ActionListener<T> listener) {
+            Map<String, Object> results = new HashMap<>();
+            results.put("next_page", nextPage);
+            List<Map<String, String>> crawlResults = new ArrayList<>();
+            for (int i = 0; i < urls.size(); i++) {
+                String link = urls.get(i);
+                Map<String, String> crawlResult = crawlPage(link, authorization);
+                crawlResults.add(crawlResult);
+            }
+            results.put("items", crawlResults);
+            listener.onResponse((T) StringUtils.gson.toJson(results));
         }
     }
 }

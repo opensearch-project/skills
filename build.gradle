@@ -148,6 +148,13 @@ dependencies {
     compileOnly ('com.jayway.jsonpath:json-path:2.9.0') {
         exclude group: 'net.minidev', module: 'json-smart'
     }
+    compileOnly (group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "${versions.aws}") {
+        exclude(group: 'org.reactivestreams', module: 'reactive-streams')
+        exclude(group: 'org.slf4j', module: 'slf4j-api')
+    }
+    compileOnly(group: 'software.amazon.awssdk', name: 'http-client-spi', version: "${versions.aws}")
+    compileOnly(group: 'software.amazon.awssdk', name: 'utils', version: "${versions.aws}")
+    compileOnly(group: 'software.amazon.awssdk', name: 'sdk-core', version: "${versions.aws}")
 
     spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
     spark ('org.apache.spark:spark-core_2.13:3.5.4') {
