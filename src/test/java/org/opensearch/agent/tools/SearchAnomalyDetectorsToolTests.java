@@ -69,33 +69,33 @@ public class SearchAnomalyDetectorsToolTests {
         nonEmptyParams = Map.of("detectorName", "foo");
 
         testDetector = new AnomalyDetector(
-                "foo-id",
-                1L,
-                "foo-name",
-                "foo-description",
-                "foo-time-field",
-                new ArrayList<String>(Arrays.asList("foo-index")),
-                Collections.emptyList(),
-                null,
-                new IntervalTimeConfiguration(5, ChronoUnit.MINUTES),
-                null,
-                1,
-                Collections.emptyMap(),
-                1,
-                Instant.now(),
-                Collections.emptyList(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+                    "foo-id",
+                    1L,
+                    "foo-name",
+                    "foo-description",
+                    "foo-time-field",
+                    new ArrayList<String>(Arrays.asList("foo-index")),
+                    Collections.emptyList(),
+                    null,
+                    new IntervalTimeConfiguration(5, ChronoUnit.MINUTES),
+                    null,
+                    1,
+                    Collections.emptyMap(),
+                    1,
+                    Instant.now(),
+                    Collections.emptyList(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
         );
     }
 
@@ -165,7 +165,7 @@ public class SearchAnomalyDetectorsToolTests {
         hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
+                    .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -190,7 +190,7 @@ public class SearchAnomalyDetectorsToolTests {
         hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
+                    .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
         String expectedResponseStr = "AnomalyDetectors=[]TotalAnomalyDetectors=0";
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
@@ -213,7 +213,7 @@ public class SearchAnomalyDetectorsToolTests {
         hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
+                    .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -238,7 +238,7 @@ public class SearchAnomalyDetectorsToolTests {
         hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
+                    .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
         // Overriding the mocked response to realtime task and setting to null. This occurs when
         // a detector is created but is never started.
         when(getDetectorProfileResponse.getRealtimeAdTask()).thenReturn(null);
@@ -266,7 +266,7 @@ public class SearchAnomalyDetectorsToolTests {
         hits[0] = TestHelpers.generateSearchDetectorHit(detectorName, detectorId);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
+                    .generateGetAnomalyDetectorResponses(new String[] { detectorName }, new String[] { DetectorStateString.Running.name() });
         // Overriding the mocked response to set realtime task state to CREATED
         when(getDetectorProfileResponse.getRealtimeAdTask().getState()).thenReturn("CREATED");
         @SuppressWarnings("unchecked")
@@ -299,10 +299,10 @@ public class SearchAnomalyDetectorsToolTests {
         hits[2] = TestHelpers.generateSearchDetectorHit(detectorName3, detectorId3);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(
-                        new String[] { detectorName1, detectorName2, detectorName3 },
-                        new String[] { "INIT_FAILURE", "UNEXPECTED_FAILURE", "FAILED" }
-                );
+                    .generateGetAnomalyDetectorResponses(
+                                new String[] { detectorName1, detectorName2, detectorName3 },
+                                new String[] { "INIT_FAILURE", "UNEXPECTED_FAILURE", "FAILED" }
+                    );
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -337,10 +337,10 @@ public class SearchAnomalyDetectorsToolTests {
         hits[2] = TestHelpers.generateSearchDetectorHit(detectorName3, detectorId3);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(
-                        new String[] { detectorName1, detectorName2, detectorName3 },
-                        new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
-                );
+                    .generateGetAnomalyDetectorResponses(
+                                new String[] { detectorName1, detectorName2, detectorName3 },
+                                new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
+                    );
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -373,10 +373,10 @@ public class SearchAnomalyDetectorsToolTests {
         hits[2] = TestHelpers.generateSearchDetectorHit(detectorName3, detectorId3);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(
-                        new String[] { detectorName1, detectorName2, detectorName3 },
-                        new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
-                );
+                    .generateGetAnomalyDetectorResponses(
+                                new String[] { detectorName1, detectorName2, detectorName3 },
+                                new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
+                    );
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -404,10 +404,10 @@ public class SearchAnomalyDetectorsToolTests {
         hits[2] = TestHelpers.generateSearchDetectorHit(detectorName3, detectorId3);
         SearchResponse getDetectorsResponse = TestHelpers.generateSearchResponse(hits);
         GetAnomalyDetectorResponse getDetectorProfileResponse = TestHelpers
-                .generateGetAnomalyDetectorResponses(
-                        new String[] { detectorName1, detectorName2, detectorName3 },
-                        new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
-                );
+                    .generateGetAnomalyDetectorResponses(
+                                new String[] { detectorName1, detectorName2, detectorName3 },
+                                new String[] { DetectorStateString.Running.name(), DetectorStateString.Disabled.name(), DetectorStateString.Failed.name() }
+                    );
         @SuppressWarnings("unchecked")
         ActionListener<String> listener = Mockito.mock(ActionListener.class);
         mockProfileApiCalls(getDetectorsResponse, getDetectorProfileResponse);
@@ -468,16 +468,16 @@ public class SearchAnomalyDetectorsToolTests {
 
     private String getExpectedResponseString(AnomalyDetector testDetector) {
         return String
-                .format(
-                        "AnomalyDetectors=[{id=%s,name=%s,type=%s,description=%s,index=%s,lastUpdateTime=%d}]TotalAnomalyDetectors=%d",
-                        testDetector.getId(),
-                        testDetector.getName(),
-                        testDetector.getDetectorType(),
-                        testDetector.getDescription(),
-                        testDetector.getIndices().get(0),
-                        testDetector.getLastUpdateTime().toEpochMilli(),
-                        1
-                );
+                    .format(
+                                "AnomalyDetectors=[{id=%s,name=%s,type=%s,description=%s,index=%s,lastUpdateTime=%d}]TotalAnomalyDetectors=%d",
+                                testDetector.getId(),
+                                testDetector.getName(),
+                                testDetector.getDetectorType(),
+                                testDetector.getDescription(),
+                                testDetector.getIndices().get(0),
+                                testDetector.getLastUpdateTime().toEpochMilli(),
+                                1
+                    );
 
     }
 }
