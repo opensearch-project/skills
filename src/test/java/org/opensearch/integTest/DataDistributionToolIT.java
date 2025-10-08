@@ -15,6 +15,10 @@ import java.util.Locale;
 import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
+import org.opensearch.ml.common.utils.StringUtils;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import lombok.SneakyThrows;
 
@@ -132,7 +136,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5},{\"value\":\"2\",\"selectionPercentage\":0.25},{\"value\":\"4\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -166,7 +170,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67},{\"value\":\"4\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -202,7 +206,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.5},{\"value\":\"2.0\",\"selectionPercentage\":0.25},{\"value\":\"4.0\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -238,7 +242,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.67},{\"value\":\"4.0\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -255,7 +259,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5},{\"value\":\"2\",\"selectionPercentage\":0.25},{\"value\":\"4\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -272,7 +276,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67},{\"value\":\"4\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -289,7 +293,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5},{\"value\":\"2\",\"selectionPercentage\":0.25},{\"value\":\"4\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -306,7 +310,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5},{\"value\":\"2\",\"selectionPercentage\":0.25},{\"value\":\"4\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -323,7 +327,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67},{\"value\":\"4\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -340,7 +344,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67},{\"value\":\"4\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -357,7 +361,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.67},{\"value\":\"4\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -374,7 +378,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":0.75,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":0.75},{\"value\":\"warning\",\"selectionPercentage\":0.25}]},{\"field\":\"level\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"3\",\"selectionPercentage\":0.5},{\"value\":\"2\",\"selectionPercentage\":0.25},{\"value\":\"4\",\"selectionPercentage\":0.25}]},{\"field\":\"host\",\"divergence\":0.5,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.5},{\"value\":\"server-02\",\"selectionPercentage\":0.25},{\"value\":\"server-03\",\"selectionPercentage\":0.25}]},{\"field\":\"response_time\",\"divergence\":0.25,\"topChanges\":[{\"value\":\"140.1\",\"selectionPercentage\":0.25},{\"value\":\"250.3\",\"selectionPercentage\":0.25},{\"value\":\"180.7\",\"selectionPercentage\":0.25},{\"value\":\"300.5\",\"selectionPercentage\":0.25}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
     }
 
     @SneakyThrows
@@ -443,6 +447,30 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
 
         String expectedResult =
             "{\"singleAnalysis\":[{\"field\":\"status\",\"divergence\":1.0,\"topChanges\":[{\"value\":\"error\",\"selectionPercentage\":1.0}]},{\"field\":\"level\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"3.0\",\"selectionPercentage\":0.67},{\"value\":\"4.0\",\"selectionPercentage\":0.33}]},{\"field\":\"host\",\"divergence\":0.6666666666666666,\"topChanges\":[{\"value\":\"server-01\",\"selectionPercentage\":0.67},{\"value\":\"server-02\",\"selectionPercentage\":0.33}]},{\"field\":\"response_time\",\"divergence\":0.3333333333333333,\"topChanges\":[{\"value\":\"250.3\",\"selectionPercentage\":0.33},{\"value\":\"180.7\",\"selectionPercentage\":0.33},{\"value\":\"300.5\",\"selectionPercentage\":0.33}]}]}";
-        assertEquals(expectedResult, result);
+        assertResults(expectedResult, result);
+    }
+
+    private void assertResults(String expectedResult, String result) {
+        try {
+            JsonNode resultJson = StringUtils.MAPPER.readTree(result);
+            JsonNode expectedJson = StringUtils.MAPPER.readTree(expectedResult);
+            JsonNode expectedAnalysis = expectedJson.get("singleAnalysis");
+            JsonNode resultAnalysis = resultJson.get("singleAnalysis");
+            for (int i = 0; i < expectedAnalysis.size(); i++) {
+                assertEquals(expectedAnalysis.get(i).get("field").asText(), resultAnalysis.get(i).get("field").asText());
+                assertEquals(expectedAnalysis.get(i).get("divergence").asText(), resultAnalysis.get(i).get("divergence").asText());
+                JsonNode expectedTopChanges = expectedAnalysis.get(i).get("topChanges");
+                JsonNode resultTopChanges = resultAnalysis.get(i).get("topChanges");
+                for (int j = 0; j < expectedTopChanges.size(); j++) {
+                    assertEquals(
+                        expectedTopChanges.get(j).get("selectionPercentage").asText(),
+                        resultTopChanges.get(j).get("selectionPercentage").asText()
+                    );
+                    assertEquals(expectedTopChanges.get(j).get("value").asText(), resultTopChanges.get(j).get("value").asText());
+                }
+            }
+        } catch (JsonProcessingException e) {
+            fail("Failed to process jsons");
+        }
     }
 }
