@@ -101,6 +101,7 @@ configurations {
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
             force("org.apache.httpcomponents.client5:httpclient5:${versions.httpclient5}")
         }
+        exclude group: "com.google.errorprone", module: "error_prone_annotations" 
     }
 }
 
@@ -201,7 +202,7 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240303'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.14.2'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.17.5")
+    testImplementation("net.bytebuddy:byte-buddy:1.17.7")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.17.5")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'

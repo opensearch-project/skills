@@ -194,7 +194,8 @@ public class WebSearchTool implements Tool {
                         builder.putHeader(AUTHORIZATION, authorization);
                     } else {
                         // Search engine not supported.
-                        listener.onFailure(new IllegalArgumentException("Unsupported search engine: %s".formatted(engine)));
+                        listener
+                            .onFailure(new IllegalArgumentException(String.format(Locale.ROOT, "Unsupported search engine: %s", engine)));
                         return;
                     }
                     SdkHttpFullRequest getRequest = builder.build();
@@ -210,12 +211,12 @@ public class WebSearchTool implements Tool {
                 }
             });
         } catch (Exception e) {
-            listener.onFailure(new IllegalStateException("Web search failed: %s".formatted(e.getMessage())));
+            listener.onFailure(new IllegalStateException(String.format(Locale.ROOT, "Web search failed: %s", e.getMessage())));
         }
     }
 
     private String buildDDGEndpoint(String endpoint, String query) {
-        return "%s?q=%s".formatted(endpoint, query);
+        return String.format(Locale.ROOT, "%s?q=%s", endpoint, query);
     }
 
     private String buildGoogleNextPage(String endpoint, String engineId, String query, String apiKey, String currentPage) {
@@ -225,7 +226,7 @@ public class WebSearchTool implements Tool {
     }
 
     private String buildGoogleUrl(String endpoint, String engineId, String query, String apiKey, int start) {
-        return ("%s?q=%s&cx=%s&key=%s&" + START + "=%d").formatted(endpoint, query, engineId, apiKey, start);
+        return String.format(Locale.ROOT, "%s?q=%s&cx=%s&key=%s&" + START + "=%d", endpoint, query, engineId, apiKey, start);
     }
 
     private String buildBingNextPage(String endpoint, String query, String currentPage) {
@@ -242,13 +243,13 @@ public class WebSearchTool implements Tool {
         String offsetKey,
         String limitKey
     ) {
-        String[] pageSplit = currentPage.split("&%s=".formatted(offsetKey));
+        String[] pageSplit = currentPage.split(String.format(Locale.ROOT, "&%s=", offsetKey));
         int offsetValue = NumberUtils.toInt(pageSplit[1].split("&")[0], 0) + 10;
         return buildCustomUrl(endpoint, queryKey, query, offsetKey, offsetValue, limitKey);
     }
 
     private String buildCustomUrl(String endpoint, String queryKey, String query, String offsetKey, int offsetValue, String limitKey) {
-        return "%s?%s=%s&%s=%d&%s=10".formatted(endpoint, queryKey, query, offsetKey, offsetValue, limitKey);
+        return String.format(Locale.ROOT, "%s?%s=%s&%s=%d&%s=10", endpoint, queryKey, query, offsetKey, offsetValue, limitKey);
     }
 
     private String getDefaultEndpoint(String engine) {
@@ -257,13 +258,13 @@ public class WebSearchTool implements Tool {
             case BING -> "https://api.bing.microsoft.com/v7.0/search";
             case DUCKDUCKGO -> "https://duckduckgo.com/html";
             case CUSTOM -> null;
-            default -> throw new IllegalArgumentException("Unsupported search engine: %s".formatted(engine));
+            default -> throw new IllegalArgumentException(String.format(Locale.ROOT, "Unsupported search engine: %s", engine));
         };
     }
 
     // pagination: https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/page-results#paging-through-search-results
     private String buildBingUrl(String endpoint, String query, int offset) {
-        return ("%s?q%s&textFormat=HTML&count=10&" + OFFSET + "=%d").formatted(endpoint, query, offset);
+        return String.format(Locale.ROOT, "%s?q%s&textFormat=HTML&count=10&" + OFFSET + "=%d", endpoint, query, offset);
     }
 
     private <T> void fetchDuckDuckGoResult(String endpoint, ActionListener<T> listener) {
@@ -592,7 +593,7 @@ public class WebSearchTool implements Tool {
                     parseCustomResults(urls, authorization, nextPage, listener);
                     break;
                 default:
-                    listener.onFailure(new RuntimeException("Unsupported search engine: %s".formatted(engine)));
+                    listener.onFailure(new RuntimeException(String.format(Locale.ROOT, "Unsupported search engine: %s", engine)));
             }
         }
 
