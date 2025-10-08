@@ -101,7 +101,6 @@ configurations {
             force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
             force("org.apache.httpcomponents.client5:httpclient5:${versions.httpclient5}")
         }
-        exclude group: "com.google.errorprone", module: "error_prone_annotations" 
     }
 }
 
