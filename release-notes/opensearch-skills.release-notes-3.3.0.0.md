@@ -11,6 +11,7 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.3.0
 
 ### Bug Fixes
 * Delete-single-baseline ([#641](https://github.com/opensearch-project/skills/pull/641))
+* Fix WebSearchTool issue ([#639](https://github.com/opensearch-project/skills/pull/639))
 
 ### Infrastructure
 * Update System.env syntax for Gradle 9 compatibility ([#630](https://github.com/opensearch-project/skills/pull/630))
