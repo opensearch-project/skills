@@ -11,3 +11,4 @@ out/
 .settings
 .vscode
 bin/
+.factorypath

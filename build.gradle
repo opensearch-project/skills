@@ -138,7 +138,7 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
     compileOnly group: 'org.json', name: 'json', version: '20240303'
     compileOnly("com.google.guava:guava:33.2.1-jre")
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: "${versions.commonslang}"
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
     compileOnly group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
@@ -148,6 +148,13 @@ dependencies {
     compileOnly ('com.jayway.jsonpath:json-path:2.9.0') {
         exclude group: 'net.minidev', module: 'json-smart'
     }
+    compileOnly (group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "${versions.aws}") {
+        exclude(group: 'org.reactivestreams', module: 'reactive-streams')
+        exclude(group: 'org.slf4j', module: 'slf4j-api')
+    }
+    compileOnly(group: 'software.amazon.awssdk', name: 'http-client-spi', version: "${versions.aws}")
+    compileOnly(group: 'software.amazon.awssdk', name: 'utils', version: "${versions.aws}")
+    compileOnly(group: 'software.amazon.awssdk', name: 'sdk-core', version: "${versions.aws}")
 
     spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
     spark ('org.apache.spark:spark-core_2.13:3.5.4') {
@@ -194,7 +201,7 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240303'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.14.2'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.17.5")
+    testImplementation("net.bytebuddy:byte-buddy:1.17.7")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.17.5")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
