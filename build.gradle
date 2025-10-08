@@ -139,7 +139,7 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-slf4j-impl:2.23.1"
     compileOnly group: 'org.json', name: 'json', version: '20240303'
     compileOnly("com.google.guava:guava:33.2.1-jre")
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: "${versions.commonslang}"
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.12.0'
     compileOnly group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
