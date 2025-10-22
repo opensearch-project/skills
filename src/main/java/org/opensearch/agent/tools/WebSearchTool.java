@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.hc.core5.http.HttpStatus;
@@ -127,7 +128,9 @@ public class WebSearchTool implements Tool {
 
     public WebSearchTool(ThreadPool threadPool) {
         // Use 1s for connection timeout, 3s for read timeout, 30 for max connections of httpclient.
-        this.httpClient = MLHttpClientFactory.getAsyncHttpClient(Duration.ofSeconds(1), Duration.ofSeconds(3), 30);
+        // For WebSearchTool, we don't allow user to connect to private ip.
+        this.httpClient = MLHttpClientFactory
+            .getAsyncHttpClient(Duration.ofSeconds(1), Duration.ofSeconds(3), 30, new AtomicBoolean(false));
         this.threadPool = threadPool;
         this.attributes = new HashMap<>();
         attributes.put(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
@@ -207,7 +210,12 @@ public class WebSearchTool implements Tool {
                             new WebSearchResponseHandler<T>(endpoint, authorization, parsedNextPage, engine, customResUrlJsonpath, listener)
                         )
                         .build();
-                    httpClient.execute(executeRequest);
+                    try {
+                        httpClient.execute(executeRequest);
+                    } catch (Exception e) {
+                        log.error("Web search failed!", e);
+                        listener.onFailure(new IllegalStateException(String.format(Locale.ROOT, "Web search failed: %s", e.getMessage())));
+                    }
                 }
             });
         } catch (Exception e) {
