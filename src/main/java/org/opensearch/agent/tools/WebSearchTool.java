@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.hc.core5.http.HttpStatus;
@@ -129,8 +128,7 @@ public class WebSearchTool implements Tool {
     public WebSearchTool(ThreadPool threadPool) {
         // Use 1s for connection timeout, 3s for read timeout, 30 for max connections of httpclient.
         // For WebSearchTool, we don't allow user to connect to private ip.
-        this.httpClient = MLHttpClientFactory
-            .getAsyncHttpClient(Duration.ofSeconds(1), Duration.ofSeconds(3), 30, new AtomicBoolean(false));
+        this.httpClient = MLHttpClientFactory.getAsyncHttpClient(Duration.ofSeconds(1), Duration.ofSeconds(3), 30, false);
         this.threadPool = threadPool;
         this.attributes = new HashMap<>();
         attributes.put(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
