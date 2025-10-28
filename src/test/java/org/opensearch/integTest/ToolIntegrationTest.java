@@ -129,10 +129,12 @@ public abstract class ToolIntegrationTest extends BaseAgentToolsIT {
             updateClusterSettings("plugins.ml_commons.only_run_on_ml_node", false);
             updateClusterSettings("plugins.ml_commons.memory_feature_enabled", true);
             updateClusterSettings("plugins.ml_commons.trusted_connector_endpoints_regex", List.of("^.*$"));
+            updateClusterSettings("plugins.ml_commons.connector.private_ip_enabled", true);
         } else {
             updateClusterSettings("plugins.ml_commons.only_run_on_ml_node", null);
             updateClusterSettings("plugins.ml_commons.memory_feature_enabled", null);
             updateClusterSettings("plugins.ml_commons.trusted_connector_endpoints_regex", null);
+            updateClusterSettings("plugins.ml_commons.connector.private_ip_enabled", false);
         }
     }
 
