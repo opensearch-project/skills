@@ -30,6 +30,7 @@ buildscript {
 
     repositories {
         mavenLocal()
+        maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
         maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
         maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
         maven { url "https://plugins.gradle.org/m2/" }
@@ -54,6 +55,7 @@ lombok {
 
 repositories {
     mavenLocal()
+    maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
     maven { url "https://plugins.gradle.org/m2/" }
     maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
     maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
@@ -134,7 +136,7 @@ dependencies {
     compileOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
     compileOnly group: 'org.json', name: 'json', version: '20240205'
     compileOnly("com.google.guava:guava:33.2.1-jre")
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.16.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.18.0'
     compileOnly group: 'org.apache.commons', name: 'commons-text', version: '1.11.0'
     compileOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}")
     compileOnly("com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}")
