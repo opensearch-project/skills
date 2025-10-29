@@ -7,7 +7,6 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
-import static org.opensearch.ml.common.utils.ToolUtils.NO_ESCAPE_PARAMS;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -252,7 +251,7 @@ public class PPLTool implements WithModelTool {
                 );
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Map.of("prompt", formatString(reformattedInput), NO_ESCAPE_PARAMS, "prompt"))
+                .parameters(Map.of("prompt", formatString(reformattedInput)))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
