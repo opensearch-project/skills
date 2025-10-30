@@ -27,7 +27,11 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.metadata.Metadata;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -91,10 +95,31 @@ public class PPLToolTests {
 
     private String pplResult = "ppl result";
 
+    @Mock
+    private ClusterService clusterService;
+
+    @Mock
+    private ClusterState clusterState;
+
+    @Mock
+    private Metadata metadata;
+
+    @Mock
+    private Settings persistentSettings;
+
+    @Mock
+    private Settings transientSettings;
+
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
         createMappings();
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(metadata);
+        when(metadata.persistentSettings()).thenReturn(persistentSettings);
+        when(metadata.transientSettings()).thenReturn(transientSettings);
+        when(transientSettings.get(any())).thenReturn(null);
+        when(persistentSettings.get(any())).thenReturn(null);
         // get mapping
         when(mappingMetadata.getSourceAsMap()).thenReturn(indexMappings);
         when(getMappingsResponse.getMappings()).thenReturn(mockedMappings);
@@ -125,7 +150,7 @@ public class PPLToolTests {
             listener.onResponse(transportPPLQueryResponse);
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
-        PPLTool.Factory.getInstance().init(client);
+        PPLTool.Factory.getInstance().init(client, clusterService);
     }
 
     @Test

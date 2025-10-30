@@ -72,7 +72,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension {
         this.client = client;
         this.clusterService = clusterService;
         this.xContentRegistry = xContentRegistry;
-        PPLTool.Factory.getInstance().init(client);
+        PPLTool.Factory.getInstance().init(client, clusterService);
         NeuralSparseSearchTool.Factory.getInstance().init(client, xContentRegistry);
         VectorDBTool.Factory.getInstance().init(client, xContentRegistry);
         RAGTool.Factory.getInstance().init(client, xContentRegistry);
