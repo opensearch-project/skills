@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -23,15 +24,21 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.AdminClient;
 import org.opensearch.client.Client;
 import org.opensearch.client.IndicesAdminClient;
+import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.metadata.Metadata;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
@@ -88,10 +95,31 @@ public class PPLToolTests {
 
     private String pplResult = "ppl result";
 
+    @Mock
+    private ClusterService clusterService;
+
+    @Mock
+    private ClusterState clusterState;
+
+    @Mock
+    private Metadata metadata;
+
+    @Mock
+    private Settings persistentSettings;
+
+    @Mock
+    private Settings transientSettings;
+
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
         createMappings();
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(metadata);
+        when(metadata.persistentSettings()).thenReturn(persistentSettings);
+        when(metadata.transientSettings()).thenReturn(transientSettings);
+        when(transientSettings.get(any())).thenReturn(null);
+        when(persistentSettings.get(any())).thenReturn(null);
         // get mapping
         when(mappingMetadata.getSourceAsMap()).thenReturn(indexMappings);
         when(getMappingsResponse.getMappings()).thenReturn(mockedMappings);
@@ -122,7 +150,7 @@ public class PPLToolTests {
             listener.onResponse(transportPPLQueryResponse);
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
-        PPLTool.Factory.getInstance().init(client);
+        PPLTool.Factory.getInstance().init(client, clusterService);
     }
 
     @Test
@@ -173,6 +201,36 @@ public class PPLToolTests {
             assertEquals("ppl result", returnResults.get("executionResult"));
             assertEquals("source=demo| head 1", returnResults.get("ppl"));
         }, e -> { log.info(e); }));
+
+    }
+
+    @Test
+    public void testToolWhenGettingSagemakerError() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+        doAnswer(invocation -> {
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            OpenSearchStatusException exception = new OpenSearchStatusException(
+                "Error from remote service: {\"ErrorCode\":\"CLIENT_ERROR_FROM_MODEL\",\"LogStreamArn\":\"arn:aws:logs:us-east-1:12345678:log-group:/aws/sagemaker/Endpoints/demo-test-name\",\"Message\":\"Received client error (404) from primary with message \\\"{\\n \\\"code\\\":404,\\n \\\"message\\\":\\\"prediction failure\\\",\\n \\\"error\\\":\\\"Input token limit exceeded. The model only supports schemas with less than 1000-1500 fields, and has optimal performance for 350 fields or fewer.\\\"\\n}\\\". See https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logEventViewer:group=/aws/sagemaker/Endpoints/demo-test-name in account 12345678 for more information.\",\"OriginalMessage\":\"{\\n \\\"code\\\":500,\\n \\\"message\\\":\\\"prediction failure\\\",\\n \\\"error\\\":\\\"Input token limit exceeded. The model only supports schemas with less than 1000-1500 fields, and has optimal performance for 350 fields or fewer.\\\"\\n}\",\"OriginalStatusCode\":404}",
+                RestStatus.fromCode(404)
+            );
+
+            listener.onFailure(exception);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        OpenSearchStatusException exception = assertThrows(
+            OpenSearchStatusException.class,
+            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+                Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+                assertEquals("ppl result", returnResults.get("executionResult"));
+                assertEquals("source=demo| head 1", returnResults.get("ppl"));
+            }, e -> { throw new OpenSearchStatusException(e.getMessage(), ((OpenSearchStatusException) e).status()); }))
+        );
+        assertTrue(exception.getMessage().contains("<SAGEMAKER_ENDPOINT>"));
+        assertFalse(exception.getMessage().contains("demo-test-name"));
+        assertFalse(exception.getMessage().contains("12345678"));
 
     }
 
@@ -289,6 +347,18 @@ public class PPLToolTests {
                     assertEquals("source=demo| head 1", returnResults.get("ppl"));
                 }, e -> { log.info(e); })
             );
+
+    }
+
+    @Test
+    public void testTool_basic() {
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "previous_tool_name", "previousTool", "head", "-5"));
+        assertEquals(tool.getDescription(), PPLTool.Factory.getInstance().getDefaultDescription());
+        assertEquals(tool.getType(), PPLTool.Factory.getInstance().getDefaultType());
+        assertEquals(null, PPLTool.Factory.getInstance().getDefaultVersion());
+        assertEquals(List.of(COMMON_MODEL_ID_FIELD), PPLTool.Factory.getInstance().getAllModelKeys());
 
     }
 
