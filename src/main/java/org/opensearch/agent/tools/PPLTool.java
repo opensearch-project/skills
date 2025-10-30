@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,21 +23,29 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.spark.sql.types.DataType;
 import org.json.JSONObject;
+import org.opensearch.OpenSearchStatusException;
+import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.ToolHelper;
+import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.query.MatchAllQueryBuilder;
@@ -79,6 +88,9 @@ public class PPLTool implements WithModelTool {
     private static final String DEFAULT_DESCRIPTION =
         "\"Use this tool when user ask question based on the data in the cluster or parse user statement about which index to use in a conversion.\nAlso use this tool when question only contains index information.\n1. If uesr question contain both question and index name, the input parameters are {'question': UserQuestion, 'index': IndexName}.\n2. If user question contain only question, the input parameter is {'question': UserQuestion}.\n3. If uesr question contain only index name, find the original human input from the conversation histroy and formulate parameter as {'question': UserQuestion, 'index': IndexName}\nThe index name should be exactly as stated in user's input.";
 
+    private static final String TABLE_INFO_KEY = "table_info";
+    private static final String MAPPING_KEY = "mappings";
+
     @Setter
     private String name = TYPE;
     @Getter
@@ -92,6 +104,8 @@ public class PPLTool implements WithModelTool {
     private String contextPrompt;
 
     private Boolean execute;
+
+    private ClusterService clusterService;
 
     private PPLModelType pplModelType;
 
@@ -108,6 +122,8 @@ public class PPLTool implements WithModelTool {
     private static Set<String> ALLOWED_FIELDS_TYPE;
 
     private static Set<String> ALLOWED_FIELD_TYPE_FOR_SPARK;
+
+    private static String CALCITE_ENABLE_FLAG = "plugins.calcite.enabled";
 
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
@@ -177,7 +193,8 @@ public class PPLTool implements WithModelTool {
         String pplModelType,
         String previousToolKey,
         int head,
-        boolean execute
+        boolean execute,
+        ClusterService clusterService
     ) {
         this.client = client;
         this.modelId = modelId;
@@ -190,6 +207,7 @@ public class PPLTool implements WithModelTool {
         this.previousToolKey = previousToolKey;
         this.head = head;
         this.execute = execute;
+        this.clusterService = clusterService;
     }
 
     @SuppressWarnings("unchecked")
@@ -197,27 +215,50 @@ public class PPLTool implements WithModelTool {
     public <T> void run(Map<String, String> parameters, ActionListener<T> listener) {
         final String tenantId = parameters.get(TENANT_ID_FIELD);
         extractFromChatParameters(parameters);
-        String indexName = getIndexNameFromParameters(parameters);
-        if (StringUtils.isBlank(indexName)) {
+        List<String> indices = Optional
+            .ofNullable(getIndexNameFromParameters(parameters, "index"))
+            .filter(list -> !list.isEmpty())
+            .orElseGet(() -> getIndexNameFromParameters(parameters, this.previousToolKey + ".output"));
+        if (indices.isEmpty()) {
             throw new IllegalArgumentException(
                 "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
             );
         }
         String question = parameters.get("question");
-        if (StringUtils.isBlank(indexName) || StringUtils.isBlank(question)) {
+        if (StringUtils.isBlank(question)) {
             throw new IllegalArgumentException("Parameter index and question can not be null or empty.");
         }
-        if (indexName.startsWith(".")) {
-            throw new IllegalArgumentException(
-                "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
-                    + indexName
-            );
+        for (String index : indices) {
+            if (index.startsWith(".")) {
+                throw new IllegalArgumentException(
+                    "PPLTool doesn't support searching indices starting with '.' since it could be system index, current searching index name: "
+                        + index
+                );
+            }
         }
-        ActionListener<String> actionsAfterTableinfo = ActionListener.wrap(tableInfo -> {
-            String prompt = constructPrompt(tableInfo, question.strip(), indexName);
+        ActionListener<Map<String, Object>> actionsAfterTableinfo = ActionListener.wrap(indexInfo -> {
+            if (Objects.isNull(indexInfo.get(TABLE_INFO_KEY)) || Objects.isNull(indexInfo.get(MAPPING_KEY))) {
+                log.error("The table info and mappings are missing in: {}", indexInfo);
+                listener.onFailure(new RuntimeException("The table info and mappings are missing in: " + indexInfo));
+            }
+            String tableInfo = indexInfo.get(TABLE_INFO_KEY).toString();
+            String prompt = constructPrompt(tableInfo, question.strip(), indices);
+            Map<String, Object> reformattedInput = Map
+                .of(
+                    "prompt",
+                    prompt,
+                    "mappings",
+                    indexInfo.get(MAPPING_KEY),
+                    "os_version",
+                    getPPLVersionNumber(),
+                    "current_time",
+                    Instant.now().toString(),
+                    "datasourceType",
+                    parameters.getOrDefault("type", "Opensearch")
+                );
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
-                .parameters(Map.of("prompt", prompt, "datasourceType", parameters.getOrDefault("type", "Opensearch")))
+                .parameters(Map.of("prompt", formatString(reformattedInput)))
                 .build();
             ActionRequest request = new MLPredictionTaskRequest(
                 modelId,
@@ -234,7 +275,7 @@ public class PPLTool implements WithModelTool {
                     listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
                     return;
                 }
-                String ppl = parseOutput(dataAsMap.get("response"), indexName);
+                String ppl = parseOutput(dataAsMap.get("response"));
                 if (!this.execute) {
                     Map<String, String> ret = ImmutableMap.of("ppl", ppl);
                     listener.onResponse((T) AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(ret)));
@@ -262,8 +303,14 @@ public class PPLTool implements WithModelTool {
                     );
                 // Execute output here
             }, e -> {
+
                 log.error(String.format(Locale.ROOT, "fail to predict model: %s with error: %s", modelId, e.getMessage()), e);
-                listener.onFailure(e);
+                if (e instanceof OpenSearchStatusException) {
+                    String errorMessage = redactSagemakerArns(redactCloudwatchUrl(e.getMessage()));
+                    listener.onFailure(new OpenSearchStatusException(errorMessage, ((OpenSearchStatusException) e).status()));
+                } else {
+                    listener.onFailure(e);
+                }
             }));
         }, e -> {
             log.info("fail to get index schema");
@@ -271,6 +318,7 @@ public class PPLTool implements WithModelTool {
         }
 
         );
+        // Logic for schema/samples as input
         if (parameters.containsKey("schema")
             && parameters.containsKey("samples")
             && Objects.equals(parameters.getOrDefault("type", ""), "s3")) {
@@ -281,44 +329,61 @@ public class PPLTool implements WithModelTool {
                     transferS3SchemaFormat(schema),
                     (Map<String, Object>) samples.get(0)
                 );
-                actionsAfterTableinfo.onResponse(tableInfo);
+                actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, tableInfo, MAPPING_KEY, gson.toJson(schema)));
             } catch (Exception e) {
                 log.info("fail to get table info for s3");
                 actionsAfterTableinfo.onFailure(e);
             }
-
             return;
         }
-        GetMappingsRequest getMappingsRequest = buildGetMappingRequest(indexName);
-        client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
-            Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
-            if (mappings.isEmpty()) {
-                throw new IllegalArgumentException("No matching mapping with index name: " + indexName);
-            }
-            String firstIndexName = (String) mappings.keySet().toArray()[0];
-            SearchRequest searchRequest = buildSearchRequest(firstIndexName);
-            client.search(searchRequest, ActionListener.wrap(searchResponse -> {
-                SearchHit[] searchHits = searchResponse.getHits().getHits();
-                String tableInfo = constructTableInfo(searchHits, mappings);
-                actionsAfterTableinfo.onResponse(tableInfo);
+
+        CountDownLatch latch = new CountDownLatch(indices.size());
+        ConcurrentHashMap<String, String> tableInfos = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, Object> mappingInfos = new ConcurrentHashMap<>();
+        for (String index : indices) {
+            GetMappingsRequest getMappingsRequest = buildGetMappingRequest(index);
+            client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(getMappingsResponse -> {
+                Map<String, MappingMetadata> mappings = getMappingsResponse.getMappings();
+                if (mappings.isEmpty()) {
+                    throw new IllegalArgumentException("No matching mapping with index name: " + index);
+                }
+                String firstIndexName = (String) mappings.keySet().toArray()[0];
+                SearchRequest searchRequest = buildSearchRequest(firstIndexName);
+                client.search(searchRequest, ActionListener.wrap(searchResponse -> {
+                    SearchHit[] searchHits = searchResponse.getHits().getHits();
+                    Map<String, Object> finalMappings = new HashMap<>();
+                    for (MappingMetadata mappingMetadata : mappings.values()) {
+                        Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+                        MergeRuleHelper.merge(mappingSource, finalMappings);
+                    }
+                    String tableInfo = constructTableInfo(searchHits, finalMappings);
+                    tableInfos.put(index, tableInfo);
+                    mappingInfos.put(index, finalMappings);
+                    latch.countDown();
+                    if (latch.getCount() == 0) {
+                        String mergedTableInfo = mergeTableInfo(tableInfos);
+                        actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, mappingInfos));
+                    }
+                }, e -> {
+                    log.error(String.format(Locale.ROOT, "fail to search index: %s with error: %s", firstIndexName, e.getMessage()), e);
+                    listener.onFailure(e);
+                }));
             }, e -> {
-                log.error(String.format(Locale.ROOT, "fail to search model: %s with error: %s", modelId, e.getMessage()), e);
-                listener.onFailure(e);
+                log.error(String.format(Locale.ROOT, "fail to get mapping of index: %s with error: %s", indices, e.getMessage()), e);
+                String errorMessage = e.getMessage();
+                if (errorMessage.contains("no such index")) {
+                    listener
+                        .onFailure(
+                            new IllegalArgumentException(
+                                "Return this final answer to human directly and do not use other tools: 'Please provide the existing index name(s)'. Please try to directly send this message to human to ask for index name"
+                            )
+                        );
+                } else {
+                    listener.onFailure(e);
+                }
             }));
-        }, e -> {
-            log.error(String.format(Locale.ROOT, "fail to get mapping of index: %s with error: %s", indexName, e.getMessage()), e);
-            String errorMessage = e.getMessage();
-            if (errorMessage.contains("no such index")) {
-                listener
-                    .onFailure(
-                        new IllegalArgumentException(
-                            "Return this final answer to human directly and do not use other tools: 'Please provide index name'. Please try to directly send this message to human to ask for index name"
-                        )
-                    );
-            } else {
-                listener.onFailure(e);
-            }
-        }));
+        }
+
     }
 
     @Override
@@ -339,6 +404,8 @@ public class PPLTool implements WithModelTool {
     public static class Factory implements WithModelTool.Factory<PPLTool> {
         private Client client;
 
+        private ClusterService clusterService;
+
         private static Factory INSTANCE;
 
         public static Factory getInstance() {
@@ -354,8 +421,9 @@ public class PPLTool implements WithModelTool {
             }
         }
 
-        public void init(Client client) {
+        public void init(Client client, ClusterService clusterService) {
             this.client = client;
+            this.clusterService = clusterService;
         }
 
         @Override
@@ -368,7 +436,8 @@ public class PPLTool implements WithModelTool {
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
                 NumberUtils.toInt((String) map.get("head"), -1),
-                Boolean.parseBoolean((String) map.getOrDefault("execute", "true"))
+                Boolean.parseBoolean((String) map.getOrDefault("execute", "true")),
+                clusterService
             );
         }
 
@@ -504,17 +573,10 @@ public class PPLTool implements WithModelTool {
 
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, MappingMetadata> mappings) throws PrivilegedActionException {
-        String firstIndexName = (String) mappings.keySet().toArray()[0];
-        MappingMetadata mappingMetadata = mappings.get(firstIndexName);
-        Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-        if (Objects.isNull(mappingSource)) {
-            throw new IllegalArgumentException(
-                "The querying index doesn't have mapping metadata, please add data to it or using another index."
-            );
-        }
+    private String constructTableInfo(SearchHit[] searchHits, Map<String, Object> allFields) throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
-        ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", false);
+        ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
+
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
@@ -546,8 +608,8 @@ public class PPLTool implements WithModelTool {
         return tableInfoJoiner.toString();
     }
 
-    private String constructPrompt(String tableInfo, String question, String indexName) {
-        Map<String, String> indexInfo = ImmutableMap.of("mappingInfo", tableInfo, "question", question, "indexName", indexName);
+    private String constructPrompt(String tableInfo, String question, List<String> indices) {
+        Map<String, String> indexInfo = ImmutableMap.of("mappingInfo", tableInfo, "question", question, "indexName", indices.toString());
         StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
         return substitutor.replace(contextPrompt);
     }
@@ -602,7 +664,7 @@ public class PPLTool implements WithModelTool {
         }
     }
 
-    private String parseOutput(String llmOutput, String indexName) {
+    private String parseOutput(String llmOutput) {
         String ppl;
         Pattern pattern = Pattern.compile("<ppl>((.|[\\r\\n])+?)</ppl>"); // For ppl like <ppl> source=a \n | fields b </ppl>
         Matcher matcher = pattern.matcher(llmOutput);
@@ -612,32 +674,10 @@ public class PPLTool implements WithModelTool {
         } else { // logic for only ppl returned
             int sourceIndex = llmOutput.indexOf("source=");
             int describeIndex = llmOutput.indexOf("describe ");
-            if (sourceIndex != -1) {
-                llmOutput = llmOutput.substring(sourceIndex);
-
-                // Splitting the string at "|"
-                String[] lists = llmOutput.split("\\|");
-
-                // Modifying the first element
-                if (lists.length > 0) {
-                    lists[0] = "source=" + indexName;
-                }
-
-                // Joining the string back together
-                ppl = String.join("|", lists);
-            } else if (describeIndex != -1) {
-                llmOutput = llmOutput.substring(describeIndex);
-                String[] lists = llmOutput.split("\\|");
-
-                // Modifying the first element
-                if (lists.length > 0) {
-                    lists[0] = "describe " + indexName;
-                }
-
-                // Joining the string back together
-                ppl = String.join("|", lists);
-            } else {
+            if (sourceIndex == -1 && describeIndex == -1) {
                 throw new IllegalArgumentException("The returned PPL: " + llmOutput + " has wrong format");
+            } else {
+                ppl = llmOutput;
             }
         }
         if (this.pplModelType != PPLModelType.FINETUNE) {
@@ -656,12 +696,26 @@ public class PPLTool implements WithModelTool {
         return ppl;
     }
 
-    private String getIndexNameFromParameters(Map<String, String> parameters) {
-        String indexName = parameters.getOrDefault("index", "");
-        if (!StringUtils.isBlank(this.previousToolKey) && StringUtils.isBlank(indexName)) {
-            indexName = parameters.getOrDefault(this.previousToolKey + ".output", ""); // read index name from previous key
+    private List<String> getIndexNameFromParameters(Map<String, String> parameters, String key) {
+        if (!parameters.containsKey(key)) {
+            return List.of();
         }
-        return indexName.trim();
+        String indexName = parameters.get(key);
+        try {
+            List<String> list = gson.fromJson(indexName, List.class);
+            return list.stream().map(Object::toString).map(String::trim).collect(Collectors.toList());
+        } catch (Exception e) {
+            return List.of(indexName.trim());
+        }
+    }
+
+    private String mergeTableInfo(ConcurrentHashMap<String, String> tableInfos) {
+        StringBuilder mergedTableInfo = new StringBuilder();
+        for (Map.Entry<String, String> entry : tableInfos.entrySet()) {
+            mergedTableInfo.append(entry.getKey()).append("\n");
+            mergedTableInfo.append(entry.getValue()).append("\n");
+        }
+        return mergedTableInfo.toString();
     }
 
     private Map<String, Object> transferS3SchemaFormat(Map<String, Object> originalSchema) {
@@ -685,5 +739,38 @@ public class PPLTool implements WithModelTool {
             log.error("Failed to load default prompt dict", e);
         }
         return new HashMap<>();
+    }
+
+    private static String redactSagemakerArns(String input) {
+        String regex = "arn:aws:logs:[^:]+:\\d+:log-group:/aws/sagemaker/Endpoints/[^ \\t\\n\\r\\f\\v,\"']+";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        return matcher.replaceAll("<SAGEMAKER_ENDPOINT>");
+    }
+
+    public static String redactCloudwatchUrl(String input) {
+        String regex = "See\\s+.+?\\s+in\\s+account\\s+.+?\\s+for\\s+more\\s+information";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        return matcher.replaceAll("");
+    }
+
+    public String formatString(Map<String, Object> targetMap) {
+        String mapString = gson.toJson(gson.toJson(targetMap));
+        return mapString.substring(1, mapString.length() - 1);
+    }
+
+    public String getPPLVersionNumber() {
+        String currentVersion = Version.CURRENT.toString();
+        Object calciteEnabled = clusterService.state().metadata().transientSettings().get(CALCITE_ENABLE_FLAG);
+        if (Objects.isNull(calciteEnabled)) {
+            calciteEnabled = clusterService.state().metadata().persistentSettings().get(CALCITE_ENABLE_FLAG);
+        }
+        if (Boolean.parseBoolean((String) calciteEnabled)) {
+            currentVersion = "3.3.0";
+        }
+        return currentVersion;
     }
 }
