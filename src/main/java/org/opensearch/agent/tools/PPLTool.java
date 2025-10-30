@@ -757,7 +757,7 @@ public class PPLTool implements WithModelTool {
         String currentVersion = Version.CURRENT.toString();
         Object calciteEnabled = clusterService.state().metadata().transientSettings().get(CALCITE_ENABLE_FLAG);
         if (Objects.isNull(calciteEnabled)) {
-            calciteEnabled = clusterService.state().metadata().transientSettings().get(CALCITE_ENABLE_FLAG);
+            calciteEnabled = clusterService.state().metadata().persistentSettings().get(CALCITE_ENABLE_FLAG);
         }
         if (Boolean.parseBoolean((String) calciteEnabled)) {
             currentVersion = "3.3.0";
