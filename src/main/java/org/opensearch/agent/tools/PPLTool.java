@@ -46,6 +46,7 @@ import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.query.MatchAllQueryBuilder;
@@ -104,6 +105,8 @@ public class PPLTool implements WithModelTool {
 
     private Boolean execute;
 
+    private ClusterService clusterService;
+
     private PPLModelType pplModelType;
 
     private String previousToolKey;
@@ -117,6 +120,8 @@ public class PPLTool implements WithModelTool {
     private static Set<String> ALLOWED_FIELDS_TYPE;
 
     private static Set<String> ALLOWED_FIELD_TYPE_FOR_SPARK;
+
+    private static String CALCITE_ENABLE_FLAG = "plugins.calcite.enabled";
 
     static {
         ALLOWED_FIELDS_TYPE = new HashSet<>(); // from
@@ -186,7 +191,8 @@ public class PPLTool implements WithModelTool {
         String pplModelType,
         String previousToolKey,
         int head,
-        boolean execute
+        boolean execute,
+        ClusterService clusterService
     ) {
         this.client = client;
         this.modelId = modelId;
@@ -199,6 +205,7 @@ public class PPLTool implements WithModelTool {
         this.previousToolKey = previousToolKey;
         this.head = head;
         this.execute = execute;
+        this.clusterService = clusterService;
     }
 
     @SuppressWarnings("unchecked")
@@ -241,7 +248,7 @@ public class PPLTool implements WithModelTool {
                     "mappings",
                     indexInfo.get(MAPPING_KEY),
                     "os_version",
-                    Version.CURRENT.toString(),
+                    getPPLVersionNumber(),
                     "current_time",
                     Instant.now().toString(),
                     "datasourceType",
@@ -395,6 +402,8 @@ public class PPLTool implements WithModelTool {
     public static class Factory implements WithModelTool.Factory<PPLTool> {
         private Client client;
 
+        private ClusterService clusterService;
+
         private static Factory INSTANCE;
 
         public static Factory getInstance() {
@@ -410,8 +419,9 @@ public class PPLTool implements WithModelTool {
             }
         }
 
-        public void init(Client client) {
+        public void init(Client client, ClusterService clusterService) {
             this.client = client;
+            this.clusterService = clusterService;
         }
 
         @Override
@@ -424,7 +434,8 @@ public class PPLTool implements WithModelTool {
                 (String) map.getOrDefault("model_type", ""),
                 (String) map.getOrDefault("previous_tool_name", ""),
                 NumberUtils.toInt((String) map.get("head"), -1),
-                Boolean.parseBoolean((String) map.getOrDefault("execute", "true"))
+                Boolean.parseBoolean((String) map.getOrDefault("execute", "true")),
+                clusterService
             );
         }
 
@@ -740,5 +751,17 @@ public class PPLTool implements WithModelTool {
     public String formatString(Map<String, Object> targetMap) throws PrivilegedActionException {
         String mapString = AccessController.doPrivileged((PrivilegedExceptionAction<String>) () -> gson.toJson(targetMap));
         return mapString.substring(1, mapString.length() - 1);
+    }
+
+    public String getPPLVersionNumber() {
+        String currentVersion = Version.CURRENT.toString();
+        Object calciteEnabled = clusterService.state().metadata().transientSettings().get(CALCITE_ENABLE_FLAG);
+        if (Objects.isNull(calciteEnabled)) {
+            calciteEnabled = clusterService.state().metadata().transientSettings().get(CALCITE_ENABLE_FLAG);
+        }
+        if (Boolean.parseBoolean((String) calciteEnabled)) {
+            currentVersion = "3.3.0";
+        }
+        return currentVersion;
     }
 }
