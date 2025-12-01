@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
@@ -77,6 +79,22 @@ public class ToolHelper {
                 }
             }
         }
+    }
+
+    /**
+     * Find all date type fields from a field-to-type mapping
+     * @param fieldsToType map of field names to field types
+     * @return set of field names that are date or date_nanos type
+     */
+    public static Set<String> findDateTypeFields(Map<String, String> fieldsToType) {
+        Set<String> result = new HashSet<>();
+        for (Map.Entry<String, String> entry : fieldsToType.entrySet()) {
+            String value = entry.getValue();
+            if (value.equals("date") || value.equals("date_nanos")) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
     }
 
     /**

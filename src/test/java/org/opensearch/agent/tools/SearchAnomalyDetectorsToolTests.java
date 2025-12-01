@@ -96,7 +96,8 @@ public class SearchAnomalyDetectorsToolTests {
             null,
             null,
             null,
-            null
+            new IntervalTimeConfiguration(5, ChronoUnit.MINUTES), // frequency
+            false // autoCreated
         );
     }
 
