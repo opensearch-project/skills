@@ -753,7 +753,7 @@ public class LogPatternAnalysisTool implements Tool {
             .format(
                 Locale.ROOT,
                 "source=%s | where %s>'%s' and %s<'%s' | where match(%s, '%s') | patterns %s method=brain "
-                    + "mode=aggregation max_sample_count=2 "
+                    + "mode=aggregation max_sample_count=5 "
                     + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
                     + "| sort -pattern_count | head 5",
                 params.index,
