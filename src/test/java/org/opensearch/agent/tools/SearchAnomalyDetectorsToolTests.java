@@ -96,6 +96,7 @@ public class SearchAnomalyDetectorsToolTests {
             null,
             null,
             null,
+            null,
             null
         );
     }
