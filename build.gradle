@@ -167,7 +167,7 @@ dependencies {
     implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
     implementation 'com.fasterxml.jackson.module:jackson-module-scala_3:2.18.2'
     implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
-    implementation("com.thoughtworks.paranamer:paranamer:2.8")
+    implementation("com.thoughtworks.paranamer:paranamer:2.8.3")
     implementation("org.jsoup:jsoup:1.19.1")
 
     // Plugin dependencies
