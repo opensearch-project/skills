@@ -208,7 +208,7 @@ dependencies {
     testImplementation 'com.jayway.jsonpath:json-path:2.9.0'
     testImplementation('net.minidev:json-smart:2.5.2')
     testImplementation 'net.minidev:asm:1.0.2'
-    testImplementation "commons-validator:commons-validator:1.8.0"
+    testImplementation "commons-validator:commons-validator:1.10.1"
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.2'
 }
 task addSparkJar(type: Copy) {
