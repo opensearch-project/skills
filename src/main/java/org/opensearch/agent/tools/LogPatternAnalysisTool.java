@@ -93,7 +93,7 @@ public class LogPatternAnalysisTool implements Tool {
 
     // Constants
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool used to detect selection log patterns by the patterns command in PPL or to detect selection log sequences by the log clustering algorithm.";
+        "Analyzes log patterns and sequences in OpenSearch using PPL patterns command with brain method. Supports three modes: (1) Log Sequence Analysis - identifies exceptional trace sequences by comparing selection period against baseline; (2) Pattern Diff Analysis - detects significant pattern changes between baseline and selection time ranges; (3) Log Insight - extracts top error patterns with sample logs from selection period when no baseline is provided.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
