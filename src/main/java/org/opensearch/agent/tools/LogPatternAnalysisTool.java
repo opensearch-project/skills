@@ -254,7 +254,7 @@ public class LogPatternAnalysisTool implements Tool {
 
     @Override
     public Map<String, Object> getAttributes() {
-        return Map.of();
+        return DEFAULT_ATTRIBUTES;
     }
 
     @Override
