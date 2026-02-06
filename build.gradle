@@ -96,7 +96,7 @@ configurations {
         resolutionStrategy {
             force "org.mockito:mockito-core:${versions.mockito}"
             force "com.google.guava:guava:33.2.1-jre" // CVE for 31.1
-            force("org.eclipse.platform:org.eclipse.core.runtime:3.30.0") // CVE for < 3.29.0, forces JDK17 for spotless
+            force("org.eclipse.platform:org.eclipse.core.runtime:3.34.100") // CVE for < 3.29.0, forces JDK17 for spotless
             force("org.apache.httpcomponents.client5:httpclient5:${versions.httpclient5}")
         }
     }
