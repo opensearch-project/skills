@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.jsoup.helper.Validate.fail;
 import static org.junit.Assert.assertEquals;
@@ -883,8 +884,8 @@ public class DataDistributionToolTests {
                         "15000"
                     ),
                 ActionListener.<String>wrap(response -> fail("Should have failed with size exceeding limit"), e -> {
-                    MatcherAssert.assertThat(e.getMessage(), containsString("Size parameter exceeds maximum limit of 10000"));
-                    MatcherAssert.assertThat(e.getMessage(), containsString("got: 15000"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("must be between 1 and 10000"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("15000"));
                 })
             );
     }
@@ -1852,6 +1853,7 @@ public class DataDistributionToolTests {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
+        // Test that invalid DSL query causes execution to fail
         tool
             .run(
                 ImmutableMap
@@ -1868,13 +1870,14 @@ public class DataDistributionToolTests {
                         "invalid-json-query"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    // Should fallback to time range only query when DSL parsing fails
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    fail("Should have failed with invalid DSL query");
+                }, e -> {
+                    // Expect failure due to invalid DSL format
                     assertTrue(
-                        "Response should contain singleAnalysis even with invalid DSL",
-                        result.getAsJsonObject().has("singleAnalysis")
+                        "Should fail with exception for invalid DSL",
+                        e instanceof IllegalArgumentException || e.getMessage().contains("Invalid query format")
                     );
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
+                })
             );
     }
 
@@ -2101,6 +2104,7 @@ public class DataDistributionToolTests {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
+        // Test that invalid filter JSON causes parameter validation to fail
         tool
             .run(
                 ImmutableMap
@@ -2117,13 +2121,15 @@ public class DataDistributionToolTests {
                         "[\"{'term': {'status': 'error'}}\", \"invalid-json-filter\"]"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    // Should continue processing valid filters and ignore invalid ones
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    fail("Should have failed with invalid filter JSON");
+                }, e -> {
+                    // Expect IllegalArgumentException due to invalid filter format
+                    assertTrue("Should fail with IllegalArgumentException for invalid filter", e instanceof IllegalArgumentException);
                     assertTrue(
-                        "Response should contain singleAnalysis even with some invalid filters",
-                        result.getAsJsonObject().has("singleAnalysis")
+                        "Error message should mention invalid filter",
+                        e.getMessage().contains("Invalid 'filter' parameter") || e.getMessage().contains("Invalid query format")
                     );
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
+                })
             );
     }
 
@@ -2484,8 +2490,13 @@ public class DataDistributionToolTests {
                         "[malformed-json]"
                     ),
                 ActionListener.<String>wrap(response -> fail("Should have failed with malformed filter JSON"), e -> {
-                    MatcherAssert.assertThat(e.getMessage(), containsString("Invalid 'filter' parameter"));
-                    MatcherAssert.assertThat(e.getMessage(), containsString("must be a valid JSON array of strings"));
+                    // The filter "[malformed-json]" is valid JSON array syntax, but "malformed-json" is not valid query JSON
+                    // Error occurs during query execution, not parameter validation
+                    MatcherAssert
+                        .assertThat(
+                            e.getMessage(),
+                            anyOf(containsString("Invalid query format"), containsString("Invalid 'filter' parameter"))
+                        );
                 })
             );
     }

@@ -14,7 +14,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,11 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.math.NumberUtils;
-import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
-import org.opensearch.action.search.SearchRequest;
 import org.opensearch.agent.tools.utils.PPLExecuteHelper;
-import org.opensearch.agent.tools.utils.ToolHelper;
-import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
 import org.opensearch.index.query.BoolQueryBuilder;
@@ -39,11 +34,7 @@ import org.opensearch.index.query.RangeQueryBuilder;
 import org.opensearch.ml.common.spi.tools.Tool;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.utils.ToolUtils;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.transport.client.Client;
-
-import com.google.gson.reflect.TypeToken;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -208,97 +199,6 @@ public class DataDistributionTool implements Tool {
     public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, STRICT_FIELD, false);
 
     /**
-     * Parameter class to hold analysis parameters with validation
-     */
-    private static class AnalysisParameters {
-        final String index;
-        final String timeField;
-        final String selectionTimeRangeStart;
-        final String selectionTimeRangeEnd;
-        final String baselineTimeRangeStart;
-        final String baselineTimeRangeEnd;
-        final int size;
-        final String queryType;
-        final List<String> filter;
-        final String dsl;
-        final String ppl;
-
-        /**
-         * Constructs analysis parameters from input map with default values
-         *
-         * @param parameters Input parameter map from user request
-         */
-        AnalysisParameters(Map<String, String> parameters) {
-            this.index = parameters.getOrDefault(PARAM_INDEX, "");
-            this.timeField = parameters.getOrDefault(PARAM_TIME_FIELD, DEFAULT_TIME_FIELD);
-            this.selectionTimeRangeStart = parameters.getOrDefault(PARAM_SELECTION_TIME_RANGE_START, "");
-            this.selectionTimeRangeEnd = parameters.getOrDefault(PARAM_SELECTION_TIME_RANGE_END, "");
-            this.baselineTimeRangeStart = parameters.getOrDefault(PARAM_BASELINE_TIME_RANGE_START, "");
-            this.baselineTimeRangeEnd = parameters.getOrDefault(PARAM_BASELINE_TIME_RANGE_END, "");
-
-            try {
-                this.size = Integer.parseInt(parameters.getOrDefault(PARAM_SIZE, DEFAULT_SIZE));
-                if (this.size > MAX_SIZE_LIMIT) {
-                    throw new IllegalArgumentException("Size parameter exceeds maximum limit of " + MAX_SIZE_LIMIT + ", got: " + this.size);
-                }
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException(
-                    "Invalid 'size' parameter: must be a valid integer, got '" + parameters.get(PARAM_SIZE) + "'"
-                );
-            }
-
-            this.queryType = parameters.getOrDefault(PARAM_QUERY_TYPE, QUERY_TYPE_DSL);
-
-            String filterParam = parameters.getOrDefault(PARAM_FILTER, "");
-            if (Strings.isEmpty(filterParam)) {
-                this.filter = List.of();
-            } else {
-                try {
-                    this.filter = Arrays.asList(gson.fromJson(filterParam, String[].class));
-                } catch (Exception e) {
-                    throw new IllegalArgumentException(
-                        "Invalid 'filter' parameter: must be a valid JSON array of strings, got '"
-                            + filterParam
-                            + "'. Example: [\"{'term': {'status': 'error'}}\", \"{'range': {'level': {'gte': 3}}}\"]"
-                    );
-                }
-            }
-
-            this.dsl = parameters.getOrDefault(PARAM_DSL, "");
-            this.ppl = parameters.getOrDefault(QUERY_TYPE_PPL, "");
-        }
-
-        /**
-         * Validates required parameters are present
-         *
-         * @throws IllegalArgumentException if required parameters are missing
-         */
-        void validate() {
-            List<String> missingParams = new ArrayList<>();
-            if (Strings.isEmpty(index))
-                missingParams.add(PARAM_INDEX);
-            if (Strings.isEmpty(selectionTimeRangeStart))
-                missingParams.add(PARAM_SELECTION_TIME_RANGE_START);
-            if (Strings.isEmpty(selectionTimeRangeEnd))
-                missingParams.add(PARAM_SELECTION_TIME_RANGE_END);
-            if (Strings.isEmpty(timeField))
-                missingParams.add(PARAM_TIME_FIELD);
-            if (!missingParams.isEmpty()) {
-                throw new IllegalArgumentException("Missing required parameters: " + String.join(", ", missingParams));
-            }
-        }
-
-        /**
-         * Checks if baseline time range is provided for comparison analysis
-         *
-         * @return true if both baseline start and end times are provided
-         */
-        boolean hasBaselineTime() {
-            return !Strings.isEmpty(baselineTimeRangeStart) && !Strings.isEmpty(baselineTimeRangeEnd);
-        }
-    }
-
-    /**
      * Result class for data distribution analysis
      */
     private record SummaryDataItem(String field, double divergence, List<ChangeItem> topChanges) {
@@ -319,6 +219,7 @@ public class DataDistributionTool implements Tool {
     @Getter
     private String version;
     private Client client;
+    private DataFetchingHelper dataFetchingHelper;
 
     /**
      * Constructs a DataDistributionTool with the given OpenSearch client
@@ -327,6 +228,7 @@ public class DataDistributionTool implements Tool {
      */
     public DataDistributionTool(Client client) {
         this.client = client;
+        this.dataFetchingHelper = new DataFetchingHelper(client);
     }
 
     @Override
@@ -345,7 +247,7 @@ public class DataDistributionTool implements Tool {
     @Override
     public boolean validate(Map<String, String> map) {
         try {
-            new AnalysisParameters(map).validate();
+            new DataFetchingHelper.AnalysisParameters(map).validate();
         } catch (Exception e) {
             log.error("Failed to validate the data distribution analysis parameter: {}", e.getMessage());
             return false;
@@ -366,7 +268,7 @@ public class DataDistributionTool implements Tool {
         try {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
             log.debug("Starting data distribution analysis with parameters: {}", parameters.keySet());
-            AnalysisParameters params = new AnalysisParameters(parameters);
+            DataFetchingHelper.AnalysisParameters params = new DataFetchingHelper.AnalysisParameters(parameters);
 
             if (QUERY_TYPE_PPL.equals(params.queryType)) {
                 executePPLAnalysis(params, listener);
@@ -389,8 +291,8 @@ public class DataDistributionTool implements Tool {
      * @param params Analysis parameters containing query details
      * @param listener Action listener for handling results
      */
-    private <T> void executePPLAnalysis(AnalysisParameters params, ActionListener<T> listener) {
-        if (params.hasBaselineTime()) {
+    private <T> void executePPLAnalysis(DataFetchingHelper.AnalysisParameters params, ActionListener<T> listener) {
+        if (params.hasBaselineTimeRange()) {
             fetchPPLComparisonData(params, listener);
         } else {
             String pplQuery = buildPPLQuery(
@@ -423,8 +325,8 @@ public class DataDistributionTool implements Tool {
      * @param params Analysis parameters containing query details
      * @param listener Action listener for handling results
      */
-    private <T> void executeDSLAnalysis(AnalysisParameters params, ActionListener<T> listener) {
-        if (params.hasBaselineTime()) {
+    private <T> void executeDSLAnalysis(DataFetchingHelper.AnalysisParameters params, ActionListener<T> listener) {
+        if (params.hasBaselineTimeRange()) {
             fetchComparisonData(params, listener);
         } else {
             getSingleDataDistribution(params, listener);
@@ -438,7 +340,7 @@ public class DataDistributionTool implements Tool {
      * @param params Analysis parameters containing time ranges
      * @param listener Action listener for handling comparison results
      */
-    private <T> void fetchComparisonData(AnalysisParameters params, ActionListener<T> listener) {
+    private <T> void fetchComparisonData(DataFetchingHelper.AnalysisParameters params, ActionListener<T> listener) {
         fetchIndexData(params.selectionTimeRangeStart, params.selectionTimeRangeEnd, params, ActionListener.wrap(selectionData -> {
             fetchIndexData(params.baselineTimeRangeStart, params.baselineTimeRangeEnd, params, ActionListener.wrap(baselineData -> {
                 try {
@@ -465,7 +367,7 @@ public class DataDistributionTool implements Tool {
      * @param params Analysis parameters containing selection time range
      * @param listener Action listener for handling single analysis results
      */
-    private <T> void getSingleDataDistribution(AnalysisParameters params, ActionListener<T> listener) {
+    private <T> void getSingleDataDistribution(DataFetchingHelper.AnalysisParameters params, ActionListener<T> listener) {
         fetchIndexData(params.selectionTimeRangeStart, params.selectionTimeRangeEnd, params, ActionListener.wrap(data -> {
             try {
                 if (data.isEmpty()) {
@@ -533,82 +435,28 @@ public class DataDistributionTool implements Tool {
     private void fetchIndexData(
         String startTime,
         String endTime,
-        AnalysisParameters params,
+        DataFetchingHelper.AnalysisParameters params,
         ActionListener<List<Map<String, Object>>> listener
     ) {
-        try {
-            String formattedStartTime = formatTimeString(startTime);
-            String formattedEndTime = formatTimeString(endTime);
-            BoolQueryBuilder query;
-
-            // Use raw DSL query if provided
-            if (!Strings.isEmpty(params.dsl)) {
-                try {
-                    Map<String, Object> dslMap = gson.fromJson(params.dsl, new TypeToken<Map<String, Object>>() {
-                    }.getType());
-                    query = QueryBuilders.boolQuery();
-
-                    // Handle DSL query structure - check if it has "query" wrapper
-                    if (dslMap.containsKey("query")) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> queryMap = (Map<String, Object>) dslMap.get("query");
-                        log.debug("Processing DSL query with wrapper: {}", queryMap);
-
-                        // Build the DSL query directly into the main query
-                        buildQueryFromMap(queryMap, query);
-
-                        // Add time range filter
-                        query.filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
-                    } else {
-                        log.debug("Processing DSL query without wrapper: {}", dslMap);
-                        buildQueryFromMap(dslMap, query);
-                        // Add time range filter to the raw DSL query
-                        query.filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
-                    }
-
-                    log.debug("Final DSL query: {}", query.toString());
-                } catch (Exception e) {
-                    log.warn("Failed to parse raw DSL query: {}, falling back to time range only", params.dsl, e);
-                    query = QueryBuilders
-                        .boolQuery()
-                        .filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
-                }
-            } else {
-                query = QueryBuilders
-                    .boolQuery()
-                    .filter(new RangeQueryBuilder(params.timeField).gte(formattedStartTime).lte(formattedEndTime));
-
-                // Add additional filters if provided
-                if (!params.filter.isEmpty()) {
-                    for (String filterStr : params.filter) {
-                        try {
-                            Map<String, Object> filterMap = gson.fromJson(filterStr, new TypeToken<Map<String, Object>>() {
-                            }.getType());
-                            BoolQueryBuilder filterQuery = QueryBuilders.boolQuery();
-                            buildQueryFromMap(filterMap, filterQuery);
-                            query.must(filterQuery);
-                        } catch (Exception e) {
-                            log.warn("Failed to parse filter parameter: {}", filterStr, e);
-                        }
-                    }
-                }
-            }
-
-            SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(query).size(params.size);
-
-            SearchRequest request = new SearchRequest(params.index).source(sourceBuilder);
-
-            client.search(request, ActionListener.wrap(response -> {
-                List<Map<String, Object>> data = Arrays
-                    .stream(response.getHits().getHits())
-                    .map(SearchHit::getSourceAsMap)
-                    .collect(Collectors.toList());
-                listener.onResponse(data);
-            }, listener::onFailure));
-        } catch (Exception e) {
-            log.error("Failed to format time strings: {}", e.getMessage());
-            listener.onFailure(new IllegalArgumentException("Invalid time format: " + e.getMessage(), e));
+        // Convert AnalysisParameters to helper parameters
+        Map<String, String> helperParams = new HashMap<>();
+        helperParams.put("index", params.index);
+        helperParams.put("timeField", params.timeField);
+        helperParams.put("size", String.valueOf(params.size));
+        helperParams.put("queryType", params.queryType);
+        if (!Strings.isEmpty(params.dsl)) {
+            helperParams.put("dsl", params.dsl);
         }
+        if (!params.filter.isEmpty()) {
+            helperParams.put("filter", gson.toJson(params.filter));
+        }
+        if (!Strings.isEmpty(params.ppl)) {
+            helperParams.put("ppl", params.ppl);
+        }
+
+        DataFetchingHelper.AnalysisParameters helperAnalysisParams = new DataFetchingHelper.AnalysisParameters(helperParams);
+
+        dataFetchingHelper.fetchIndexData(startTime, endTime, helperAnalysisParams, listener);
     }
 
     /**
@@ -618,7 +466,7 @@ public class DataDistributionTool implements Tool {
      * @param params Analysis parameters containing time ranges
      * @param listener Action listener for handling comparison results
      */
-    private <T> void fetchPPLComparisonData(AnalysisParameters params, ActionListener<T> listener) {
+    private <T> void fetchPPLComparisonData(DataFetchingHelper.AnalysisParameters params, ActionListener<T> listener) {
         String selectionQuery = buildPPLQuery(
             params.index,
             params.timeField,
@@ -840,38 +688,7 @@ public class DataDistributionTool implements Tool {
      * @param listener Action listener for handling field types result
      */
     private void getFieldTypes(String index, ActionListener<Map<String, String>> listener) {
-        try {
-            GetMappingsRequest getMappingsRequest = new GetMappingsRequest().indices(index);
-            client.admin().indices().getMappings(getMappingsRequest, ActionListener.wrap(response -> {
-                try {
-                    Map<String, MappingMetadata> mappings = response.getMappings();
-                    if (mappings.isEmpty()) {
-                        listener.onResponse(Map.of());
-                        return;
-                    }
-
-                    MappingMetadata mappingMetadata = mappings.values().iterator().next();
-                    Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-                    if (mappingSource == null) {
-                        listener.onResponse(Map.of());
-                        return;
-                    }
-
-                    Map<String, String> fieldsToType = new HashMap<>();
-                    ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
-                    listener.onResponse(fieldsToType);
-                } catch (Exception e) {
-                    log.error("Failed to process field types for index: {}", index, e);
-                    listener.onResponse(Map.of());
-                }
-            }, e -> {
-                log.error("Failed to get field types for index: {}", index, e);
-                listener.onResponse(Map.of());
-            }));
-        } catch (Exception e) {
-            log.error("Failed to create getMappings request for index: {}", index, e);
-            listener.onResponse(Map.of());
-        }
+        dataFetchingHelper.getFieldTypes(index, listener);
     }
 
     /**
@@ -940,20 +757,7 @@ public class DataDistributionTool implements Tool {
      * @return Field value or null if not found
      */
     private Object getFlattenedValue(Map<String, Object> doc, String field) {
-        String[] parts = field.split("\\.");
-        Object current = doc;
-
-        for (String part : parts) {
-            if (current instanceof Map) {
-                current = ((Map<?, ?>) current).get(part);
-            } else if (current instanceof List) {
-                return gson.toJson(current);
-            } else {
-                return null;
-            }
-        }
-
-        return current;
+        return dataFetchingHelper.getFlattenedValue(doc, field);
     }
 
     /**
@@ -1043,12 +847,7 @@ public class DataDistributionTool implements Tool {
      * @return Set of number field names
      */
     private Set<String> getNumberFields(Map<String, String> fieldTypes) {
-        return fieldTypes
-            .entrySet()
-            .stream()
-            .filter(entry -> NUMBER_FIELD_TYPES.contains(entry.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toSet());
+        return dataFetchingHelper.getNumberFields(fieldTypes);
     }
 
     /**
