@@ -139,7 +139,7 @@ public class LogPatternAnalysisTool implements Tool {
                     },
                     "filter": {
                         "type": "string",
-                        "description": "[OPTIONAL] PPL boolean expression for additional filtering (e.g., "serviceName='payment-service' and severity='ERROR'"). Applied as a 'where' clause before pattern analysis."
+                        "description": "[OPTIONAL] PPL boolean expression for additional filtering (e.g., \\"serviceName='payment-service' and severity='ERROR'\\"). Applied as a 'where' clause before pattern analysis."
                     }
                 },
                 "required": [
