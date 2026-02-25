@@ -97,16 +97,15 @@ public class DataFetchingHelper {
             String sizeStr = parameters.getOrDefault("size", DEFAULT_SIZE);
             int parsedSize;
             try {
-                parsedSize = Integer.parseInt(sizeStr);
+                parsedSize = Double.valueOf(sizeStr).intValue();
                 if (parsedSize <= 0 || parsedSize > MAX_SIZE_LIMIT) {
                     throw new IllegalArgumentException(
                         String.format(Locale.ROOT, "Invalid 'size' parameter: must be between 1 and %d, got '%s'", MAX_SIZE_LIMIT, sizeStr)
                     );
                 }
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException(
-                    String.format(Locale.ROOT, "Invalid 'size' parameter: must be a valid integer, got '%s'", sizeStr)
-                );
+                // fallback to default
+                parsedSize = Integer.parseInt(DEFAULT_SIZE);
             }
             this.size = parsedSize;
 

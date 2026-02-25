@@ -50,8 +50,9 @@ public class MetricChangeAnalysisTool implements Tool {
     public static final String TYPE = "MetricChangeAnalysisTool";
 
     private static final String DEFAULT_DESCRIPTION =
-        "Analyzes metric changes by comparing percentile distributions (P25, P50, P75, P90) between time periods. "
-            + "Ranks fields by relative change to identify the most significant changes regardless of scale.";
+        "This tool analyzes a metric index to identify which numeric metrics changed most significantly between a selection time range and a baseline time range. "
+            + "It compares percentile distributions (P25, P50, P75, P90) of all numeric fields and returns the top N fields ranked by relative change score. "
+            + "Use this tool for root cause analysis when investigating performance degradation, anomalies, or incidents in metric data.";
 
     private static final int DEFAULT_TOP_N = 5;
 
@@ -60,7 +61,7 @@ public class MetricChangeAnalysisTool implements Tool {
             "type": "object",
             "properties": {
                 "index": {
-                    "type": "string",
+                    "type": "integer",
                     "description": "Target OpenSearch index name"
                 },
                 "timeField": {
