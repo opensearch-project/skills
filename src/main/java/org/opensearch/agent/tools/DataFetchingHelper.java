@@ -8,8 +8,8 @@ package org.opensearch.agent.tools;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -50,13 +50,13 @@ import lombok.extern.log4j.Log4j2;
 public class DataFetchingHelper {
 
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
-    private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ss";
-    private static final String QUERY_TYPE_PPL = "ppl";
-    private static final String QUERY_TYPE_DSL = "dsl";
+    public static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ss";
+    public static final String QUERY_TYPE_PPL = "ppl";
+    public static final String QUERY_TYPE_DSL = "dsl";
     private static final String DEFAULT_SIZE = "1000";
     private static final int MAX_SIZE_LIMIT = 10000;
 
-    private static final Set<String> NUMBER_FIELD_TYPES = Set
+    public static final Set<String> NUMBER_FIELD_TYPES = Set
         .of("byte", "short", "integer", "long", "float", "double", "half_float", "scaled_float");
 
     private final Client client;
@@ -361,25 +361,45 @@ public class DataFetchingHelper {
     }
 
     /**
-     * Formats time string to ISO 8601 format
-     * Uses OffsetDateTime to avoid forbidden LocalDateTime.atZone() API
+     * Formats time string to ISO 8601 format for OpenSearch compatibility
+     *
+     * @param timeString Input time string
+     * @return Formatted time string in ISO 8601 format
+     * @throws DateTimeParseException if time string cannot be parsed
      */
-    public String formatTimeString(String timeStr) {
-        if (timeStr == null || timeStr.isEmpty()) {
-            return timeStr;
+    private String formatTimeString(String timeString) throws DateTimeParseException {
+        log.debug("Attempting to parse time string: {}", timeString);
+
+        // Try parsing with zone first
+        try {
+            if (timeString.endsWith("Z")) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'", Locale.ROOT);
+                ZonedDateTime dateTime = ZonedDateTime.parse(timeString, formatter.withZone(ZoneOffset.UTC));
+                return dateTime.format(DateTimeFormatter.ISO_INSTANT);
+            }
+        } catch (DateTimeParseException e) {
+            log.debug("Failed to parse as UTC time: {}", e.getMessage());
         }
 
+        // Try parsing as local time without zone
         try {
-            // Parse as LocalDateTime first, then convert to OffsetDateTime with UTC offset
-            DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN, Locale.ROOT);
-            LocalDateTime localDateTime = LocalDateTime.parse(timeStr, inputFormatter);
-            // Use OffsetDateTime instead of ZonedDateTime to avoid atZone() forbidden API
-            OffsetDateTime offsetDateTime = localDateTime.atOffset(ZoneOffset.UTC);
-            return offsetDateTime.format(DateTimeFormatter.ISO_INSTANT);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN, Locale.ROOT);
+            LocalDateTime localDateTime = LocalDateTime.parse(timeString, formatter);
+            ZonedDateTime zonedDateTime = localDateTime.atOffset(ZoneOffset.UTC).toZonedDateTime();
+            return zonedDateTime.format(DateTimeFormatter.ISO_INSTANT);
         } catch (DateTimeParseException e) {
-            log.warn("Failed to parse time string '{}', using as-is", timeStr);
-            return timeStr;
+            log.debug("Failed to parse as local time: {}", e.getMessage());
         }
+
+        // Try ISO format
+        try {
+            ZonedDateTime dateTime = ZonedDateTime.parse(timeString);
+            return dateTime.format(DateTimeFormatter.ISO_INSTANT);
+        } catch (DateTimeParseException e) {
+            log.debug("Failed to parse as ISO format: {}", e.getMessage());
+        }
+
+        throw new RuntimeException("Invalid time format: " + timeString);
     }
 
     /**
