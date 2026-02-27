@@ -51,77 +51,79 @@ public class MetricChangeAnalysisTool implements Tool {
 
     private static final String DEFAULT_DESCRIPTION =
         "This tool analyzes a metric index to identify which numeric metrics changed most significantly between a selection time range and a baseline time range. "
-            + "It compares percentile distributions (P25, P50, P75, P90) of all numeric fields and returns the top N fields ranked by relative change score. "
-            + "Use this tool for root cause analysis when investigating performance degradation, anomalies, or incidents in metric data.";
+            + "It compares percentile distributions (P50, P90) of all numeric fields and returns the top N fields ranked by log-ratio change score. "
+            + "Use this tool for root cause analysis when investigating performance degradation, anomalies, or incidents in metric data. "
+            + "Keep both time ranges short and focused (e.g. 15-30 minutes) and similar in duration for accurate comparison.";
 
-    private static final int DEFAULT_TOP_N = 5;
+    private static final int DEFAULT_TOP_N = 10;
 
-    public static final String DEFAULT_INPUT_SCHEMA = """
-        {
-            "type": "object",
-            "properties": {
-                "index": {
-                    "type": "integer",
-                    "description": "Target OpenSearch index name"
-                },
-                "timeField": {
-                    "type": "string",
-                    "description": "Date/time field for filtering (default: @timestamp)"
-                },
-                "selectionTimeRangeStart": {
-                    "type": "string",
-                    "description": "Start time for analysis period (format: yyyy-MM-dd HH:mm:ss)"
-                },
-                "selectionTimeRangeEnd": {
-                    "type": "string",
-                    "description": "End time for analysis period (format: yyyy-MM-dd HH:mm:ss)"
-                },
-                "baselineTimeRangeStart": {
-                    "type": "string",
-                    "description": "Start time for baseline period (format: yyyy-MM-dd HH:mm:ss)"
-                },
-                "baselineTimeRangeEnd": {
-                    "type": "string",
-                    "description": "End time for baseline period (format: yyyy-MM-dd HH:mm:ss)"
-                },
-                "size": {
-                    "type": "integer",
-                    "description": "Maximum number of documents to analyze (default: 1000, max: 10000)"
-                },
-                "topN": {
-                    "type": "integer",
-                    "description": "Number of top fields to return, ranked by change score (default: 5)"
-                },
-                "queryType": {
-                    "type": "string",
-                    "description": "Query type: 'ppl' or 'dsl' (default: 'dsl')"
-                },
-                "filter": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
+    public static final String DEFAULT_INPUT_SCHEMA =
+        """
+            {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "string",
+                        "description": "Target OpenSearch index name"
                     },
-                    "description": "Additional DSL query conditions (optional)"
+                    "timeField": {
+                        "type": "string",
+                        "description": "Date/time field for filtering (default: @timestamp)"
+                    },
+                    "selectionTimeRangeStart": {
+                        "type": "string",
+                        "description": "Start time for the analysis period (format: yyyy-MM-dd HH:mm:ss). The selection period is the time range where the change or anomaly occurred."
+                    },
+                    "selectionTimeRangeEnd": {
+                        "type": "string",
+                        "description": "End time for the analysis period (format: yyyy-MM-dd HH:mm:ss)."
+                    },
+                    "baselineTimeRangeStart": {
+                        "type": "string",
+                        "description": "Start time for the baseline period (format: yyyy-MM-dd HH:mm:ss). The baseline represents normal behavior. Its duration should be same to the selection period for a fair comparison."
+                    },
+                    "baselineTimeRangeEnd": {
+                        "type": "string",
+                        "description": "End time for the baseline period (format: yyyy-MM-dd HH:mm:ss). Should be at or before selectionTimeRangeStart."
+                    },
+                    "size": {
+                        "type": "integer",
+                        "description": "Maximum number of documents to analyze (default: 1000, max: 10000)"
+                    },
+                    "topN": {
+                        "type": "integer",
+                        "description": "Number of top fields to return, ranked by change score (default: 10)"
+                    },
+                    "queryType": {
+                        "type": "string",
+                        "description": "Query type: 'ppl' or 'dsl' (default: 'dsl')"
+                    },
+                    "filter": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Additional DSL query conditions (optional)"
+                    },
+                    "dsl": {
+                        "type": "string",
+                        "description": "Complete raw DSL query as JSON string (optional)"
+                    },
+                    "ppl": {
+                        "type": "string",
+                        "description": "Complete PPL statement without time information (optional)"
+                    }
                 },
-                "dsl": {
-                    "type": "string",
-                    "description": "Complete raw DSL query as JSON string (optional)"
-                },
-                "ppl": {
-                    "type": "string",
-                    "description": "Complete PPL statement without time information (optional)"
-                }
-            },
-            "required": ["index", "selectionTimeRangeStart", "selectionTimeRangeEnd", "baselineTimeRangeStart", "baselineTimeRangeEnd"]
-        }
-        """;
+                "required": ["index", "timeField", "selectionTimeRangeStart", "selectionTimeRangeEnd", "baselineTimeRangeStart", "baselineTimeRangeEnd"]
+            }
+            """;
 
     public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
 
     /**
      * Record for percentile statistics
      */
-    private record PercentileStats(double p25, double p50, double p75, double p90) {
+    private record PercentileStats(double p50, double p90) {
     }
 
     /**
@@ -133,8 +135,8 @@ public class MetricChangeAnalysisTool implements Tool {
     /**
      * Result item for JSON output
      */
-    private record PercentileAnalysisResult(String field, Double relativeChangeScore, Map<String, Double> selectionPercentiles,
-        Map<String, Double> baselinePercentiles, Map<String, Double> relativeChanges) {
+    private record PercentileAnalysisResult(String field, Double changeScore, Map<String, Double> selectionPercentiles,
+        Map<String, Double> baselinePercentiles, Map<String, Double> logRatios) {
     }
 
     @Setter
@@ -197,12 +199,12 @@ public class MetricChangeAnalysisTool implements Tool {
             Map<String, String> parameters = ToolUtils.extractInputParameters(originalParameters, DEFAULT_ATTRIBUTES);
             log.debug("Starting metric change analysis with parameters: {}", parameters.keySet());
 
-            // Extract topN parameter
+            // Extract topN parameter (use Double.valueOf to handle "30.0" from Gson serialization)
             int topN = DEFAULT_TOP_N;
             String topNStr = parameters.get("topN");
             if (topNStr != null && !topNStr.isEmpty()) {
                 try {
-                    topN = Integer.parseInt(topNStr);
+                    topN = Double.valueOf(topNStr).intValue();
                     if (topN <= 0) {
                         topN = DEFAULT_TOP_N;
                     }
@@ -329,49 +331,19 @@ public class MetricChangeAnalysisTool implements Tool {
      */
     private List<PercentileAnalysisResult> formatResults(List<FieldPercentileAnalysis> analyses, int topN) {
         return analyses.stream().limit(topN).map(analysis -> {
-            Map<String, Double> selectionPercentiles = Map
+            Map<String, Double> selectionStats = Map.of("p50", analysis.selectionStats.p50, "p90", analysis.selectionStats.p90);
+
+            Map<String, Double> baselineStats = Map.of("p50", analysis.baselineStats.p50, "p90", analysis.baselineStats.p90);
+
+            Map<String, Double> logRatios = Map
                 .of(
-                    "p25",
-                    analysis.selectionStats.p25,
                     "p50",
-                    analysis.selectionStats.p50,
-                    "p75",
-                    analysis.selectionStats.p75,
+                    safeLogRatio(analysis.selectionStats.p50, analysis.baselineStats.p50),
                     "p90",
-                    analysis.selectionStats.p90
+                    safeLogRatio(analysis.selectionStats.p90, analysis.baselineStats.p90)
                 );
 
-            Map<String, Double> baselinePercentiles = Map
-                .of(
-                    "p25",
-                    analysis.baselineStats.p25,
-                    "p50",
-                    analysis.baselineStats.p50,
-                    "p75",
-                    analysis.baselineStats.p75,
-                    "p90",
-                    analysis.baselineStats.p90
-                );
-
-            Map<String, Double> relativeChanges = Map
-                .of(
-                    "p25",
-                    calculateRelativeChange(analysis.selectionStats.p25, analysis.baselineStats.p25),
-                    "p50",
-                    calculateRelativeChange(analysis.selectionStats.p50, analysis.baselineStats.p50),
-                    "p75",
-                    calculateRelativeChange(analysis.selectionStats.p75, analysis.baselineStats.p75),
-                    "p90",
-                    calculateRelativeChange(analysis.selectionStats.p90, analysis.baselineStats.p90)
-                );
-
-            return new PercentileAnalysisResult(
-                analysis.field,
-                analysis.variance,
-                selectionPercentiles,
-                baselinePercentiles,
-                relativeChanges
-            );
+            return new PercentileAnalysisResult(analysis.field, analysis.variance, selectionStats, baselineStats, logRatios);
         }).toList();
     }
 
@@ -438,22 +410,20 @@ public class MetricChangeAnalysisTool implements Tool {
     }
 
     /**
-     * Calculates percentile statistics (P25, P50, P75, P90) for a list of values
+     * Calculates statistics (avg, P50, P90) for a list of values
      */
     private PercentileStats calculatePercentiles(List<Double> values) {
         if (values.isEmpty()) {
-            return new PercentileStats(0.0, 0.0, 0.0, 0.0);
+            return new PercentileStats(0.0, 0.0);
         }
 
         List<Double> sorted = new ArrayList<>(values);
         sorted.sort(Double::compareTo);
 
-        double p25 = calculatePercentile(sorted, 25);
         double p50 = calculatePercentile(sorted, 50);
-        double p75 = calculatePercentile(sorted, 75);
         double p90 = calculatePercentile(sorted, 90);
 
-        return new PercentileStats(p25, p50, p75, p90);
+        return new PercentileStats(p50, p90);
     }
 
     /**
@@ -483,32 +453,47 @@ public class MetricChangeAnalysisTool implements Tool {
         return lowerValue + (upperValue - lowerValue) * fraction;
     }
 
+    private static final double LOG_RATIO_CAP = 10.0;
+    private static final double EPSILON = 1e-10;
+
     /**
-     * Calculates variance between selection and baseline percentile statistics
-     * Uses sum of squared relative changes (percentage changes) across all percentiles
+     * Calculates change score between selection and baseline statistics.
+     * Uses weighted log-ratio scoring on avg, P50, and P90.
+     * Skips a metric if its baseline is near zero to avoid inflated scores.
+     * Redistributes weight equally among valid metrics.
      */
     private double calculatePercentileVariance(PercentileStats selectionStats, PercentileStats baselineStats) {
-        double relativeChangeP25 = calculateRelativeChange(selectionStats.p25, baselineStats.p25);
-        double relativeChangeP50 = calculateRelativeChange(selectionStats.p50, baselineStats.p50);
-        double relativeChangeP75 = calculateRelativeChange(selectionStats.p75, baselineStats.p75);
-        double relativeChangeP90 = calculateRelativeChange(selectionStats.p90, baselineStats.p90);
+        boolean p50Valid = Math.abs(baselineStats.p50) >= EPSILON;
+        boolean p90Valid = Math.abs(baselineStats.p90) >= EPSILON;
 
-        return Math.pow(relativeChangeP25, 2) + Math.pow(relativeChangeP50, 2) + Math.pow(relativeChangeP75, 2) + Math
-            .pow(relativeChangeP90, 2);
+        if (!p50Valid && !p90Valid) {
+            return 0.0;
+        }
+        if (p50Valid && p90Valid) {
+            return 0.5 * safeLogRatio(selectionStats.p50, baselineStats.p50) + 0.5 * safeLogRatio(selectionStats.p90, baselineStats.p90);
+        }
+        if (p50Valid) {
+            return safeLogRatio(selectionStats.p50, baselineStats.p50);
+        }
+        return safeLogRatio(selectionStats.p90, baselineStats.p90);
     }
 
     /**
-     * Calculates relative change (percentage change) between two values
+     * Computes |log(selection / baseline)| with safe handling of near-zero values.
+     * Returns 0 when both values are near zero, caps at LOG_RATIO_CAP when only baseline is near zero.
      */
-    private double calculateRelativeChange(double newValue, double oldValue) {
-        if (Math.abs(oldValue) < 1e-10) {
-            if (Math.abs(newValue) < 1e-10) {
-                return 0.0;
-            }
-            return Math.abs(newValue);
+    private double safeLogRatio(double selection, double baseline) {
+        if (Math.abs(baseline) < EPSILON && Math.abs(selection) < EPSILON) {
+            return 0.0;
         }
-
-        return Math.abs(newValue - oldValue) / Math.abs(oldValue);
+        if (Math.abs(baseline) < EPSILON) {
+            return LOG_RATIO_CAP;
+        }
+        double ratio = selection / baseline;
+        if (ratio <= 0) {
+            return 0.0;
+        }
+        return Math.abs(Math.log(ratio));
     }
 
     /**

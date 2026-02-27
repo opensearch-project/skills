@@ -235,6 +235,40 @@ public class DataFetchingHelper {
     }
 
     /**
+     * Builds a BoolQueryBuilder with time range filter and optional custom filters.
+     * Can be used with any SearchSourceBuilder (for documents or aggregations).
+     *
+     * @param timeRangeStart Start time string
+     * @param timeRangeEnd End time string
+     * @param params Analysis parameters containing timeField, dsl, and filter settings
+     * @return BoolQueryBuilder with time range and custom filters applied
+     */
+    public BoolQueryBuilder buildFilterQuery(String timeRangeStart, String timeRangeEnd, AnalysisParameters params) {
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+
+        // Add time range filter
+        RangeQueryBuilder timeRangeQuery = QueryBuilders
+            .rangeQuery(params.timeField)
+            .gte(formatTimeString(timeRangeStart))
+            .lte(formatTimeString(timeRangeEnd))
+            .format("strict_date_optional_time||epoch_millis");
+        boolQuery.must(timeRangeQuery);
+
+        // Add custom query if provided
+        if (!Strings.isNullOrEmpty(params.dsl)) {
+            Map<String, Object> dslMap = buildQueryFromMap(params.dsl);
+            boolQuery.must(QueryBuilders.wrapperQuery(gson.toJson(dslMap)));
+        } else if (!params.filter.isEmpty()) {
+            for (String filterStr : params.filter) {
+                Map<String, Object> filterMap = buildQueryFromMap(filterStr);
+                boolQuery.must(QueryBuilders.wrapperQuery(gson.toJson(filterMap)));
+            }
+        }
+
+        return boolQuery;
+    }
+
+    /**
      * Fetches data using DSL query
      */
     private void fetchDataWithDSL(
@@ -244,26 +278,7 @@ public class DataFetchingHelper {
         ActionListener<List<Map<String, Object>>> listener
     ) {
         try {
-            BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-
-            // Add time range filter
-            RangeQueryBuilder timeRangeQuery = QueryBuilders
-                .rangeQuery(params.timeField)
-                .gte(formatTimeString(timeRangeStart))
-                .lte(formatTimeString(timeRangeEnd))
-                .format("strict_date_optional_time||epoch_millis");
-            boolQuery.must(timeRangeQuery);
-
-            // Add custom query if provided
-            if (!Strings.isNullOrEmpty(params.dsl)) {
-                Map<String, Object> dslMap = buildQueryFromMap(params.dsl);
-                boolQuery.must(QueryBuilders.wrapperQuery(gson.toJson(dslMap)));
-            } else if (!params.filter.isEmpty()) {
-                for (String filterStr : params.filter) {
-                    Map<String, Object> filterMap = buildQueryFromMap(filterStr);
-                    boolQuery.must(QueryBuilders.wrapperQuery(gson.toJson(filterMap)));
-                }
-            }
+            BoolQueryBuilder boolQuery = buildFilterQuery(timeRangeStart, timeRangeEnd, params);
 
             SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(boolQuery).size(params.size).fetchSource(true);
 

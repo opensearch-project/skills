@@ -190,19 +190,13 @@ public class MetricChangeAnalysisToolTests {
         Object result = calculatePercentilesMethod.invoke(tool, values);
 
         assertNotNull(result);
-        java.lang.reflect.Method p25Method = result.getClass().getDeclaredMethod("p25");
         java.lang.reflect.Method p50Method = result.getClass().getDeclaredMethod("p50");
-        java.lang.reflect.Method p75Method = result.getClass().getDeclaredMethod("p75");
         java.lang.reflect.Method p90Method = result.getClass().getDeclaredMethod("p90");
 
-        double p25 = (double) p25Method.invoke(result);
         double p50 = (double) p50Method.invoke(result);
-        double p75 = (double) p75Method.invoke(result);
         double p90 = (double) p90Method.invoke(result);
 
-        assertEquals(3.25, p25, 0.01);
         assertEquals(5.5, p50, 0.01);
-        assertEquals(7.75, p75, 0.01);
         assertEquals(9.1, p90, 0.01);
     }
 
@@ -281,36 +275,77 @@ public class MetricChangeAnalysisToolTests {
         assertTrue(values.contains(300.0));
     }
 
-    // ========== Relative Change Tests ==========
+    // ========== Log Ratio Tests ==========
 
     @Test
     @SneakyThrows
-    public void testCalculateRelativeChange() {
+    public void testSafeLogRatio() {
         MetricChangeAnalysisTool tool = MetricChangeAnalysisTool.Factory.getInstance().create(params);
 
-        java.lang.reflect.Method calculateRelativeChangeMethod = MetricChangeAnalysisTool.class
-            .getDeclaredMethod("calculateRelativeChange", double.class, double.class);
-        calculateRelativeChangeMethod.setAccessible(true);
+        java.lang.reflect.Method safeLogRatioMethod = MetricChangeAnalysisTool.class
+            .getDeclaredMethod("safeLogRatio", double.class, double.class);
+        safeLogRatioMethod.setAccessible(true);
 
-        // Test normal case: 1 -> 2 = 100% change
-        double change1 = (double) calculateRelativeChangeMethod.invoke(tool, 2.0, 1.0);
-        assertEquals(1.0, change1, 0.01);
+        // Test 2x increase: |log(2/1)| = log(2) ≈ 0.693
+        double ratio1 = (double) safeLogRatioMethod.invoke(tool, 2.0, 1.0);
+        assertEquals(Math.log(2.0), ratio1, 0.01);
 
-        // Test normal case: 100 -> 180 = 80% change
-        double change2 = (double) calculateRelativeChangeMethod.invoke(tool, 180.0, 100.0);
-        assertEquals(0.8, change2, 0.01);
+        // Test 1.8x increase: |log(180/100)| = log(1.8) ≈ 0.588
+        double ratio2 = (double) safeLogRatioMethod.invoke(tool, 180.0, 100.0);
+        assertEquals(Math.log(1.8), ratio2, 0.01);
 
-        // Test decrease: 10 -> 5 = 50% change
-        double change3 = (double) calculateRelativeChangeMethod.invoke(tool, 5.0, 10.0);
-        assertEquals(0.5, change3, 0.01);
+        // Test decrease: |log(5/10)| = |log(0.5)| = log(2) ≈ 0.693
+        double ratio3 = (double) safeLogRatioMethod.invoke(tool, 5.0, 10.0);
+        assertEquals(Math.log(2.0), ratio3, 0.01);
 
-        // Test zero baseline (edge case)
-        double change4 = (double) calculateRelativeChangeMethod.invoke(tool, 10.0, 0.0);
-        assertEquals(10.0, change4, 0.01);
+        // Test zero baseline: should return cap (10.0)
+        double ratio4 = (double) safeLogRatioMethod.invoke(tool, 10.0, 0.0);
+        assertEquals(10.0, ratio4, 0.01);
 
-        // Test both near zero (edge case)
-        double change5 = (double) calculateRelativeChangeMethod.invoke(tool, 0.0, 0.0);
-        assertEquals(0.0, change5, 0.01);
+        // Test both near zero: should return 0.0
+        double ratio5 = (double) safeLogRatioMethod.invoke(tool, 0.0, 0.0);
+        assertEquals(0.0, ratio5, 0.01);
+
+        // Test no change: |log(1)| = 0
+        double ratio6 = (double) safeLogRatioMethod.invoke(tool, 100.0, 100.0);
+        assertEquals(0.0, ratio6, 0.01);
+    }
+
+    // ========== Variance Calculation Tests ==========
+
+    @Test
+    @SneakyThrows
+    public void testCalculatePercentileVarianceSkipsZeroBaseline() {
+        MetricChangeAnalysisTool tool = MetricChangeAnalysisTool.Factory.getInstance().create(params);
+
+        java.lang.reflect.Method calculatePercentileVarianceMethod = MetricChangeAnalysisTool.class
+            .getDeclaredMethod(
+                "calculatePercentileVariance",
+                Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats"),
+                Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats")
+            );
+        calculatePercentileVarianceMethod.setAccessible(true);
+
+        Class<?> percentileStatsClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats");
+        java.lang.reflect.Constructor<?> constructor = percentileStatsClass.getDeclaredConstructor(double.class, double.class);
+        constructor.setAccessible(true);
+
+        // Both baselines zero → score 0
+        Object sel1 = constructor.newInstance(10.0, 5.0);
+        Object base1 = constructor.newInstance(0.0, 0.0);
+        assertEquals(0.0, (double) calculatePercentileVarianceMethod.invoke(tool, sel1, base1), 0.01);
+
+        // Only P50 baseline zero → score based on P90 only
+        Object sel2 = constructor.newInstance(10.0, 20.0);
+        Object base2 = constructor.newInstance(0.0, 10.0);
+        double expected = Math.abs(Math.log(20.0 / 10.0)); // log(2) ≈ 0.693
+        assertEquals(expected, (double) calculatePercentileVarianceMethod.invoke(tool, sel2, base2), 0.01);
+
+        // Only P90 baseline zero → score based on P50 only
+        Object sel3 = constructor.newInstance(20.0, 5.0);
+        Object base3 = constructor.newInstance(10.0, 0.0);
+        double expected3 = Math.abs(Math.log(20.0 / 10.0)); // log(2) ≈ 0.693
+        assertEquals(expected3, (double) calculatePercentileVarianceMethod.invoke(tool, sel3, base3), 0.01);
     }
 
     // ========== Variance Calculation Tests ==========
@@ -328,20 +363,19 @@ public class MetricChangeAnalysisToolTests {
             );
         calculatePercentileVarianceMethod.setAccessible(true);
 
-        // Create PercentileStats using reflection
+        // Create PercentileStats using reflection (p50, p90)
         Class<?> percentileStatsClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats");
-        java.lang.reflect.Constructor<?> constructor = percentileStatsClass
-            .getDeclaredConstructor(double.class, double.class, double.class, double.class);
+        java.lang.reflect.Constructor<?> constructor = percentileStatsClass.getDeclaredConstructor(double.class, double.class);
         constructor.setAccessible(true);
 
-        Object selectionStats = constructor.newInstance(10.0, 20.0, 30.0, 40.0);
-        Object baselineStats = constructor.newInstance(5.0, 10.0, 15.0, 20.0);
+        // selection p50=20, p90=40; baseline p50=10, p90=20 → both are 2x
+        Object selectionStats = constructor.newInstance(20.0, 40.0);
+        Object baselineStats = constructor.newInstance(10.0, 20.0);
 
         double variance = (double) calculatePercentileVarianceMethod.invoke(tool, selectionStats, baselineStats);
 
-        // Variance = (|10-5|/5)^2 + (|20-10|/10)^2 + (|30-15|/15)^2 + (|40-20|/20)^2
-        // = (1.0)^2 + (1.0)^2 + (1.0)^2 + (1.0)^2 = 4.0
-        assertEquals(4.0, variance, 0.01);
+        // score = 0.5 * log(2) + 0.5 * log(2) = log(2) ≈ 0.693
+        assertEquals(Math.log(2.0), variance, 0.01);
     }
 
     @Test
@@ -358,12 +392,11 @@ public class MetricChangeAnalysisToolTests {
         calculatePercentileVarianceMethod.setAccessible(true);
 
         Class<?> percentileStatsClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats");
-        java.lang.reflect.Constructor<?> constructor = percentileStatsClass
-            .getDeclaredConstructor(double.class, double.class, double.class, double.class);
+        java.lang.reflect.Constructor<?> constructor = percentileStatsClass.getDeclaredConstructor(double.class, double.class);
         constructor.setAccessible(true);
 
-        Object selectionStats = constructor.newInstance(10.0, 20.0, 30.0, 40.0);
-        Object baselineStats = constructor.newInstance(10.0, 20.0, 30.0, 40.0);
+        Object selectionStats = constructor.newInstance(20.0, 40.0);
+        Object baselineStats = constructor.newInstance(20.0, 40.0);
 
         double variance = (double) calculatePercentileVarianceMethod.invoke(tool, selectionStats, baselineStats);
 
@@ -384,25 +417,24 @@ public class MetricChangeAnalysisToolTests {
         calculatePercentileVarianceMethod.setAccessible(true);
 
         Class<?> percentileStatsClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats");
-        java.lang.reflect.Constructor<?> constructor = percentileStatsClass
-            .getDeclaredConstructor(double.class, double.class, double.class, double.class);
+        java.lang.reflect.Constructor<?> constructor = percentileStatsClass.getDeclaredConstructor(double.class, double.class);
         constructor.setAccessible(true);
 
-        // Test that 1->2 (100% change) ranks higher than 100->180 (80% change)
-        Object smallChangeStats = constructor.newInstance(2.0, 2.0, 2.0, 2.0);
-        Object smallBaselineStats = constructor.newInstance(1.0, 1.0, 1.0, 1.0);
+        // Test that 1->2 (2x) ranks higher than 100->180 (1.8x)
+        Object smallChangeStats = constructor.newInstance(2.0, 2.0);
+        Object smallBaselineStats = constructor.newInstance(1.0, 1.0);
 
-        Object largeChangeStats = constructor.newInstance(180.0, 180.0, 180.0, 180.0);
-        Object largeBaselineStats = constructor.newInstance(100.0, 100.0, 100.0, 100.0);
+        Object largeChangeStats = constructor.newInstance(180.0, 180.0);
+        Object largeBaselineStats = constructor.newInstance(100.0, 100.0);
 
         double smallVariance = (double) calculatePercentileVarianceMethod.invoke(tool, smallChangeStats, smallBaselineStats);
         double largeVariance = (double) calculatePercentileVarianceMethod.invoke(tool, largeChangeStats, largeBaselineStats);
 
-        // Small change: (|2-1|/1)^2 * 4 = 1.0^2 * 4 = 4.0
-        // Large change: (|180-100|/100)^2 * 4 = 0.8^2 * 4 = 2.56
-        assertEquals(4.0, smallVariance, 0.01);
-        assertEquals(2.56, largeVariance, 0.01);
-        assertTrue("1->2 should rank higher than 100->180", smallVariance > largeVariance);
+        // 2x change: 0.5 * log(2) + 0.5 * log(2) = log(2) ≈ 0.693
+        // 1.8x change: 0.5 * log(1.8) + 0.5 * log(1.8) = log(1.8) ≈ 0.588
+        assertEquals(Math.log(2.0), smallVariance, 0.01);
+        assertEquals(Math.log(1.8), largeVariance, 0.01);
+        assertTrue("2x change should rank higher than 1.8x change", smallVariance > largeVariance);
     }
 
     // ========== Percentile Analysis Tests ==========
@@ -416,20 +448,21 @@ public class MetricChangeAnalysisToolTests {
             .getDeclaredMethod("calculateMetricChangeAnalysis", List.class, List.class, java.util.Set.class);
         calculateMetricChangeAnalysisMethod.setAccessible(true);
 
+        // Use non-monotonic (gauge-like) data to avoid counter detection
         List<Map<String, Object>> selectionData = List
             .of(
+                Map.of("response_time", 400, "cpu_usage", 80),
                 Map.of("response_time", 100, "cpu_usage", 50),
-                Map.of("response_time", 200, "cpu_usage", 60),
-                Map.of("response_time", 300, "cpu_usage", 70),
-                Map.of("response_time", 400, "cpu_usage", 80)
+                Map.of("response_time", 300, "cpu_usage", 60),
+                Map.of("response_time", 200, "cpu_usage", 70)
             );
 
         List<Map<String, Object>> baselineData = List
             .of(
-                Map.of("response_time", 50, "cpu_usage", 45),
-                Map.of("response_time", 100, "cpu_usage", 55),
                 Map.of("response_time", 150, "cpu_usage", 65),
-                Map.of("response_time", 200, "cpu_usage", 75)
+                Map.of("response_time", 50, "cpu_usage", 45),
+                Map.of("response_time", 200, "cpu_usage", 75),
+                Map.of("response_time", 100, "cpu_usage", 55)
             );
 
         java.util.Set<String> numberFields = java.util.Set.of("response_time", "cpu_usage");
@@ -500,21 +533,21 @@ public class MetricChangeAnalysisToolTests {
             .getDeclaredMethod("calculateMetricChangeAnalysis", List.class, List.class, java.util.Set.class);
         calculateMetricChangeAnalysisMethod.setAccessible(true);
 
-        // Create data where response_time has high variance and cpu_usage has low variance
+        // Create non-monotonic data where response_time has high change and cpu_usage has low change
         List<Map<String, Object>> selectionData = List
             .of(
-                Map.of("response_time", 1000, "cpu_usage", 51),
-                Map.of("response_time", 2000, "cpu_usage", 52),
-                Map.of("response_time", 3000, "cpu_usage", 53),
-                Map.of("response_time", 4000, "cpu_usage", 54)
+                Map.of("response_time", 3000, "cpu_usage", 52),
+                Map.of("response_time", 1000, "cpu_usage", 54),
+                Map.of("response_time", 4000, "cpu_usage", 51),
+                Map.of("response_time", 2000, "cpu_usage", 53)
             );
 
         List<Map<String, Object>> baselineData = List
             .of(
-                Map.of("response_time", 100, "cpu_usage", 50),
-                Map.of("response_time", 200, "cpu_usage", 51),
                 Map.of("response_time", 300, "cpu_usage", 52),
-                Map.of("response_time", 400, "cpu_usage", 53)
+                Map.of("response_time", 100, "cpu_usage", 50),
+                Map.of("response_time", 400, "cpu_usage", 53),
+                Map.of("response_time", 200, "cpu_usage", 51)
             );
 
         java.util.Set<String> numberFields = java.util.Set.of("response_time", "cpu_usage");
@@ -549,15 +582,14 @@ public class MetricChangeAnalysisToolTests {
         Class<?> fieldAnalysisClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$FieldPercentileAnalysis");
         Class<?> percentileStatsClass = Class.forName("org.opensearch.agent.tools.MetricChangeAnalysisTool$PercentileStats");
 
-        java.lang.reflect.Constructor<?> statsConstructor = percentileStatsClass
-            .getDeclaredConstructor(double.class, double.class, double.class, double.class);
+        java.lang.reflect.Constructor<?> statsConstructor = percentileStatsClass.getDeclaredConstructor(double.class, double.class);
         statsConstructor.setAccessible(true);
 
         java.lang.reflect.Constructor<?> analysisConstructor = fieldAnalysisClass
             .getDeclaredConstructor(String.class, double.class, percentileStatsClass, percentileStatsClass);
         analysisConstructor.setAccessible(true);
 
-        Object stats = statsConstructor.newInstance(10.0, 20.0, 30.0, 40.0);
+        Object stats = statsConstructor.newInstance(20.0, 40.0);
 
         // Create 15 fields with descending variance scores
         for (int i = 0; i < 15; i++) {
