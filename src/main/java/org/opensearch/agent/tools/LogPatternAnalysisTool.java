@@ -814,7 +814,14 @@ public class LogPatternAnalysisTool implements Tool {
             );
     }
 
-    private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime, String filter) {
+    private String buildLogPatternPPL(
+        String index,
+        String timeField,
+        String logFieldName,
+        String startTime,
+        String endTime,
+        String filter
+    ) {
         return String
             .format(
                 Locale.ROOT,

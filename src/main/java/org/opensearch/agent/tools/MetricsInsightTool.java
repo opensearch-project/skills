@@ -197,13 +197,15 @@ public class MetricsInsightTool implements Tool {
             this.aggregationType = aggType;
 
             try {
-                this.zScoreThreshold = Double.parseDouble(parameters.getOrDefault(PARAM_Z_SCORE_THRESHOLD, String.valueOf(DEFAULT_Z_SCORE_THRESHOLD)));
+                this.zScoreThreshold = Double
+                    .parseDouble(parameters.getOrDefault(PARAM_Z_SCORE_THRESHOLD, String.valueOf(DEFAULT_Z_SCORE_THRESHOLD)));
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("Invalid zScoreThreshold: " + parameters.get(PARAM_Z_SCORE_THRESHOLD));
             }
 
             try {
-                this.changeThreshold = Double.parseDouble(parameters.getOrDefault(PARAM_CHANGE_THRESHOLD, String.valueOf(DEFAULT_CHANGE_THRESHOLD)));
+                this.changeThreshold = Double
+                    .parseDouble(parameters.getOrDefault(PARAM_CHANGE_THRESHOLD, String.valueOf(DEFAULT_CHANGE_THRESHOLD)));
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("Invalid changeThreshold: " + parameters.get(PARAM_CHANGE_THRESHOLD));
             }
@@ -215,17 +217,23 @@ public class MetricsInsightTool implements Tool {
                 try {
                     this.metricFields = Arrays.asList(gson.fromJson(metricFieldsStr, String[].class));
                 } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid metricFields: must be a JSON array of strings, got '" + metricFieldsStr + "'");
+                    throw new IllegalArgumentException(
+                        "Invalid metricFields: must be a JSON array of strings, got '" + metricFieldsStr + "'"
+                    );
                 }
             }
         }
 
         void validate() {
             List<String> missingParams = new ArrayList<>();
-            if (Strings.isEmpty(index)) missingParams.add(PARAM_INDEX);
-            if (metricFields.isEmpty()) missingParams.add(PARAM_METRIC_FIELDS);
-            if (Strings.isEmpty(selectionTimeRangeStart)) missingParams.add(PARAM_SELECTION_TIME_RANGE_START);
-            if (Strings.isEmpty(selectionTimeRangeEnd)) missingParams.add(PARAM_SELECTION_TIME_RANGE_END);
+            if (Strings.isEmpty(index))
+                missingParams.add(PARAM_INDEX);
+            if (metricFields.isEmpty())
+                missingParams.add(PARAM_METRIC_FIELDS);
+            if (Strings.isEmpty(selectionTimeRangeStart))
+                missingParams.add(PARAM_SELECTION_TIME_RANGE_START);
+            if (Strings.isEmpty(selectionTimeRangeEnd))
+                missingParams.add(PARAM_SELECTION_TIME_RANGE_END);
             if (!missingParams.isEmpty()) {
                 throw new IllegalArgumentException("Missing required parameters: " + String.join(", ", missingParams));
             }
@@ -300,7 +308,10 @@ public class MetricsInsightTool implements Tool {
         try {
             String resolvedInterval = resolveInterval(params);
             SearchRequest request = buildAggregationSearchRequest(
-                params, params.selectionTimeRangeStart, params.selectionTimeRangeEnd, resolvedInterval
+                params,
+                params.selectionTimeRangeStart,
+                params.selectionTimeRangeEnd,
+                resolvedInterval
             );
 
             client.search(request, ActionListener.wrap(response -> {
@@ -313,7 +324,18 @@ public class MetricsInsightTool implements Tool {
                         List<double[]> series = entry.getValue();
 
                         if (series.isEmpty()) {
-                            results.add(new MetricResult(field, params.aggregationType, 0, 0, new MetricStatistics(0, 0, 0, 0), List.of(), new TrendInfo("stable", 0)));
+                            results
+                                .add(
+                                    new MetricResult(
+                                        field,
+                                        params.aggregationType,
+                                        0,
+                                        0,
+                                        new MetricStatistics(0, 0, 0, 0),
+                                        List.of(),
+                                        new TrendInfo("stable", 0)
+                                    )
+                                );
                             continue;
                         }
 
@@ -343,7 +365,10 @@ public class MetricsInsightTool implements Tool {
             String resolvedInterval = resolveInterval(params);
 
             SearchRequest selectionRequest = buildAggregationSearchRequest(
-                params, params.selectionTimeRangeStart, params.selectionTimeRangeEnd, resolvedInterval
+                params,
+                params.selectionTimeRangeStart,
+                params.selectionTimeRangeEnd,
+                resolvedInterval
             );
 
             client.search(selectionRequest, ActionListener.wrap(selectionResponse -> {
@@ -351,7 +376,10 @@ public class MetricsInsightTool implements Tool {
                     Map<String, List<double[]>> selectionSeries = parseAggregationResponse(selectionResponse, params);
 
                     SearchRequest baselineRequest = buildAggregationSearchRequest(
-                        params, params.baselineTimeRangeStart, params.baselineTimeRangeEnd, resolvedInterval
+                        params,
+                        params.baselineTimeRangeStart,
+                        params.baselineTimeRangeEnd,
+                        resolvedInterval
                     );
 
                     client.search(baselineRequest, ActionListener.wrap(baselineResponse -> {
@@ -364,17 +392,42 @@ public class MetricsInsightTool implements Tool {
                                 List<double[]> basSeries = baselineSeries.getOrDefault(field, List.of());
 
                                 if (selSeries.isEmpty()) {
-                                    results.add(new MetricResult(field, params.aggregationType, 0, 0, new MetricStatistics(0, 0, 0, 0), List.of(), new TrendInfo("stable", 0)));
+                                    results
+                                        .add(
+                                            new MetricResult(
+                                                field,
+                                                params.aggregationType,
+                                                0,
+                                                0,
+                                                new MetricStatistics(0, 0, 0, 0),
+                                                List.of(),
+                                                new TrendInfo("stable", 0)
+                                            )
+                                        );
                                     continue;
                                 }
 
                                 MetricStatistics stats = computeStatistics(selSeries);
                                 List<AnomalyRecord> anomalies = detectBaselineAnomalies(
-                                    selSeries, basSeries, params.zScoreThreshold, params.changeThreshold
+                                    selSeries,
+                                    basSeries,
+                                    params.zScoreThreshold,
+                                    params.changeThreshold
                                 );
                                 TrendInfo trend = detectTrend(selSeries);
 
-                                results.add(new MetricResult(field, params.aggregationType, anomalies.size(), selSeries.size(), stats, anomalies, trend));
+                                results
+                                    .add(
+                                        new MetricResult(
+                                            field,
+                                            params.aggregationType,
+                                            anomalies.size(),
+                                            selSeries.size(),
+                                            stats,
+                                            anomalies,
+                                            trend
+                                        )
+                                    );
                             }
 
                             String output = buildOutput(results, "baseline");
@@ -397,12 +450,14 @@ public class MetricsInsightTool implements Tool {
         String formattedStart = formatTimeString(startTime);
         String formattedEnd = formatTimeString(endTime);
 
-        BoolQueryBuilder query = QueryBuilders.boolQuery()
+        BoolQueryBuilder query = QueryBuilders
+            .boolQuery()
             .filter(new RangeQueryBuilder(params.timeField).gte(formattedStart).lte(formattedEnd));
 
         if (!Strings.isEmpty(params.filter)) {
             try {
-                Map<String, Object> filterMap = gson.fromJson(params.filter, new TypeToken<Map<String, Object>>() {}.getType());
+                Map<String, Object> filterMap = gson.fromJson(params.filter, new TypeToken<Map<String, Object>>() {
+                }.getType());
                 BoolQueryBuilder filterQuery = QueryBuilders.boolQuery();
                 buildQueryFromMap(filterMap, filterQuery);
                 query.must(filterQuery);
@@ -423,22 +478,17 @@ public class MetricsInsightTool implements Tool {
                 case "sum" -> dateHistogram.subAggregation(AggregationBuilders.sum("metric_" + field).field(field));
                 case "max" -> dateHistogram.subAggregation(AggregationBuilders.max("metric_" + field).field(field));
                 case "min" -> dateHistogram.subAggregation(AggregationBuilders.min("metric_" + field).field(field));
-                case "p99" -> dateHistogram.subAggregation(AggregationBuilders.percentiles("metric_" + field).field(field).percentiles(99.0));
+                case "p99" -> dateHistogram
+                    .subAggregation(AggregationBuilders.percentiles("metric_" + field).field(field).percentiles(99.0));
             }
         }
 
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder()
-            .query(query)
-            .size(0)
-            .aggregation(dateHistogram);
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(query).size(0).aggregation(dateHistogram);
 
         return new SearchRequest(params.index).source(sourceBuilder);
     }
 
-    Map<String, List<double[]>> parseAggregationResponse(
-        org.opensearch.action.search.SearchResponse response,
-        AnalysisParameters params
-    ) {
+    Map<String, List<double[]>> parseAggregationResponse(org.opensearch.action.search.SearchResponse response, AnalysisParameters params) {
         Map<String, List<double[]>> result = new HashMap<>();
         for (String field : params.metricFields) {
             result.put(field, new ArrayList<>());
@@ -461,7 +511,7 @@ public class MetricsInsightTool implements Tool {
                 double value = extractMetricValue(bucket, aggName, params.aggregationType);
 
                 if (!Double.isNaN(value) && !Double.isInfinite(value)) {
-                    result.get(field).add(new double[]{timestamp, value});
+                    result.get(field).add(new double[] { timestamp, value });
                 }
             }
         }
@@ -488,11 +538,16 @@ public class MetricsInsightTool implements Tool {
         Instant end = parseToInstant(endTime);
         long durationMinutes = ChronoUnit.MINUTES.between(start, end);
 
-        if (durationMinutes < 60) return "1m";
-        if (durationMinutes < 360) return "5m";
-        if (durationMinutes < 1440) return "15m";
-        if (durationMinutes < 10080) return "1h";
-        if (durationMinutes < 43200) return "6h";
+        if (durationMinutes < 60)
+            return "1m";
+        if (durationMinutes < 360)
+            return "5m";
+        if (durationMinutes < 1440)
+            return "15m";
+        if (durationMinutes < 10080)
+            return "1h";
+        if (durationMinutes < 43200)
+            return "6h";
         return "1d";
     }
 
@@ -517,8 +572,10 @@ public class MetricsInsightTool implements Tool {
         for (double[] point : series) {
             double v = point[1];
             sum += v;
-            if (v < min) min = v;
-            if (v > max) max = v;
+            if (v < min)
+                min = v;
+            if (v > max)
+                max = v;
         }
 
         double mean = sum / series.size();
@@ -530,12 +587,7 @@ public class MetricsInsightTool implements Tool {
         }
         double stddev = Math.sqrt(varianceSum / series.size());
 
-        return new MetricStatistics(
-            roundTo(mean, 2),
-            roundTo(stddev, 2),
-            roundTo(min, 2),
-            roundTo(max, 2)
-        );
+        return new MetricStatistics(roundTo(mean, 2), roundTo(stddev, 2), roundTo(min, 2), roundTo(max, 2));
     }
 
     static List<AnomalyRecord> detectZScoreAnomalies(List<double[]> series, double threshold, MetricStatistics stats) {
@@ -547,15 +599,18 @@ public class MetricsInsightTool implements Tool {
         for (double[] point : series) {
             double zScore = Math.abs(point[1] - stats.mean()) / stats.stddev();
             if (zScore > threshold) {
-                anomalies.add(new AnomalyRecord(
-                    formatEpochMillis((long) point[0]),
-                    roundTo(point[1], 2),
-                    roundTo(stats.mean(), 2),
-                    0,
-                    0,
-                    roundTo(zScore, 2),
-                    "zscore"
-                ));
+                anomalies
+                    .add(
+                        new AnomalyRecord(
+                            formatEpochMillis((long) point[0]),
+                            roundTo(point[1], 2),
+                            roundTo(stats.mean(), 2),
+                            0,
+                            0,
+                            roundTo(zScore, 2),
+                            "zscore"
+                        )
+                    );
             }
         }
         return anomalies;
@@ -602,15 +657,18 @@ public class MetricsInsightTool implements Tool {
             double deviation = Math.abs(series.get(i)[1] - movingAvgs[i]);
             if (deviation > deviationThreshold) {
                 double score = deviation / avgDeviation;
-                anomalies.add(new AnomalyRecord(
-                    formatEpochMillis((long) series.get(i)[0]),
-                    roundTo(series.get(i)[1], 2),
-                    roundTo(movingAvgs[i], 2),
-                    0,
-                    0,
-                    roundTo(score, 2),
-                    "moving_average"
-                ));
+                anomalies
+                    .add(
+                        new AnomalyRecord(
+                            formatEpochMillis((long) series.get(i)[0]),
+                            roundTo(series.get(i)[1], 2),
+                            roundTo(movingAvgs[i], 2),
+                            0,
+                            0,
+                            roundTo(score, 2),
+                            "moving_average"
+                        )
+                    );
             }
         }
         return anomalies;
@@ -658,15 +716,18 @@ public class MetricsInsightTool implements Tool {
             }
 
             if (isAnomaly) {
-                anomalies.add(new AnomalyRecord(
-                    formatEpochMillis((long) point[0]),
-                    roundTo(value, 2),
-                    roundTo(baselineMean, 2),
-                    roundTo(baselineMean, 2),
-                    roundTo(percentageChange, 2),
-                    roundTo(anomalyScore, 2),
-                    type
-                ));
+                anomalies
+                    .add(
+                        new AnomalyRecord(
+                            formatEpochMillis((long) point[0]),
+                            roundTo(value, 2),
+                            roundTo(baselineMean, 2),
+                            roundTo(baselineMean, 2),
+                            roundTo(percentageChange, 2),
+                            roundTo(anomalyScore, 2),
+                            type
+                        )
+                    );
             }
         }
         return anomalies;
@@ -892,7 +953,8 @@ public class MetricsInsightTool implements Tool {
     }
 
     private void processRangeQuery(String field, Object operatorValue, BoolQueryBuilder queryBuilder) {
-        if (!(operatorValue instanceof Map)) return;
+        if (!(operatorValue instanceof Map))
+            return;
 
         @SuppressWarnings("unchecked")
         Map<String, Object> rangeMap = (Map<String, Object>) operatorValue;
@@ -917,12 +979,21 @@ public class MetricsInsightTool implements Tool {
             m.put("aggregationType", r.aggregationType());
             m.put("anomalyCount", r.anomalyCount());
             m.put("totalBuckets", r.totalBuckets());
-            m.put("statistics", Map.of(
-                "mean", r.statistics().mean(),
-                "stddev", r.statistics().stddev(),
-                "min", r.statistics().min(),
-                "max", r.statistics().max()
-            ));
+            m
+                .put(
+                    "statistics",
+                    Map
+                        .of(
+                            "mean",
+                            r.statistics().mean(),
+                            "stddev",
+                            r.statistics().stddev(),
+                            "min",
+                            r.statistics().min(),
+                            "max",
+                            r.statistics().max()
+                        )
+                );
             m.put("anomalies", r.anomalies().stream().map(a -> {
                 Map<String, Object> am = new LinkedHashMap<>();
                 am.put("timestamp", a.timestamp());
@@ -945,12 +1016,21 @@ public class MetricsInsightTool implements Tool {
 
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("metrics", metricsOutput);
-        output.put("summary", Map.of(
-            "totalMetrics", results.size(),
-            "metricsWithAnomalies", metricsWithAnomalies,
-            "totalAnomalies", totalAnomalies,
-            "analysisMode", analysisMode
-        ));
+        output
+            .put(
+                "summary",
+                Map
+                    .of(
+                        "totalMetrics",
+                        results.size(),
+                        "metricsWithAnomalies",
+                        metricsWithAnomalies,
+                        "totalAnomalies",
+                        totalAnomalies,
+                        "analysisMode",
+                        analysisMode
+                    )
+            );
 
         return gson.toJson(output);
     }

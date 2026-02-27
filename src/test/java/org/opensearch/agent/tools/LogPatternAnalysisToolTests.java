@@ -567,14 +567,10 @@ public class LogPatternAnalysisToolTests {
         parameters.put("selectionTimeRangeEnd", "2025-01-01T01:00:00Z");
         parameters.put("filter", "serviceName='payment-service' and severity='ERROR'");
 
-        tool
-            .run(
-                parameters,
-                ActionListener.<String>wrap(response -> {
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("logInsights"));
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
-            );
+        tool.run(parameters, ActionListener.<String>wrap(response -> {
+            JsonElement result = gson.fromJson(response, JsonElement.class);
+            assertTrue(result.getAsJsonObject().has("logInsights"));
+        }, e -> fail("Tool execution failed: " + e.getMessage())));
 
         assertEquals(1, capturedPPLQueries.size());
         assertTrue(
@@ -607,9 +603,7 @@ public class LogPatternAnalysisToolTests {
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
 
-        when(pplQueryResponse.getResult())
-            .thenReturn(baseResponse)
-            .thenReturn(selectionResponse);
+        when(pplQueryResponse.getResult()).thenReturn(baseResponse).thenReturn(selectionResponse);
 
         LogPatternAnalysisTool tool = LogPatternAnalysisTool.Factory.getInstance().create(params);
 
@@ -623,14 +617,10 @@ public class LogPatternAnalysisToolTests {
         parameters.put("selectionTimeRangeEnd", "2025-01-01T02:00:00Z");
         parameters.put("filter", "host='server-01'");
 
-        tool
-            .run(
-                parameters,
-                ActionListener.<String>wrap(response -> {
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
-                    assertTrue(result.getAsJsonObject().has("patternMapDifference"));
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
-            );
+        tool.run(parameters, ActionListener.<String>wrap(response -> {
+            JsonElement result = gson.fromJson(response, JsonElement.class);
+            assertTrue(result.getAsJsonObject().has("patternMapDifference"));
+        }, e -> fail("Tool execution failed: " + e.getMessage())));
 
         // Verify both PPL queries (base + selection) contain the filter clause
         assertEquals(2, capturedPPLQueries.size());

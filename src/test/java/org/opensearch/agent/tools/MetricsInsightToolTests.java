@@ -17,7 +17,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -27,7 +26,6 @@ import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchResponseSections;
@@ -43,7 +41,6 @@ import org.opensearch.search.aggregations.metrics.Sum;
 import org.opensearch.transport.client.Client;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import lombok.SneakyThrows;
@@ -79,46 +76,95 @@ public class MetricsInsightToolTests {
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
         // Valid parameters
-        assertTrue(tool.validate(Map.of(
-            "index", "test_index",
-            "metricFields", "[\"cpu_usage\"]",
-            "selectionTimeRangeStart", "2025-01-15 10:00:00",
-            "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-        )));
+        assertTrue(
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "metricFields",
+                            "[\"cpu_usage\"]",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00"
+                        )
+                )
+        );
 
         // Missing index
-        assertFalse(tool.validate(Map.of(
-            "metricFields", "[\"cpu_usage\"]",
-            "selectionTimeRangeStart", "2025-01-15 10:00:00",
-            "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-        )));
+        assertFalse(
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "metricFields",
+                            "[\"cpu_usage\"]",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00"
+                        )
+                )
+        );
 
         // Missing metricFields
-        assertFalse(tool.validate(Map.of(
-            "index", "test_index",
-            "selectionTimeRangeStart", "2025-01-15 10:00:00",
-            "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-        )));
+        assertFalse(
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00"
+                        )
+                )
+        );
 
         // Empty params
         assertFalse(tool.validate(Map.of()));
 
         // Invalid aggregation type
-        assertFalse(tool.validate(Map.of(
-            "index", "test_index",
-            "metricFields", "[\"cpu_usage\"]",
-            "selectionTimeRangeStart", "2025-01-15 10:00:00",
-            "selectionTimeRangeEnd", "2025-01-15 11:00:00",
-            "aggregationType", "invalid"
-        )));
+        assertFalse(
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "metricFields",
+                            "[\"cpu_usage\"]",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00",
+                            "aggregationType",
+                            "invalid"
+                        )
+                )
+        );
 
         // Invalid metricFields JSON
-        assertFalse(tool.validate(Map.of(
-            "index", "test_index",
-            "metricFields", "not-json",
-            "selectionTimeRangeStart", "2025-01-15 10:00:00",
-            "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-        )));
+        assertFalse(
+            tool
+                .validate(
+                    Map
+                        .of(
+                            "index",
+                            "test_index",
+                            "metricFields",
+                            "not-json",
+                            "selectionTimeRangeStart",
+                            "2025-01-15 10:00:00",
+                            "selectionTimeRangeEnd",
+                            "2025-01-15 11:00:00"
+                        )
+                )
+        );
     }
 
     // --- Single Period Analysis Tests ---
@@ -129,34 +175,40 @@ public class MetricsInsightToolTests {
         mockSearchWithAggregation(createNormalBuckets(60, 45.0, 10.0));
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                assertTrue(result.has("metrics"));
-                assertTrue(result.has("summary"));
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    assertTrue(result.has("metrics"));
+                    assertTrue(result.has("summary"));
 
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                assertTrue(metrics.size() > 0);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    assertTrue(metrics.size() > 0);
 
-                JsonObject firstMetric = metrics.get(0).getAsJsonObject();
-                assertEquals("cpu_usage", firstMetric.get("field").getAsString());
-                assertEquals("avg", firstMetric.get("aggregationType").getAsString());
-                assertTrue(firstMetric.has("statistics"));
-                assertTrue(firstMetric.has("anomalies"));
-                assertTrue(firstMetric.has("trend"));
-                assertEquals(60, firstMetric.get("totalBuckets").getAsInt());
+                    JsonObject firstMetric = metrics.get(0).getAsJsonObject();
+                    assertEquals("cpu_usage", firstMetric.get("field").getAsString());
+                    assertEquals("avg", firstMetric.get("aggregationType").getAsString());
+                    assertTrue(firstMetric.has("statistics"));
+                    assertTrue(firstMetric.has("anomalies"));
+                    assertTrue(firstMetric.has("trend"));
+                    assertEquals(60, firstMetric.get("totalBuckets").getAsInt());
 
-                JsonObject summary = result.getAsJsonObject("summary");
-                assertEquals(1, summary.get("totalMetrics").getAsInt());
-                assertEquals("single", summary.get("analysisMode").getAsString());
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    JsonObject summary = result.getAsJsonObject("summary");
+                    assertEquals(1, summary.get("totalMetrics").getAsInt());
+                    assertEquals("single", summary.get("analysisMode").getAsString());
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     @Test
@@ -167,40 +219,48 @@ public class MetricsInsightToolTests {
         // Override bucket 30 with a very high value (spike)
         Histogram.Bucket spikeBucket = createMockBucket(
             ZonedDateTime.of(2025, 1, 15, 10, 30, 0, 0, ZoneOffset.UTC),
-            "cpu_usage", "avg", 150.0
+            "cpu_usage",
+            "avg",
+            150.0
         );
         buckets.set(30, spikeBucket);
 
         mockSearchWithAggregation(buckets);
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                JsonObject metric = metrics.get(0).getAsJsonObject();
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    JsonObject metric = metrics.get(0).getAsJsonObject();
 
-                int anomalyCount = metric.get("anomalyCount").getAsInt();
-                assertTrue("Should detect at least one anomaly for spike", anomalyCount >= 1);
+                    int anomalyCount = metric.get("anomalyCount").getAsInt();
+                    assertTrue("Should detect at least one anomaly for spike", anomalyCount >= 1);
 
-                JsonArray anomalies = metric.getAsJsonArray("anomalies");
-                assertTrue(anomalies.size() >= 1);
+                    JsonArray anomalies = metric.getAsJsonArray("anomalies");
+                    assertTrue(anomalies.size() >= 1);
 
-                // Verify anomaly structure
-                JsonObject anomaly = anomalies.get(0).getAsJsonObject();
-                assertTrue(anomaly.has("timestamp"));
-                assertTrue(anomaly.has("value"));
-                assertTrue(anomaly.has("expectedValue"));
-                assertTrue(anomaly.has("anomalyScore"));
-                assertTrue(anomaly.has("type"));
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    // Verify anomaly structure
+                    JsonObject anomaly = anomalies.get(0).getAsJsonObject();
+                    assertTrue(anomaly.has("timestamp"));
+                    assertTrue(anomaly.has("value"));
+                    assertTrue(anomaly.has("expectedValue"));
+                    assertTrue(anomaly.has("anomalyScore"));
+                    assertTrue(anomaly.has("type"));
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     @Test
@@ -218,22 +278,28 @@ public class MetricsInsightToolTests {
         mockSearchWithAggregation(buckets);
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                JsonObject metric = metrics.get(0).getAsJsonObject();
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    JsonObject metric = metrics.get(0).getAsJsonObject();
 
-                int anomalyCount = metric.get("anomalyCount").getAsInt();
-                assertTrue("Should detect anomalies for sudden change", anomalyCount >= 1);
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    int anomalyCount = metric.get("anomalyCount").getAsInt();
+                    assertTrue("Should detect anomalies for sudden change", anomalyCount >= 1);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Baseline Comparison Tests ---
@@ -261,29 +327,37 @@ public class MetricsInsightToolTests {
 
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00",
-                "baselineTimeRangeStart", "2025-01-15 08:00:00",
-                "baselineTimeRangeEnd", "2025-01-15 09:00:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                assertTrue(result.has("metrics"));
-                assertTrue(result.has("summary"));
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "baselineTimeRangeStart",
+                        "2025-01-15 08:00:00",
+                        "baselineTimeRangeEnd",
+                        "2025-01-15 09:00:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    assertTrue(result.has("metrics"));
+                    assertTrue(result.has("summary"));
 
-                JsonObject summary = result.getAsJsonObject("summary");
-                assertEquals("baseline", summary.get("analysisMode").getAsString());
+                    JsonObject summary = result.getAsJsonObject("summary");
+                    assertEquals("baseline", summary.get("analysisMode").getAsString());
 
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                JsonObject metric = metrics.get(0).getAsJsonObject();
-                // Selection mean ~90 vs baseline mean ~40: >50% change
-                assertTrue("Should detect baseline anomalies", metric.get("anomalyCount").getAsInt() > 0);
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    JsonObject metric = metrics.get(0).getAsJsonObject();
+                    // Selection mean ~90 vs baseline mean ~40: >50% change
+                    assertTrue("Should detect baseline anomalies", metric.get("anomalyCount").getAsInt() > 0);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Auto-Detect Interval Tests ---
@@ -310,27 +384,38 @@ public class MetricsInsightToolTests {
     @SneakyThrows
     public void testMultipleMetricFields() {
         // Create buckets with two metrics
-        List<Histogram.Bucket> buckets = createMultiFieldBuckets(30, new String[]{"cpu_usage", "memory"}, new double[]{50.0, 70.0}, new double[]{5.0, 10.0});
+        List<Histogram.Bucket> buckets = createMultiFieldBuckets(
+            30,
+            new String[] { "cpu_usage", "memory" },
+            new double[] { 50.0, 70.0 },
+            new double[] { 5.0, 10.0 }
+        );
 
         mockSearchWithAggregation(buckets);
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\", \"memory\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 10:30:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                assertEquals(2, metrics.size());
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\", \"memory\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 10:30:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    assertEquals(2, metrics.size());
 
-                JsonObject summary = result.getAsJsonObject("summary");
-                assertEquals(2, summary.get("totalMetrics").getAsInt());
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    JsonObject summary = result.getAsJsonObject("summary");
+                    assertEquals(2, summary.get("totalMetrics").getAsInt());
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Filter Tests ---
@@ -341,20 +426,27 @@ public class MetricsInsightToolTests {
         mockSearchWithAggregation(createNormalBuckets(30, 45.0, 10.0));
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 10:30:00",
-                "filter", "{\"term\": {\"host\": \"server-01\"}}"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                assertTrue(result.has("metrics"));
-                assertTrue(result.has("summary"));
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 10:30:00",
+                        "filter",
+                        "{\"term\": {\"host\": \"server-01\"}}"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    assertTrue(result.has("metrics"));
+                    assertTrue(result.has("summary"));
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Empty Result Tests ---
@@ -365,23 +457,29 @@ public class MetricsInsightToolTests {
         mockSearchWithAggregation(List.of());
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                assertEquals(1, metrics.size());
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    assertEquals(1, metrics.size());
 
-                JsonObject metric = metrics.get(0).getAsJsonObject();
-                assertEquals(0, metric.get("anomalyCount").getAsInt());
-                assertEquals(0, metric.get("totalBuckets").getAsInt());
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+                    JsonObject metric = metrics.get(0).getAsJsonObject();
+                    assertEquals(0, metric.get("anomalyCount").getAsInt());
+                    assertEquals(0, metric.get("totalBuckets").getAsInt());
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Trend Detection Tests ---
@@ -391,7 +489,7 @@ public class MetricsInsightToolTests {
         // Increasing trend
         List<double[]> increasing = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            increasing.add(new double[]{i * 60000.0, 10.0 + i * 5.0});
+            increasing.add(new double[] { i * 60000.0, 10.0 + i * 5.0 });
         }
         MetricsInsightTool.TrendInfo incTrend = MetricsInsightTool.detectTrend(increasing);
         assertEquals("increasing", incTrend.direction());
@@ -400,7 +498,7 @@ public class MetricsInsightToolTests {
         // Decreasing trend
         List<double[]> decreasing = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            decreasing.add(new double[]{i * 60000.0, 100.0 - i * 5.0});
+            decreasing.add(new double[] { i * 60000.0, 100.0 - i * 5.0 });
         }
         MetricsInsightTool.TrendInfo decTrend = MetricsInsightTool.detectTrend(decreasing);
         assertEquals("decreasing", decTrend.direction());
@@ -409,7 +507,7 @@ public class MetricsInsightToolTests {
         // Stable trend
         List<double[]> stable = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            stable.add(new double[]{i * 60000.0, 50.0});
+            stable.add(new double[] { i * 60000.0, 50.0 });
         }
         MetricsInsightTool.TrendInfo staTrend = MetricsInsightTool.detectTrend(stable);
         assertEquals("stable", staTrend.direction());
@@ -424,7 +522,9 @@ public class MetricsInsightToolTests {
         List<Histogram.Bucket> buckets = createNormalBuckets(60, 50.0, 5.0);
         Histogram.Bucket spikeBucket = createMockBucket(
             ZonedDateTime.of(2025, 1, 15, 10, 30, 0, 0, ZoneOffset.UTC),
-            "cpu_usage", "avg", 70.0
+            "cpu_usage",
+            "avg",
+            70.0
         );
         buckets.set(30, spikeBucket);
 
@@ -432,21 +532,28 @@ public class MetricsInsightToolTests {
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
         // With low threshold (should detect more)
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00",
-                "zScoreThreshold", "2.0"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                JsonObject metric = metrics.get(0).getAsJsonObject();
-                assertTrue("Lower threshold should detect more anomalies", metric.get("anomalyCount").getAsInt() >= 1);
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00",
+                        "zScoreThreshold",
+                        "2.0"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    JsonObject metric = metrics.get(0).getAsJsonObject();
+                    assertTrue("Lower threshold should detect more anomalies", metric.get("anomalyCount").getAsInt() >= 1);
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- P99 Aggregation Tests ---
@@ -459,21 +566,28 @@ public class MetricsInsightToolTests {
         mockSearchWithAggregation(buckets);
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"response_time\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 10:30:00",
-                "aggregationType", "p99"
-            ),
-            ActionListener.<String>wrap(response -> {
-                JsonObject result = gson.fromJson(response, JsonObject.class);
-                JsonArray metrics = result.getAsJsonArray("metrics");
-                assertEquals(1, metrics.size());
-                assertEquals("p99", metrics.get(0).getAsJsonObject().get("aggregationType").getAsString());
-            }, e -> fail("Tool execution failed: " + e.getMessage()))
-        );
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"response_time\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 10:30:00",
+                        "aggregationType",
+                        "p99"
+                    ),
+                ActionListener.<String>wrap(response -> {
+                    JsonObject result = gson.fromJson(response, JsonObject.class);
+                    JsonArray metrics = result.getAsJsonArray("metrics");
+                    assertEquals(1, metrics.size());
+                    assertEquals("p99", metrics.get(0).getAsJsonObject().get("aggregationType").getAsString());
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
     }
 
     // --- Search Failure Tests ---
@@ -489,18 +603,25 @@ public class MetricsInsightToolTests {
 
         MetricsInsightTool tool = MetricsInsightTool.Factory.getInstance().create(params);
 
-        tool.run(
-            Map.of(
-                "index", "test_index",
-                "metricFields", "[\"cpu_usage\"]",
-                "selectionTimeRangeStart", "2025-01-15 10:00:00",
-                "selectionTimeRangeEnd", "2025-01-15 11:00:00"
-            ),
-            ActionListener.<String>wrap(
-                response -> fail("Should have failed"),
-                e -> assertTrue(e.getMessage().contains("Search execution failed"))
-            )
-        );
+        tool
+            .run(
+                Map
+                    .of(
+                        "index",
+                        "test_index",
+                        "metricFields",
+                        "[\"cpu_usage\"]",
+                        "selectionTimeRangeStart",
+                        "2025-01-15 10:00:00",
+                        "selectionTimeRangeEnd",
+                        "2025-01-15 11:00:00"
+                    ),
+                ActionListener
+                    .<String>wrap(
+                        response -> fail("Should have failed"),
+                        e -> assertTrue(e.getMessage().contains("Search execution failed"))
+                    )
+            );
     }
 
     // --- Constant Time Series Tests ---
@@ -510,7 +631,7 @@ public class MetricsInsightToolTests {
         // All values are the same -> stddev = 0 -> no z-score anomalies
         List<double[]> series = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
-            series.add(new double[]{i * 60000.0, 50.0});
+            series.add(new double[] { i * 60000.0, 50.0 });
         }
 
         MetricsInsightTool.MetricStatistics stats = MetricsInsightTool.computeStatistics(series);
@@ -529,11 +650,11 @@ public class MetricsInsightToolTests {
     @Test
     public void testComputeStatistics() {
         List<double[]> series = new ArrayList<>();
-        series.add(new double[]{0, 10.0});
-        series.add(new double[]{1, 20.0});
-        series.add(new double[]{2, 30.0});
-        series.add(new double[]{3, 40.0});
-        series.add(new double[]{4, 50.0});
+        series.add(new double[] { 0, 10.0 });
+        series.add(new double[] { 1, 20.0 });
+        series.add(new double[] { 2, 30.0 });
+        series.add(new double[] { 3, 40.0 });
+        series.add(new double[] { 4, 50.0 });
 
         MetricsInsightTool.MetricStatistics stats = MetricsInsightTool.computeStatistics(series);
         assertEquals(30.0, stats.mean(), 0.01);
@@ -565,7 +686,8 @@ public class MetricsInsightToolTests {
 
         assertEquals(3, merged.size());
         // The overlapping timestamp should keep the higher score (5.0 from MA)
-        MetricsInsightTool.AnomalyRecord overlapRecord = merged.stream()
+        MetricsInsightTool.AnomalyRecord overlapRecord = merged
+            .stream()
             .filter(a -> a.timestamp().equals("2025-01-15T10:30:00Z"))
             .findFirst()
             .orElse(null);
@@ -580,18 +702,16 @@ public class MetricsInsightToolTests {
         // Baseline: mean=50, stddev=5
         List<double[]> baseline = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            baseline.add(new double[]{i * 60000.0, 50.0 + (i % 2 == 0 ? 3.0 : -3.0)});
+            baseline.add(new double[] { i * 60000.0, 50.0 + (i % 2 == 0 ? 3.0 : -3.0) });
         }
 
         // Selection: significantly higher
         List<double[]> selection = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            selection.add(new double[]{i * 60000.0, 120.0});
+            selection.add(new double[] { i * 60000.0, 120.0 });
         }
 
-        List<MetricsInsightTool.AnomalyRecord> anomalies = MetricsInsightTool.detectBaselineAnomalies(
-            selection, baseline, 3.0, 50.0
-        );
+        List<MetricsInsightTool.AnomalyRecord> anomalies = MetricsInsightTool.detectBaselineAnomalies(selection, baseline, 3.0, 50.0);
 
         assertTrue("All selection points should be anomalous vs baseline", anomalies.size() > 0);
         for (MetricsInsightTool.AnomalyRecord a : anomalies) {
@@ -604,12 +724,10 @@ public class MetricsInsightToolTests {
     public void testBaselineAnomalyDetectionWithEmptyBaseline() {
         List<double[]> selection = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            selection.add(new double[]{i * 60000.0, 50.0});
+            selection.add(new double[] { i * 60000.0, 50.0 });
         }
 
-        List<MetricsInsightTool.AnomalyRecord> anomalies = MetricsInsightTool.detectBaselineAnomalies(
-            selection, List.of(), 3.0, 50.0
-        );
+        List<MetricsInsightTool.AnomalyRecord> anomalies = MetricsInsightTool.detectBaselineAnomalies(selection, List.of(), 3.0, 50.0);
         assertTrue("Empty baseline should produce no anomalies", anomalies.isEmpty());
     }
 
