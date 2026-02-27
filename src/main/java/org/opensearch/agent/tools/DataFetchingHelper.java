@@ -104,8 +104,9 @@ public class DataFetchingHelper {
                     );
                 }
             } catch (NumberFormatException e) {
-                // fallback to default
-                parsedSize = Integer.parseInt(DEFAULT_SIZE);
+                throw new IllegalArgumentException(
+                    String.format(Locale.ROOT, "Invalid 'size' parameter: '%s', must be a valid integer", sizeStr)
+                );
             }
             this.size = parsedSize;
 
