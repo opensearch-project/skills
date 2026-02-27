@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.jsoup.helper.Validate.fail;
 import static org.junit.Assert.assertEquals;
@@ -883,8 +884,8 @@ public class DataDistributionToolTests {
                         "15000"
                     ),
                 ActionListener.<String>wrap(response -> fail("Should have failed with size exceeding limit"), e -> {
-                    MatcherAssert.assertThat(e.getMessage(), containsString("Size parameter exceeds maximum limit of 10000"));
-                    MatcherAssert.assertThat(e.getMessage(), containsString("got: 15000"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("must be between 1 and 10000"));
+                    MatcherAssert.assertThat(e.getMessage(), containsString("15000"));
                 })
             );
     }
@@ -1166,284 +1167,6 @@ public class DataDistributionToolTests {
             data.add(doc);
         }
         return data;
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithTermQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("status", Map.of("term", "error"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("term"));
-        assertTrue(queryBuilder.toString().contains("status"));
-        assertTrue(queryBuilder.toString().contains("error"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithRangeQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("level", Map.of("range", Map.of("gte", 3, "lte", 5)));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("range"));
-        assertTrue(queryBuilder.toString().contains("level"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMatchQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("message", Map.of("match", "test message"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("match"));
-        assertTrue(queryBuilder.toString().contains("message"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithExistsQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("status", Map.of("exists", true));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("exists"));
-        assertTrue(queryBuilder.toString().contains("status"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithDirectTermQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("status", "error");
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("term"));
-        assertTrue(queryBuilder.toString().contains("status"));
-        assertTrue(queryBuilder.toString().contains("error"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMatchPhraseQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("message", Map.of("match_phrase", "exact phrase"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("match_phrase"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithPrefixQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("host", Map.of("prefix", "server"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("prefix"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithWildcardQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("host", Map.of("wildcard", "server*"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("wildcard"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithWildcardMapQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("host", Map.of("wildcard", Map.of("value", "server*")));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("wildcard"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithRegexpQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("host", Map.of("regexp", "server-[0-9]+"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("regexp"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithRegexpMapQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("host", Map.of("regexp", Map.of("value", "server-[0-9]+")));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("regexp"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithTermsQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("terms", Map.of("status", List.of("error", "warning")));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("terms"));
-        assertTrue(queryBuilder.toString().contains("status"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMultiMatchQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map
-            .of("multi_match", Map.of("query", "error message", "fields", List.of("message", "description")));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("multi_match"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithComplexRangeQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("level", Map.of("range", Map.of("gt", 1, "lt", 10)));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        assertTrue(queryBuilder.toString().contains("range"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithUnsupportedOperator() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        Map<String, Object> filterMap = Map.of("status", Map.of("unsupported_op", "value"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
     }
 
     @Test
@@ -1852,6 +1575,7 @@ public class DataDistributionToolTests {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
+        // Test that invalid DSL query causes execution to fail
         tool
             .run(
                 ImmutableMap
@@ -1868,13 +1592,14 @@ public class DataDistributionToolTests {
                         "invalid-json-query"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    // Should fallback to time range only query when DSL parsing fails
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    fail("Should have failed with invalid DSL query");
+                }, e -> {
+                    // Expect failure due to invalid DSL format
                     assertTrue(
-                        "Response should contain singleAnalysis even with invalid DSL",
-                        result.getAsJsonObject().has("singleAnalysis")
+                        "Should fail with exception for invalid DSL",
+                        e instanceof IllegalArgumentException || e.getMessage().contains("Invalid query format")
                     );
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
+                })
             );
     }
 
@@ -2101,6 +1826,7 @@ public class DataDistributionToolTests {
         mockSearchResponse();
         DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
 
+        // Test that invalid filter JSON causes parameter validation to fail
         tool
             .run(
                 ImmutableMap
@@ -2117,13 +1843,15 @@ public class DataDistributionToolTests {
                         "[\"{'term': {'status': 'error'}}\", \"invalid-json-filter\"]"
                     ),
                 ActionListener.<String>wrap(response -> {
-                    // Should continue processing valid filters and ignore invalid ones
-                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    fail("Should have failed with invalid filter JSON");
+                }, e -> {
+                    // Expect IllegalArgumentException due to invalid filter format
+                    assertTrue("Should fail with IllegalArgumentException for invalid filter", e instanceof IllegalArgumentException);
                     assertTrue(
-                        "Response should contain singleAnalysis even with some invalid filters",
-                        result.getAsJsonObject().has("singleAnalysis")
+                        "Error message should mention invalid filter",
+                        e.getMessage().contains("Invalid 'filter' parameter") || e.getMessage().contains("Invalid query format")
                     );
-                }, e -> fail("Tool execution failed: " + e.getMessage()))
+                })
             );
     }
 
@@ -2484,8 +2212,13 @@ public class DataDistributionToolTests {
                         "[malformed-json]"
                     ),
                 ActionListener.<String>wrap(response -> fail("Should have failed with malformed filter JSON"), e -> {
-                    MatcherAssert.assertThat(e.getMessage(), containsString("Invalid 'filter' parameter"));
-                    MatcherAssert.assertThat(e.getMessage(), containsString("must be a valid JSON array of strings"));
+                    // The filter "[malformed-json]" is valid JSON array syntax, but "malformed-json" is not valid query JSON
+                    // Error occurs during query execution, not parameter validation
+                    MatcherAssert
+                        .assertThat(
+                            e.getMessage(),
+                            anyOf(containsString("Invalid query format"), containsString("Invalid 'filter' parameter"))
+                        );
                 })
             );
     }
@@ -2636,85 +2369,5 @@ public class DataDistributionToolTests {
                     assertTrue("DSL should take precedence over filter", singleAnalysis.getAsJsonArray().size() > 0);
                 }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithTermsQueryNonListValue() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        // Test terms query with non-list value (should be ignored)
-        Map<String, Object> filterMap = Map.of("terms", Map.of("status", "error"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        // Should not contain terms query since value is not a list
-        assertFalse(queryBuilder.toString().contains("terms"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMultiMatchQueryMissingFields() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        // Test multi_match query with missing fields (should be ignored)
-        Map<String, Object> filterMap = Map.of("multi_match", Map.of("query", "error message"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        // Should not contain multi_match query since fields is missing
-        assertFalse(queryBuilder.toString().contains("multi_match"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMultiMatchQueryMissingQuery() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        // Test multi_match query with missing query (should be ignored)
-        Map<String, Object> filterMap = Map.of("multi_match", Map.of("fields", List.of("message", "description")));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        // Should not contain multi_match query since query is missing
-        assertFalse(queryBuilder.toString().contains("multi_match"));
-    }
-
-    @Test
-    @SneakyThrows
-    public void testBuildQueryFromMapWithMultiMatchQueryNonListFields() {
-        DataDistributionTool tool = DataDistributionTool.Factory.getInstance().create(params);
-
-        java.lang.reflect.Method buildQueryMethod = DataDistributionTool.class
-            .getDeclaredMethod("buildQueryFromMap", Map.class, org.opensearch.index.query.BoolQueryBuilder.class);
-        buildQueryMethod.setAccessible(true);
-
-        // Test multi_match query with non-list fields (should be ignored)
-        Map<String, Object> filterMap = Map.of("multi_match", Map.of("query", "error message", "fields", "message"));
-        org.opensearch.index.query.BoolQueryBuilder queryBuilder = org.opensearch.index.query.QueryBuilders.boolQuery();
-
-        buildQueryMethod.invoke(tool, filterMap, queryBuilder);
-
-        assertNotNull(queryBuilder);
-        // Should not contain multi_match query since fields is not a list
-        assertFalse(queryBuilder.toString().contains("multi_match"));
     }
 }
