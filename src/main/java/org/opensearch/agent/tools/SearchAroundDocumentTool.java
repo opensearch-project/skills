@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.opensearch.action.search.MultiSearchRequest;
-import org.opensearch.action.search.MultiSearchResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -197,7 +195,7 @@ public class SearchAroundDocumentTool implements Tool {
             }
             if (count == null && parameters.containsKey(COUNT_FIELD)) {
                 try {
-                    count = Integer.parseInt(parameters.get(COUNT_FIELD));
+                    count = Double.valueOf(parameters.get(COUNT_FIELD)).intValue();
                 } catch (NumberFormatException e) {
                     log.error("Invalid count parameter: {}", parameters.get(COUNT_FIELD), e);
                 }
@@ -221,7 +219,7 @@ public class SearchAroundDocumentTool implements Tool {
 
             // Step 1: Fetch the target document by ID with sort values
             log
-                .info(
+                .debug(
                     "Calling SearchAroundDocumentTool: index={}, doc_id={}, timestamp_field={}, count={}",
                     index,
                     docId,
@@ -253,22 +251,7 @@ public class SearchAroundDocumentTool implements Tool {
                 // Build target document response
                 Map<String, Object> targetDoc = processResponse(targetHit);
 
-                // Step 2 & 3: Execute multi-search for documents before and after using search_after
-                MultiSearchRequest multiSearchRequest = new MultiSearchRequest();
-
-                // Query for documents AFTER: search_after with ASC sort, exclude target doc
-                BoolQueryBuilder afterQuery = QueryBuilders.boolQuery().mustNot(QueryBuilders.idsQuery().addIds(finalDocId));
-
-                SearchSourceBuilder afterSource = new SearchSourceBuilder()
-                    .query(afterQuery)
-                    .sort(new FieldSortBuilder(finalTimestampField).order(SortOrder.ASC).unmappedType("boolean"))
-                    .sort(new FieldSortBuilder("_doc").order(SortOrder.ASC).unmappedType("boolean"))
-                    .searchAfter(sortValues)
-                    .size(finalCount);
-                SearchRequest afterRequest = new SearchRequest(finalIndex).source(afterSource);
-                multiSearchRequest.add(afterRequest);
-
-                // Query for documents BEFORE: search_after with DESC sort, exclude target doc
+                // Step 2: Search for documents BEFORE using search_after with DESC sort
                 BoolQueryBuilder beforeQuery = QueryBuilders.boolQuery().mustNot(QueryBuilders.idsQuery().addIds(finalDocId));
 
                 SearchSourceBuilder beforeSource = new SearchSourceBuilder()
@@ -278,38 +261,49 @@ public class SearchAroundDocumentTool implements Tool {
                     .searchAfter(sortValues)
                     .size(finalCount);
                 SearchRequest beforeRequest = new SearchRequest(finalIndex).source(beforeSource);
-                multiSearchRequest.add(beforeRequest);
 
-                client.multiSearch(multiSearchRequest, ActionListener.wrap(multiSearchResponse -> {
-                    List<Map<String, Object>> result = new ArrayList<>();
-                    MultiSearchResponse.Item[] responses = multiSearchResponse.getResponses();
+                client.search(beforeRequest, ActionListener.wrap(beforeResponse -> {
+                    // Step 3: Search for documents AFTER using search_after with ASC sort
+                    BoolQueryBuilder afterQuery = QueryBuilders
+                        .boolQuery()
+                        .mustNot(QueryBuilders.idsQuery().addIds(finalDocId));
 
-                    // Process "before" results (need to reverse to get chronological order)
-                    if (responses.length > 1 && responses[1].getResponse() != null) {
-                        SearchHit[] beforeHits = responses[1].getResponse().getHits().getHits();
+                    SearchSourceBuilder afterSource = new SearchSourceBuilder()
+                        .query(afterQuery)
+                        .sort(new FieldSortBuilder(finalTimestampField).order(SortOrder.ASC).unmappedType("boolean"))
+                        .sort(new FieldSortBuilder("_doc").order(SortOrder.ASC).unmappedType("boolean"))
+                        .searchAfter(sortValues)
+                        .size(finalCount);
+                    SearchRequest afterRequest = new SearchRequest(finalIndex).source(afterSource);
+
+                    client.search(afterRequest, ActionListener.wrap(afterSearchResponse -> {
+
+                        // Process "before" results (need to reverse to get chronological order)
+                        SearchHit[] beforeHits = beforeResponse.getHits().getHits();
                         List<Map<String, Object>> beforeDocs = new ArrayList<>();
                         for (SearchHit hit : beforeHits) {
                             beforeDocs.add(processResponse(hit));
                         }
                         Collections.reverse(beforeDocs);
-                        result.addAll(beforeDocs);
-                    }
+                        List<Map<String, Object>> result = new ArrayList<>(beforeDocs);
 
-                    // Add target document
-                    result.add(targetDoc);
+                        // Add target document
+                        result.add(targetDoc);
 
-                    // Process "after" results
-                    if (responses.length > 0 && responses[0].getResponse() != null) {
-                        SearchHit[] afterHits = responses[0].getResponse().getHits().getHits();
+                        // Process "after" results
+                        SearchHit[] afterHits = afterSearchResponse.getHits().getHits();
                         for (SearchHit hit : afterHits) {
                             result.add(processResponse(hit));
                         }
-                    }
 
-                    String resultJson = GSON.toJson(result);
-                    listener.onResponse((T) resultJson);
+                        String resultJson = GSON.toJson(result);
+                        listener.onResponse((T) resultJson);
+                    }, e -> {
+                        log.error("Failed to search for documents after target", e);
+                        listener.onFailure(e);
+                    }));
                 }, e -> {
-                    log.error("Failed to execute multi-search", e);
+                    log.error("Failed to search for documents before target", e);
                     listener.onFailure(e);
                 }));
             }, e -> {
@@ -352,8 +346,7 @@ public class SearchAroundDocumentTool implements Tool {
 
         @Override
         public SearchAroundDocumentTool create(Map<String, Object> params) {
-            SearchAroundDocumentTool tool = new SearchAroundDocumentTool(client, xContentRegistry);
-            return tool;
+            return new SearchAroundDocumentTool(client, xContentRegistry);
         }
 
         @Override
