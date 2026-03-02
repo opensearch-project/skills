@@ -16,7 +16,6 @@ import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -36,8 +35,7 @@ public class SearchAroundDocumentToolIT extends BaseAgentToolsIT {
     @SneakyThrows
     public void setUp() {
         super.setUp();
-        registerAgentRequestBody = Files
-            .readString(Path.of(this.getClass().getClassLoader().getResource(REGISTER_AGENT_RESOURCE).toURI()));
+        registerAgentRequestBody = Files.readString(Path.of(this.getClass().getClassLoader().getResource(REGISTER_AGENT_RESOURCE).toURI()));
         prepareDataIndex();
         agentId = createAgent(registerAgentRequestBody);
     }
@@ -51,26 +49,23 @@ public class SearchAroundDocumentToolIT extends BaseAgentToolsIT {
 
     @SneakyThrows
     private void prepareDataIndex() {
-        createIndexWithConfiguration(
-            TEST_INDEX_NAME,
-            """
-                {
-                  "mappings": {
-                    "properties": {
-                      "@timestamp": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis"
-                      },
-                      "message": {
-                        "type": "text"
-                      },
-                      "level": {
-                        "type": "keyword"
-                      }
-                    }
+        createIndexWithConfiguration(TEST_INDEX_NAME, """
+            {
+              "mappings": {
+                "properties": {
+                  "@timestamp": {
+                    "type": "date",
+                    "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis"
+                  },
+                  "message": {
+                    "type": "text"
+                  },
+                  "level": {
+                    "type": "keyword"
                   }
-                }"""
-        );
+                }
+              }
+            }""");
 
         // Index 7 documents with known timestamps and IDs
         addDocToIndex(
@@ -278,15 +273,7 @@ public class SearchAroundDocumentToolIT extends BaseAgentToolsIT {
     public void testSearchAroundDocument_missingRequiredParameters() {
         Exception exception = assertThrows(
             Exception.class,
-            () -> executeAgent(
-                agentId,
-                String
-                    .format(
-                        Locale.ROOT,
-                        "{\"parameters\": {\"index\": \"%s\"}}",
-                        TEST_INDEX_NAME
-                    )
-            )
+            () -> executeAgent(agentId, String.format(Locale.ROOT, "{\"parameters\": {\"index\": \"%s\"}}", TEST_INDEX_NAME))
         );
         MatcherAssert.assertThat(exception.getMessage(), containsString("requires"));
     }

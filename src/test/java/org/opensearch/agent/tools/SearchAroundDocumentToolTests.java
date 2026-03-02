@@ -180,25 +180,45 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithDirectParameters() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("target-doc", "test-index",
-            Map.of("@timestamp", "2024-01-01T00:00:05", "message", "target"), sortValues);
+        SearchHit targetHit = createMockHit(
+            "target-doc",
+            "test-index",
+            Map.of("@timestamp", "2024-01-01T00:00:05", "message", "target"),
+            sortValues
+        );
 
-        SearchHit beforeHit1 = createMockHit("before-1", "test-index",
-            Map.of("@timestamp", "2024-01-01T00:00:03", "message", "before1"), new Object[]{ 998L, 3L });
-        SearchHit beforeHit2 = createMockHit("before-2", "test-index",
-            Map.of("@timestamp", "2024-01-01T00:00:04", "message", "before2"), new Object[]{ 999L, 4L });
+        SearchHit beforeHit1 = createMockHit(
+            "before-1",
+            "test-index",
+            Map.of("@timestamp", "2024-01-01T00:00:03", "message", "before1"),
+            new Object[] { 998L, 3L }
+        );
+        SearchHit beforeHit2 = createMockHit(
+            "before-2",
+            "test-index",
+            Map.of("@timestamp", "2024-01-01T00:00:04", "message", "before2"),
+            new Object[] { 999L, 4L }
+        );
 
-        SearchHit afterHit1 = createMockHit("after-1", "test-index",
-            Map.of("@timestamp", "2024-01-01T00:00:06", "message", "after1"), new Object[]{ 1001L, 6L });
-        SearchHit afterHit2 = createMockHit("after-2", "test-index",
-            Map.of("@timestamp", "2024-01-01T00:00:07", "message", "after2"), new Object[]{ 1002L, 7L });
+        SearchHit afterHit1 = createMockHit(
+            "after-1",
+            "test-index",
+            Map.of("@timestamp", "2024-01-01T00:00:06", "message", "after1"),
+            new Object[] { 1001L, 6L }
+        );
+        SearchHit afterHit2 = createMockHit(
+            "after-2",
+            "test-index",
+            Map.of("@timestamp", "2024-01-01T00:00:07", "message", "after2"),
+            new Object[] { 1002L, 7L }
+        );
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
         // Before: returned in DESC order (before2, before1) - tool reverses to chronological
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{ beforeHit2, beforeHit1 });
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{ afterHit1, afterHit2 });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] { beforeHit2, beforeHit1 });
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] { afterHit1, afterHit2 });
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -214,7 +234,8 @@ public class SearchAroundDocumentToolTests {
         String result = future.get();
         assertNotNull(result);
 
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(5, docs.size());
 
         // Verify chronological order: before1, before2, target, after1, after2
@@ -227,14 +248,18 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithJsonInput() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("doc-1", "my-index",
-            Map.of("@timestamp", "2024-01-01T00:00:05", "message", "target"), sortValues);
+        SearchHit targetHit = createMockHit(
+            "doc-1",
+            "my-index",
+            Map.of("@timestamp", "2024-01-01T00:00:05", "message", "target"),
+            sortValues
+        );
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] {});
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -247,21 +272,21 @@ public class SearchAroundDocumentToolTests {
         String result = future.get();
         assertNotNull(result);
 
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(1, docs.size());
         assertEquals("doc-1", docs.get(0).get("_id"));
     }
 
     @Test
     public void testRunWithNoBeforeOrAfterDocuments() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "only doc"), sortValues);
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "only doc"), sortValues);
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] {});
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -275,21 +300,21 @@ public class SearchAroundDocumentToolTests {
         tool.run(params, ActionListener.wrap(future::complete, future::completeExceptionally));
 
         String result = future.get();
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(1, docs.size());
         assertEquals("doc-1", docs.get(0).get("_id"));
     }
 
     @Test
     public void testRunWithCountAsDouble() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), sortValues);
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), sortValues);
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] {});
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -308,14 +333,13 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunResponseContainsSortValues() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), sortValues);
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), sortValues);
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] {});
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -329,7 +353,8 @@ public class SearchAroundDocumentToolTests {
         tool.run(params, ActionListener.wrap(future::complete, future::completeExceptionally));
 
         String result = future.get();
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(1, docs.size());
 
         Map<String, Object> doc = docs.get(0);
@@ -343,7 +368,7 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithDocumentNotFound() throws Exception {
-        SearchResponse emptyResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse emptyResponse = createMockSearchResponse(new SearchHit[] {});
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
@@ -371,10 +396,9 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithMissingSortValues() throws Exception {
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), new Object[]{});
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), new Object[] {});
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
@@ -402,10 +426,9 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithNullSortValues() throws Exception {
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), null);
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), null);
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
@@ -433,10 +456,9 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithOnlySingleSortValue() throws Exception {
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), new Object[]{ 1000L });
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), new Object[] { 1000L });
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
@@ -507,10 +529,9 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithBeforeSearchFailure() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), sortValues);
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
+        Object[] sortValues = new Object[] { 1000L, 5L };
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), sortValues);
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
 
         AtomicInteger callCount = new AtomicInteger(0);
         doAnswer(invocation -> {
@@ -544,11 +565,10 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunWithAfterSearchFailure() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
-        SearchHit targetHit = createMockHit("doc-1", "test-index",
-            Map.of("message", "target"), sortValues);
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
+        Object[] sortValues = new Object[] { 1000L, 5L };
+        SearchHit targetHit = createMockHit("doc-1", "test-index", Map.of("message", "target"), sortValues);
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
 
         AtomicInteger callCount = new AtomicInteger(0);
         doAnswer(invocation -> {
@@ -586,21 +606,20 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunBeforeDocsAreReversedToChronological() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
 
-        SearchHit targetHit = createMockHit("target", "idx",
-            Map.of("ts", 1000), sortValues);
+        SearchHit targetHit = createMockHit("target", "idx", Map.of("ts", 1000), sortValues);
 
         // Before search returns in DESC order: doc3 (newest before), doc2, doc1 (oldest before)
-        SearchHit beforeHit3 = createMockHit("before-3", "idx", Map.of("ts", 999), new Object[]{ 999L, 4L });
-        SearchHit beforeHit2 = createMockHit("before-2", "idx", Map.of("ts", 998), new Object[]{ 998L, 3L });
-        SearchHit beforeHit1 = createMockHit("before-1", "idx", Map.of("ts", 997), new Object[]{ 997L, 2L });
+        SearchHit beforeHit3 = createMockHit("before-3", "idx", Map.of("ts", 999), new Object[] { 999L, 4L });
+        SearchHit beforeHit2 = createMockHit("before-2", "idx", Map.of("ts", 998), new Object[] { 998L, 3L });
+        SearchHit beforeHit1 = createMockHit("before-1", "idx", Map.of("ts", 997), new Object[] { 997L, 2L });
 
-        SearchHit afterHit1 = createMockHit("after-1", "idx", Map.of("ts", 1001), new Object[]{ 1001L, 6L });
+        SearchHit afterHit1 = createMockHit("after-1", "idx", Map.of("ts", 1001), new Object[] { 1001L, 6L });
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{ beforeHit3, beforeHit2, beforeHit1 });
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{ afterHit1 });
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] { beforeHit3, beforeHit2, beforeHit1 });
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] { afterHit1 });
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -614,7 +633,8 @@ public class SearchAroundDocumentToolTests {
         tool.run(params, ActionListener.wrap(future::complete, future::completeExceptionally));
 
         String result = future.get();
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(5, docs.size());
 
         // Before docs should be reversed to chronological (oldest first)
@@ -627,14 +647,14 @@ public class SearchAroundDocumentToolTests {
 
     @Test
     public void testRunResponseDocStructure() throws Exception {
-        Object[] sortValues = new Object[]{ 1000L, 5L };
+        Object[] sortValues = new Object[] { 1000L, 5L };
         Map<String, Object> source = Map.of("@timestamp", "2024-01-01", "level", "INFO", "message", "test log");
 
         SearchHit targetHit = createMockHit("doc-1", "logs-index", source, sortValues);
 
-        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[]{ targetHit });
-        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[]{});
-        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[]{});
+        SearchResponse targetResponse = createMockSearchResponse(new SearchHit[] { targetHit });
+        SearchResponse beforeResponse = createMockSearchResponse(new SearchHit[] {});
+        SearchResponse afterResponse = createMockSearchResponse(new SearchHit[] {});
 
         mockThreeSearchCalls(targetResponse, beforeResponse, afterResponse);
 
@@ -648,7 +668,8 @@ public class SearchAroundDocumentToolTests {
         tool.run(params, ActionListener.wrap(future::complete, future::completeExceptionally));
 
         String result = future.get();
-        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {}.getType());
+        List<Map<String, Object>> docs = GSON.fromJson(result, new TypeToken<List<Map<String, Object>>>() {
+        }.getType());
         assertEquals(1, docs.size());
 
         Map<String, Object> doc = docs.get(0);

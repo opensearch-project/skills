@@ -264,9 +264,7 @@ public class SearchAroundDocumentTool implements Tool {
 
                 client.search(beforeRequest, ActionListener.wrap(beforeResponse -> {
                     // Step 3: Search for documents AFTER using search_after with ASC sort
-                    BoolQueryBuilder afterQuery = QueryBuilders
-                        .boolQuery()
-                        .mustNot(QueryBuilders.idsQuery().addIds(finalDocId));
+                    BoolQueryBuilder afterQuery = QueryBuilders.boolQuery().mustNot(QueryBuilders.idsQuery().addIds(finalDocId));
 
                     SearchSourceBuilder afterSource = new SearchSourceBuilder()
                         .query(afterQuery)
