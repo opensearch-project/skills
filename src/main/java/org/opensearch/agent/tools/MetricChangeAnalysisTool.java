@@ -50,10 +50,10 @@ public class MetricChangeAnalysisTool implements Tool {
     public static final String TYPE = "MetricChangeAnalysisTool";
 
     private static final String DEFAULT_DESCRIPTION =
-        "This tool analyzes a metric index to identify which numeric metrics changed most significantly between a selection time range and a baseline time range. "
-            + "It compares percentile distributions (P50, P90) of all numeric fields and returns the top N fields ranked by log-ratio change score. "
-            + "Use this tool for root cause analysis when investigating performance degradation, anomalies, or incidents in metric data. "
-            + "Keep both time ranges short and focused (e.g. 15-30 minutes) and similar in duration for accurate comparison.";
+        "Compares percentile distributions (P50, P90) of numeric fields between two time ranges. "
+            + "Returns top fields ranked by change score. "
+            + "Use for root cause analysis when investigating metric anomalies. "
+            + "Keep both time ranges short (e.g. 15-30 minutes) and similar in duration for accurate comparison.";
 
     private static final int DEFAULT_TOP_N = 10;
 
@@ -68,23 +68,23 @@ public class MetricChangeAnalysisTool implements Tool {
                     },
                     "timeField": {
                         "type": "string",
-                        "description": "Date/time field for filtering (default: @timestamp)"
+                        "description": "Date/time field for filtering"
                     },
                     "selectionTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for the analysis period (format: yyyy-MM-dd HH:mm:ss). The selection period is the time range where the change or anomaly occurred."
+                        "description": "Start of target period (format: yyyy-MM-dd HH:mm:ss)"
                     },
                     "selectionTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for the analysis period (format: yyyy-MM-dd HH:mm:ss)."
+                        "description": "End of target period (format: yyyy-MM-dd HH:mm:ss)"
                     },
                     "baselineTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for the baseline period (format: yyyy-MM-dd HH:mm:ss). The baseline represents normal behavior. Its duration should be same to the selection period for a fair comparison."
+                        "description": "Start of baseline period (format: yyyy-MM-dd HH:mm:ss)"
                     },
                     "baselineTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for the baseline period (format: yyyy-MM-dd HH:mm:ss). Should be at or before selectionTimeRangeStart."
+                        "description": "End of baseline period (format: yyyy-MM-dd HH:mm:ss). Should be at or before selectionTimeRangeStart"
                     },
                     "size": {
                         "type": "integer",
@@ -118,7 +118,8 @@ public class MetricChangeAnalysisTool implements Tool {
             }
             """;
 
-    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map
+        .of(TOOL_INPUT_SCHEMA_FIELD, gson.toJson(gson.fromJson(DEFAULT_INPUT_SCHEMA, Map.class)));
 
     /**
      * Record for percentile statistics

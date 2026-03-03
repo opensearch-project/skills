@@ -92,63 +92,67 @@ public class LogPatternAnalysisTool implements Tool {
     public static final String STRICT_FIELD = "strict";
 
     // Constants
-    private static final String DEFAULT_DESCRIPTION =
-        "This is a tool used to detect selection log patterns by the patterns command in PPL or to detect selection log sequences by the log clustering algorithm.";
+    private static final String DEFAULT_DESCRIPTION = "Analyzes log patterns in a target time range, optionally compared to a baseline. "
+        + "Use when investigating incidents to find new, spiking, or anomalous log messages. "
+        + "Three modes: "
+        + "(1) Sequence analysis (traceFieldName + baseline): groups logs by trace ID, returns exceptional trace sequences. "
+        + "(2) Pattern diff (baseline, no traceFieldName): compares pattern frequencies, returns highest-lift patterns. "
+        + "(3) Log insight (no baseline): finds top error/warning patterns with sample logs.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
 
-    public static final String DEFAULT_INPUT_SCHEMA =
-        """
-            {
-                "type": "object",
-                "properties": {
-                    "index": {
-                        "type": "string",
-                        "description": "Target OpenSearch index name containing log data (e.g., 'ss4o_logs-otel-2025.06.24')"
-                    },
-                    "timeField": {
-                        "type": "string",
-                        "description": "Date/time field in the index mapping used for time-based filtering"
-                    },
-                    "logFieldName": {
-                        "type": "string",
-                        "description": "Field containing raw log messages to analyze (e.g., 'body', 'message', 'log')"
-                    },
-                    "traceFieldName": {
-                        "type": "string",
-                        "description": "[OPTIONAL] Field for trace/correlation ID to enable sequence analysis (e.g., 'traceId', 'correlationId'). Leave empty for pattern-only analysis."
-                    },
-                    "baseTimeRangeStart": {
-                        "type": "string",
-                        "description": "Start time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:33:05')"
-                    },
-                    "baseTimeRangeEnd": {
-                        "type": "string",
-                        "description": "End time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:51:27')"
-                    },
-                    "selectionTimeRangeStart": {
-                        "type": "string",
-                        "description": "Start time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:50:26')"
-                    },
-                    "selectionTimeRangeEnd": {
-                        "type": "string",
-                        "description": "End time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:55:56')"
-                    }
+    public static final String DEFAULT_INPUT_SCHEMA = """
+        {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "type": "string",
+                    "description": "Target OpenSearch index name"
                 },
-                "required": [
-                    "index",
-                    "timeField",
-                    "logFieldName",
-                    "selectionTimeRangeStart",
-                    "selectionTimeRangeEnd"
-                ],
-                "additionalProperties": false
-            }
-            """;
+                "timeField": {
+                    "type": "string",
+                    "description": "Date/time field for filtering"
+                },
+                "logFieldName": {
+                    "type": "string",
+                    "description": "Field containing log message text"
+                },
+                "traceFieldName": {
+                    "type": "string",
+                    "description": "Trace/correlation ID field. Enables sequence analysis mode when provided with baseline time range"
+                },
+                "baseTimeRangeStart": {
+                    "type": "string",
+                    "description": "Start of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baseTimeRangeEnd"
+                },
+                "baseTimeRangeEnd": {
+                    "type": "string",
+                    "description": "End of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baseTimeRangeStart"
+                },
+                "selectionTimeRangeStart": {
+                    "type": "string",
+                    "description": "Start of target/incident period (format: yyyy-MM-dd HH:mm:ss)"
+                },
+                "selectionTimeRangeEnd": {
+                    "type": "string",
+                    "description": "End of target/incident period (format: yyyy-MM-dd HH:mm:ss)"
+                }
+            },
+            "required": [
+                "index",
+                "timeField",
+                "logFieldName",
+                "selectionTimeRangeStart",
+                "selectionTimeRangeEnd"
+            ],
+            "additionalProperties": false
+        }
+        """;
 
-    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, STRICT_FIELD, false);
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map
+        .of(TOOL_INPUT_SCHEMA_FIELD, gson.toJson(gson.fromJson(DEFAULT_INPUT_SCHEMA, Map.class)), STRICT_FIELD, false);
 
     // Compiled regex patterns for better performance
     private static final Pattern REPEATED_WILDCARDS_PATTERN = Pattern.compile("(<\\*>)(\\s+<\\*>)+");
