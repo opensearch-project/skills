@@ -103,7 +103,11 @@ public class DataDistributionTool implements Tool {
     public static final String STRICT_FIELD = "strict";
 
     private static final String DEFAULT_DESCRIPTION =
-        "This tool analyzes data distribution differences between time ranges or provides single dataset insights.";
+        "Analyzes how field value distributions differ between two time ranges (comparison mode) or summarizes field distributions for a single time range (single mode). "
+            + "Use this tool to identify which fields changed the most (e.g., error rate spiked, a specific host became dominant) when investigating anomalies or incidents. "
+            + "Outputs a ranked list of fields ordered by divergence, with top value breakdowns showing selection vs. baseline percentages. "
+            + "Supports both DSL and PPL query types. "
+            + "Comparison mode requires both selection and baseline time ranges; single mode requires only the selection time range.";
 
     private static final Set<String> USEFUL_FIELD_TYPES = Set
         .of("keyword", "boolean", "text", "byte", "short", "integer", "long", "float", "double", "half_float", "scaled_float");
@@ -126,50 +130,50 @@ public class DataDistributionTool implements Tool {
             "properties": {
                 "index": {
                     "type": "string",
-                    "description": "Target OpenSearch index name"
+                    "description": "Target OpenSearch index name to analyze (e.g., 'logs-2025.01.15', 'my-app-logs')"
                 },
                 "timeField": {
                     "type": "string",
-                    "description": "Date/time field for filtering"
+                    "description": "Date/time field in the index mapping used for time range filtering (e.g., '@timestamp', 'event.created'). If omitted, no time-based filtering is applied."
                 },
                 "selectionTimeRangeStart": {
                     "type": "string",
-                    "description": "Start time for analysis period"
+                    "description": "Start time of the target period to analyze, in 'yyyy-MM-dd HH:mm:ss' format (e.g., '2025-01-15 10:00:00'). This is the time range you want to investigate."
                 },
                 "selectionTimeRangeEnd": {
                     "type": "string",
-                    "description": "End time for analysis period"
+                    "description": "End time of the target period to analyze, in 'yyyy-MM-dd HH:mm:ss' format (e.g., '2025-01-15 11:00:00')"
                 },
                 "baselineTimeRangeStart": {
                     "type": "string",
-                    "description": "Start time for baseline period (optional)"
+                    "description": "[OPTIONAL] Start time of the baseline (normal) period for comparison, in 'yyyy-MM-dd HH:mm:ss' format. Provide both baseline start and end to enable comparison mode; omit both for single-dataset mode."
                 },
                 "baselineTimeRangeEnd": {
                     "type": "string",
-                    "description": "End time for baseline period (optional)"
+                    "description": "[OPTIONAL] End time of the baseline (normal) period for comparison, in 'yyyy-MM-dd HH:mm:ss' format. Must be provided together with baselineTimeRangeStart."
                 },
                 "size": {
                     "type": "integer",
-                    "description": "Maximum number of documents to analyze (default: 1000)"
+                    "description": "[OPTIONAL] Maximum number of documents to sample per time range. Default: 1000, max: 10000. Larger values give more accurate distributions but take longer."
                 },
                 "queryType": {
                     "type": "string",
-                    "description": "Query type: 'ppl' or 'dsl' (default: 'dsl')"
+                    "description": "[OPTIONAL] Query language to use: 'dsl' (default) or 'ppl'. Determines how filter/dsl/ppl parameters are interpreted."
                 },
                 "filter": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
-                    "description": "Additional DSL query conditions for filtering (optional)"
+                    "description": "[OPTIONAL] Additional DSL filter clauses as JSON strings to narrow the dataset (e.g., [\\"{'term': {'status': 'error'}}\\"]). Only used when queryType is 'dsl'."
                 },
                 "dsl": {
                     "type": "string",
-                    "description": "Complete raw DSL query as JSON string (optional)"
+                    "description": "[OPTIONAL] Complete DSL query body as a JSON string. Overrides filter when provided. Only used when queryType is 'dsl'."
                 },
                 "ppl": {
                     "type": "string",
-                    "description": "Complete PPL statement without time information (optional)"
+                    "description": "[OPTIONAL] PPL query without time filtering (time range is added automatically). Only used when queryType is 'ppl'. Example: 'source=my-index | where status=500'"
                 }
             },
             "required": ["index", "selectionTimeRangeStart", "selectionTimeRangeEnd"],

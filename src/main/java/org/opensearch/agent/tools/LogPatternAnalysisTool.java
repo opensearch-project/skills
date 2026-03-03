@@ -94,7 +94,15 @@ public class LogPatternAnalysisTool implements Tool {
 
     // Constants
     private static final String DEFAULT_DESCRIPTION =
-        "Analyzes log patterns and sequences in OpenSearch using PPL patterns command with brain method. Supports three modes: (1) Log Sequence Analysis - identifies exceptional trace sequences by comparing selection period against baseline; (2) Pattern Diff Analysis - detects significant pattern changes between baseline and selection time ranges; (3) Log Insight - extracts top error patterns with sample logs from selection period when no baseline is provided.";
+        "Detects unusual log patterns or log sequences that appear in a target time range compared to a baseline. "
+            + "Use this tool when investigating incidents to find what log messages are new, spiking, or anomalous during a problem period. "
+            + "Operates in three modes depending on parameters provided: "
+            + "(1) Sequence analysis (traceFieldName + baseline provided): clusters log sequences by trace/correlation ID and identifies trace sequences that only appear in the target period. "
+            + "Returns exceptional trace IDs with their log sequences. "
+            + "(2) Pattern diff (baseline provided, no traceFieldName): compares log pattern frequencies between baseline and target periods. "
+            + "Returns patterns with the highest lift (frequency ratio) or patterns that are new in the target period. "
+            + "(3) Log insight (no baseline): finds top error/warning log patterns in the target period with sample logs. "
+            + "Requires an index with a log message field. Baseline time range is optional but recommended for differential analysis.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
@@ -107,35 +115,35 @@ public class LogPatternAnalysisTool implements Tool {
                 "properties": {
                     "index": {
                         "type": "string",
-                        "description": "Target OpenSearch index name containing log data (e.g., 'ss4o_logs-otel-2025.06.24')"
+                        "description": "OpenSearch index containing log data to analyze (e.g., 'ss4o_logs-otel-2025.06.24', 'application-logs')"
                     },
                     "timeField": {
                         "type": "string",
-                        "description": "Date/time field in the index mapping used for time-based filtering"
+                        "description": "Date/time field in the index mapping used for time range filtering (e.g., '@timestamp', 'event.created'). Defaults to '@timestamp' if omitted."
                     },
                     "logFieldName": {
                         "type": "string",
-                        "description": "Field containing raw log messages to analyze (e.g., 'body', 'message', 'log')"
+                        "description": "Field containing the raw log message text to analyze (e.g., 'body', 'message', 'log'). Defaults to 'message' if omitted."
                     },
                     "traceFieldName": {
                         "type": "string",
-                        "description": "[OPTIONAL] Field for trace/correlation ID to enable sequence analysis (e.g., 'traceId', 'correlationId'). Leave empty for pattern-only analysis."
+                        "description": "[OPTIONAL] Field containing trace or correlation IDs (e.g., 'traceId', 'correlationId'). When provided together with baseline time range, enables sequence analysis mode that groups logs by trace and detects anomalous trace sequences. Leave empty for pattern-only analysis."
                     },
                     "baseTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:33:05')"
+                        "description": "[OPTIONAL] Start of the baseline (normal/healthy) period in UTC, format 'yyyy-MM-dd HH:mm:ss' (e.g., '2025-06-24 07:33:05'). Provide both baseTimeRangeStart and baseTimeRangeEnd to enable comparison mode. Omit both for log insight mode (error pattern detection only)."
                     },
                     "baseTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:51:27')"
+                        "description": "[OPTIONAL] End of the baseline (normal/healthy) period in UTC, format 'yyyy-MM-dd HH:mm:ss' (e.g., '2025-06-24 07:51:27'). Must be provided together with baseTimeRangeStart."
                     },
                     "selectionTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:50:26')"
+                        "description": "Start of the target period to investigate in UTC, format 'yyyy-MM-dd HH:mm:ss' (e.g., '2025-06-24 07:50:26'). This is the time window where the anomaly or incident occurred."
                     },
                     "selectionTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:55:56')"
+                        "description": "End of the target period to investigate in UTC, format 'yyyy-MM-dd HH:mm:ss' (e.g., '2025-06-24 07:55:56')"
                     },
                     "filter": {
                         "type": "string",
