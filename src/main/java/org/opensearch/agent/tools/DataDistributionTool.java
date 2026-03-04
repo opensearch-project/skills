@@ -103,7 +103,10 @@ public class DataDistributionTool implements Tool {
     public static final String STRICT_FIELD = "strict";
 
     private static final String DEFAULT_DESCRIPTION =
-        "This tool analyzes data distribution differences between time ranges or provides single dataset insights.";
+        "Analyzes field value distributions in a target time range, optionally compared to a baseline. "
+            + "Use to identify which fields changed most when investigating anomalies. "
+            + "Two modes: (1) Comparison (baseline provided): ranks fields by divergence. "
+            + "(2) Single (no baseline): summarizes field distributions.";
 
     private static final Set<String> USEFUL_FIELD_TYPES = Set
         .of("keyword", "boolean", "text", "byte", "short", "integer", "long", "float", "double", "half_float", "scaled_float");
@@ -134,42 +137,42 @@ public class DataDistributionTool implements Tool {
                 },
                 "selectionTimeRangeStart": {
                     "type": "string",
-                    "description": "Start time for analysis period"
+                    "description": "Start of target period (format: yyyy-MM-dd HH:mm:ss)"
                 },
                 "selectionTimeRangeEnd": {
                     "type": "string",
-                    "description": "End time for analysis period"
+                    "description": "End of target period (format: yyyy-MM-dd HH:mm:ss)"
                 },
                 "baselineTimeRangeStart": {
                     "type": "string",
-                    "description": "Start time for baseline period (optional)"
+                    "description": "Start of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baselineTimeRangeEnd"
                 },
                 "baselineTimeRangeEnd": {
                     "type": "string",
-                    "description": "End time for baseline period (optional)"
+                    "description": "End of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baselineTimeRangeStart"
                 },
                 "size": {
                     "type": "integer",
-                    "description": "Maximum number of documents to analyze (default: 1000)"
+                    "description": "Max documents to sample (default: 1000, max: 10000)"
                 },
                 "queryType": {
                     "type": "string",
-                    "description": "Query type: 'ppl' or 'dsl' (default: 'dsl')"
+                    "description": "Query type: 'dsl' (default) or 'ppl'"
                 },
                 "filter": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
-                    "description": "Additional DSL query conditions for filtering (optional)"
+                    "description": "Additional DSL filter clauses as JSON strings"
                 },
                 "dsl": {
                     "type": "string",
-                    "description": "Complete raw DSL query as JSON string (optional)"
+                    "description": "Complete DSL query as JSON string"
                 },
                 "ppl": {
                     "type": "string",
-                    "description": "Complete PPL statement without time information (optional)"
+                    "description": "PPL query without time filtering (added automatically)"
                 }
             },
             "required": ["index", "selectionTimeRangeStart", "selectionTimeRangeEnd"],
@@ -177,7 +180,8 @@ public class DataDistributionTool implements Tool {
         }
         """;
 
-    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, STRICT_FIELD, false);
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map
+        .of(TOOL_INPUT_SCHEMA_FIELD, gson.toJson(gson.fromJson(DEFAULT_INPUT_SCHEMA, Map.class)), STRICT_FIELD, false);
 
     /**
      * Result class for data distribution analysis
