@@ -1,0 +1,9 @@
+{
+  "name": "Test_Search_Around_Document_Agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "SearchAroundDocumentTool"
+    }
+  ]
+}
