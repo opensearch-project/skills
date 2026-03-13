@@ -408,23 +408,20 @@ public class LogPatternAnalysisTool implements Tool {
         String filter
     ) {
         String filterClause = Strings.isEmpty(filter) ? "" : String.format(Locale.ROOT, " | where %s", filter);
-        return String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s!='' | where %s>'%s' and %s<'%s'%s | patterns %s method=brain "
-                    + "variable_count_threshold=3 | fields %s, patterns_field, %s | sort %s",
-                index,
-                traceFieldName,
-                timeField,
-                startTime,
-                timeField,
-                endTime,
-                filterClause,
-                logFieldName,
-                traceFieldName,
-                timeField,
-                timeField
-            );
+
+        String pplTemplate =
+            "source={INDEX} | where {TRACE_FIELD}!='' | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+                + "| fields {TRACE_FIELD}, {LOG_FIELD}, {TIME_FIELD} | patterns {LOG_FIELD} method=brain variable_count_threshold=3 "
+                + "| fields {TRACE_FIELD}, patterns_field, {TIME_FIELD} | sort {TIME_FIELD}";
+
+        return pplTemplate
+            .replace("{INDEX}", index)
+            .replace("{TRACE_FIELD}", traceFieldName)
+            .replace("{TIME_FIELD}", timeField)
+            .replace("{START_TIME}", startTime)
+            .replace("{END_TIME}", endTime)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", logFieldName);
     }
 
     private Map<String, Double> vectorizePattern(Map<String, Set<String>> patternCountMap, int totalTraceCount) {
@@ -771,23 +768,20 @@ public class LogPatternAnalysisTool implements Tool {
             );
 
         String filterClause = Strings.isEmpty(params.filter) ? "" : String.format(Locale.ROOT, " | where %s", params.filter);
-        String selectionTimeRangeLogPatternPPL = String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s>'%s' and %s<'%s'%s | where match(%s, '%s') | patterns %s method=brain "
-                    + "mode=aggregation max_sample_count=5 "
-                    + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
-                    + "| sort -pattern_count | head 5",
-                params.index,
-                params.timeField,
-                params.selectionTimeRangeStart,
-                params.timeField,
-                params.selectionTimeRangeEnd,
-                filterClause,
-                params.logFieldName,
-                String.join(" ", errorKeywords),
-                params.logFieldName
-            );
+
+        String pplTemplate = "source={INDEX} | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+            + "| where match({LOG_FIELD}, '{ERROR_KEYWORDS}') | fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain "
+            + "mode=aggregation max_sample_count=5 variable_count_threshold=3 "
+            + "| fields patterns_field, pattern_count, sample_logs | sort -pattern_count | head 5";
+
+        String selectionTimeRangeLogPatternPPL = pplTemplate
+            .replace("{INDEX}", params.index)
+            .replace("{TIME_FIELD}", params.timeField)
+            .replace("{START_TIME}", params.selectionTimeRangeStart)
+            .replace("{END_TIME}", params.selectionTimeRangeEnd)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", params.logFieldName)
+            .replace("{ERROR_KEYWORDS}", String.join(" ", errorKeywords));
 
         Function<List<List<Object>>, List<PatternWithSamples>> dataRowsParser = dataRows -> {
             List<PatternWithSamples> patternWithSamplesList = new ArrayList<>();
@@ -832,19 +826,18 @@ public class LogPatternAnalysisTool implements Tool {
         String filter
     ) {
         String filterClause = Strings.isEmpty(filter) ? "" : String.format(Locale.ROOT, " | where %s", filter);
-        return String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s>'%s' and %s<'%s'%s | patterns %s method=brain mode=aggregation "
-                    + "variable_count_threshold=3 | fields pattern_count, patterns_field",
-                index,
-                timeField,
-                startTime,
-                timeField,
-                endTime,
-                filterClause,
-                logFieldName
-            );
+
+        String pplTemplate = "source={INDEX} | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+            + "| fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain mode=aggregation variable_count_threshold=3 "
+            + "| fields pattern_count, patterns_field";
+
+        return pplTemplate
+            .replace("{INDEX}", index)
+            .replace("{TIME_FIELD}", timeField)
+            .replace("{START_TIME}", startTime)
+            .replace("{END_TIME}", endTime)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", logFieldName);
     }
 
     private List<PatternDiffResult> calculatePatternDifferences(Map<String, Double> basePatterns, Map<String, Double> selectionPatterns) {
