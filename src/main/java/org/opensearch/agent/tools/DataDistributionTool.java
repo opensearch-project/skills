@@ -175,7 +175,7 @@ public class DataDistributionTool implements Tool {
                     "description": "PPL query without time filtering (added automatically)"
                 }
             },
-            "required": ["index", "selectionTimeRangeStart", "selectionTimeRangeEnd"],
+            "required": ["index", "timeField", "selectionTimeRangeStart", "selectionTimeRangeEnd"],
             "additionalProperties": false
         }
         """;
