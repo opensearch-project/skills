@@ -316,7 +316,7 @@ public class LogPatternAnalysisTool implements Tool {
         }
         // Step 1: Analyze selection time range
         analyzeSelectionTimeRange(params, ActionListener.wrap(selectionResult -> {
-            log.debug("Base time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
+            log.debug("Selection time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
 
             if (selectionResult.tracePatternMap.isEmpty()) {
                 Map<String, Map<String, String>> emptyResult = buildFinalResult(
@@ -331,7 +331,7 @@ public class LogPatternAnalysisTool implements Tool {
 
             // Step 2: Analyze base time range
             analyzeBaseTimeRange(params, ActionListener.wrap(baseResult -> {
-                log.debug("Selection time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
+                log.debug("Base time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
 
                 // Step 3: Generate comparison result
                 generateSequenceComparisonResult(baseResult, selectionResult, listener);
