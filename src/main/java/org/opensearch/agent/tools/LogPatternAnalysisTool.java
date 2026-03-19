@@ -102,6 +102,7 @@ public class LogPatternAnalysisTool implements Tool {
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
+    private static final int MAX_LOG_SAMPLE_SIZE = 10000;
 
     public static final String DEFAULT_INPUT_SCHEMA =
         """
@@ -770,7 +771,9 @@ public class LogPatternAnalysisTool implements Tool {
         String filterClause = Strings.isEmpty(params.filter) ? "" : String.format(Locale.ROOT, " | where %s", params.filter);
 
         String pplTemplate = "source={INDEX} | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
-            + "| where match({LOG_FIELD}, '{ERROR_KEYWORDS}') | fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain "
+            + "| where match({LOG_FIELD}, '{ERROR_KEYWORDS}') | head "
+            + MAX_LOG_SAMPLE_SIZE
+            + " | fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain "
             + "mode=aggregation max_sample_count=5 variable_count_threshold=3 "
             + "| fields patterns_field, pattern_count, sample_logs | sort -pattern_count | head 5";
 
