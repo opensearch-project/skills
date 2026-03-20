@@ -20,6 +20,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.hamcrest.MatcherAssert;
 import org.junit.Before;
@@ -28,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
+import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.transport.client.Client;
 
@@ -463,6 +465,105 @@ public class LogPatternAnalysisToolTests {
                         response -> fail("Should have failed with non-existent index"),
                         e -> MatcherAssert.assertThat(e.getMessage(), containsString("no such index"))
                     )
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLogInsightWithFilter() {
+        String pplResponse =
+            """
+                {"schema":[{"name":"patterns_field","type":"string"},{"name":"pattern_count","type":"long"},{"name":"sample_logs","type":"array"}],
+                "datarows":[["Auth error for user <*>",3,["Auth error for user admin","Auth error for user guest"]]],
+                "total":1,"size":1}
+                """;
+
+        AtomicReference<String> capturedPPL = new AtomicReference<>();
+        doAnswer(invocation -> {
+            TransportPPLQueryRequest request = (TransportPPLQueryRequest) invocation.getArguments()[1];
+            capturedPPL.set(request.getRequest());
+            ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
+            listener.onResponse(pplQueryResponse);
+            return null;
+        }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
+        when(pplQueryResponse.getResult()).thenReturn(pplResponse);
+
+        LogPatternAnalysisTool tool = LogPatternAnalysisTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .<String, String>builder()
+                    .put("index", "test_index")
+                    .put("timeField", "@timestamp")
+                    .put("logFieldName", "message")
+                    .put("selectionTimeRangeStart", "2025-01-01T00:00:00Z")
+                    .put("selectionTimeRangeEnd", "2025-01-01T01:00:00Z")
+                    .put("filter", "serviceName='ts-auth-service'")
+                    .build(),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue(result.getAsJsonObject().has("logInsights"));
+                    // Verify the PPL query contains the filter clause
+                    assertTrue(capturedPPL.get().contains("where serviceName='ts-auth-service'"));
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
+            );
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLogPatternDiffWithFilter() {
+        String baseResponse = """
+            {"schema":[{"name":"cnt","type":"long"},{"name":"patterns_field","type":"string"}],
+            "datarows":[[100,"User login successful"],[20,"Database query executed"]],
+            "total":2,"size":2}
+            """;
+
+        String selectionResponse = """
+            {"schema":[{"name":"cnt","type":"long"},{"name":"patterns_field","type":"string"}],
+            "datarows":[[50,"User login successful"],[80,"Error in authentication <*>"]],
+            "total":2,"size":2}
+            """;
+
+        AtomicReference<String> firstPPL = new AtomicReference<>();
+        AtomicReference<String> secondPPL = new AtomicReference<>();
+        doAnswer(invocation -> {
+            TransportPPLQueryRequest request = (TransportPPLQueryRequest) invocation.getArguments()[1];
+            String ppl = request.getRequest();
+            if (firstPPL.get() == null) {
+                firstPPL.set(ppl);
+            } else {
+                secondPPL.set(ppl);
+            }
+            ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
+            listener.onResponse(pplQueryResponse);
+            return null;
+        }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
+
+        when(pplQueryResponse.getResult()).thenReturn(baseResponse).thenReturn(selectionResponse);
+
+        LogPatternAnalysisTool tool = LogPatternAnalysisTool.Factory.getInstance().create(params);
+
+        tool
+            .run(
+                ImmutableMap
+                    .<String, String>builder()
+                    .put("index", "test_index")
+                    .put("timeField", "@timestamp")
+                    .put("logFieldName", "message")
+                    .put("baseTimeRangeStart", "2025-01-01T00:00:00Z")
+                    .put("baseTimeRangeEnd", "2025-01-01T01:00:00Z")
+                    .put("selectionTimeRangeStart", "2025-01-01T01:00:00Z")
+                    .put("selectionTimeRangeEnd", "2025-01-01T02:00:00Z")
+                    .put("filter", "severity='ERROR'")
+                    .build(),
+                ActionListener.<String>wrap(response -> {
+                    JsonElement result = gson.fromJson(response, JsonElement.class);
+                    assertTrue(result.getAsJsonObject().has("patternMapDifference"));
+                    // Verify both PPL queries contain the filter clause
+                    assertTrue(firstPPL.get().contains("where severity='ERROR'"));
+                    assertTrue(secondPPL.get().contains("where severity='ERROR'"));
+                }, e -> fail("Tool execution failed: " + e.getMessage()))
             );
     }
 
