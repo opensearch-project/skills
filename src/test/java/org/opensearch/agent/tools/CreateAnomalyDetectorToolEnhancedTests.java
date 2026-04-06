@@ -18,6 +18,7 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -749,6 +750,207 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         );
     }
 
+
+    // ===== COMMIT 2: OTel Fast-Path Tests =====
+
+    @Test
+    public void testOtelTraceMapping_CreatesTwoDetectors_SkipsLLM() throws Exception {
+        // Set up OTel trace mapping with the 4 required signature fields
+        Map<String, Object> otelTraceMapping = new HashMap<>();
+        otelTraceMapping.put("properties", Map.of(
+            "traceId", ImmutableMap.of("type", "keyword"),
+            "spanId", ImmutableMap.of("type", "keyword"),
+            "durationInNanos", ImmutableMap.of("type", "long"),
+            "serviceName", ImmutableMap.of("type", "keyword"),
+            "startTime", ImmutableMap.of("type", "date_nanos"),
+            "status", ImmutableMap.of("type", "object", "properties", Map.of(
+                "code", ImmutableMap.of("type", "integer")
+            ))
+        ));
+        when(mappingMetadata.getSourceAsMap()).thenReturn(otelTraceMapping);
+        mockedMappings.put("otel-traces", mappingMetadata);
+
+        // Mock suggest (returns null interval = use default) + create + start
+        mockOtelDetectorCreationChain();
+
+        // Mock Index Insight to fail fast
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-traces")))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        Assert.assertFalse("Should not error", response.startsWith("ERROR"));
+
+        // Parse outer result map
+        Map<String, Object> results = gson.fromJson(response, Map.class);
+        Object otelResult = results.get("otel-traces");
+        Assert.assertNotNull("Should have result for otel-traces", otelResult);
+
+        // OTel path returns a list of detector results
+        Assert.assertTrue("OTel result should be a List, got: " + otelResult.getClass(), otelResult instanceof List);
+        List<?> detectors = (List<?>) otelResult;
+        Assert.assertEquals("Should create exactly 2 detectors for traces", 2, detectors.size());
+
+        // Verify LLM was never called (OTel path bypasses LLM)
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never())
+            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+    }
+
+    @Test
+    public void testOtelLogMapping_CreatesTwoDetectors_SkipsLLM() throws Exception {
+        Map<String, Object> otelLogMapping = new HashMap<>();
+        otelLogMapping.put("properties", Map.of(
+            "severityNumber", ImmutableMap.of("type", "integer"),
+            "severityText", ImmutableMap.of("type", "keyword"),
+            "time", ImmutableMap.of("type", "date"),
+            "resource", ImmutableMap.of("type", "object", "properties", Map.of(
+                "attributes", ImmutableMap.of("type", "object", "properties", Map.of(
+                    "service.name", ImmutableMap.of("type", "keyword")
+                ))
+            ))
+        ));
+        when(mappingMetadata.getSourceAsMap()).thenReturn(otelLogMapping);
+        mockedMappings.put("otel-logs", mappingMetadata);
+
+        mockOtelDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-logs")))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Map<String, Object> results = gson.fromJson(response, Map.class);
+        Object otelResult = results.get("otel-logs");
+        Assert.assertTrue("OTel log result should be a List", otelResult instanceof List);
+        Assert.assertEquals("Should create exactly 2 detectors for logs", 2, ((List<?>) otelResult).size());
+
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never())
+            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+    }
+
+    @Test
+    public void testNonOtelMapping_FallsThrough_ToLLM() throws Exception {
+        // Default mapping (response:integer, host:keyword, date:date) is NOT OTel
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        // LLM SHOULD have been called (non-OTel falls through)
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce())
+            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+    }
+
+    @Test
+    public void testPartialOtelMapping_DoesNotTriggerFastPath() throws Exception {
+        // Has durationInNanos + serviceName but missing spanId — should NOT detect as OTel
+        Map<String, Object> partialMapping = new HashMap<>();
+        partialMapping.put("properties", Map.of(
+            "durationInNanos", ImmutableMap.of("type", "long"),
+            "serviceName", ImmutableMap.of("type", "keyword"),
+            "timestamp", ImmutableMap.of("type", "date"),
+            "responseCode", ImmutableMap.of("type", "integer")
+        ));
+        when(mappingMetadata.getSourceAsMap()).thenReturn(partialMapping);
+        mockedMappings.put("partial-otel", mappingMetadata);
+
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("partial-otel")))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        // LLM should have been called — partial OTel should NOT trigger fast-path
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce())
+            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+    }
+
+    /** Mocks suggest + create + start for OTel path (no validate needed). */
+    private void mockOtelDetectorCreationChain() {
+        // Suggest — return null interval (use default)
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.SuggestConfigParamResponse(null, null, null, null));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.SuggestAnomalyDetectorParamAction.INSTANCE), any(), any());
+
+        // Create detector
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
+                "otel-detector-id", 1L, 1L, 1L, null, org.opensearch.core.rest.RestStatus.CREATED));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.IndexAnomalyDetectorAction.INSTANCE), any(), any());
+
+        // Start detector
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.JobResponse("otel-detector-id"));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.AnomalyDetectorJobAction.INSTANCE), any(), any());
+    }
 
     private void mockSearchForDateFieldSelection() {
         SearchResponse searchResponse = org.mockito.Mockito.mock(SearchResponse.class);
