@@ -170,6 +170,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
 
     // Detector configuration defaults
     private static final int DEFAULT_INTERVAL_MINUTES = 10;
+    private static final int DEFAULT_OTEL_INTERVAL_MINUTES = 2;
     private static final int DEFAULT_WINDOW_DELAY_MINUTES = 1;
     private static final int DEFAULT_SHINGLE_SIZE = 8;
     private static final int DEFAULT_SCHEMA_VERSION = 0;
@@ -282,14 +283,15 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         processSingleIndex(indexName, tenantId, maxRetries, new ActionListener<String>() {
             @Override
             public void onResponse(String result) {
-                Map<String, Object> resultMap = gson.fromJson(result, Map.class);
-                results.put(indexName, resultMap);
+                // All paths now return a JSON array of detector results
+                List<Map<String, Object>> resultList = gson.fromJson(result, List.class);
+                results.put(indexName, resultList);
                 processNextIndex(indices, currentIndex + 1, tenantId, maxRetries, results, listener);
             }
 
             @Override
             public void onFailure(Exception e) {
-                results.put(indexName, DetectorResult.failedValidation(indexName, e.getMessage()).toMap());
+                results.put(indexName, List.of(DetectorResult.failedValidation(indexName, e.getMessage()).toMap()));
                 processNextIndex(indices, currentIndex + 1, tenantId, maxRetries, results, listener);
             }
         });
@@ -319,6 +321,14 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     }
 
     private <T> void proceedWithLLM(MappingContext mappingContext, String tenantId, int maxRetries, ActionListener<T> listener) {
+        // Check for OTel fast-path before LLM
+        OtelSignalType otelType = detectOtelSignal(mappingContext.filteredMapping);
+        if (otelType != null) {
+            log.info("OTel {} mapping detected for '{}', using predefined detectors", otelType, mappingContext.indexName);
+            createOtelDetectors(mappingContext.indexName, otelType, listener);
+            return;
+        }
+
         generateAndParseConfig(
             mappingContext,
             tenantId,
@@ -333,6 +343,174 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 listenerCallback
             )
         );
+    }
+
+    // ── OTel fast-path ────────────────────────────────────────────────────────
+
+    enum OtelSignalType { TRACES, LOGS }
+
+    /**
+     * Detect OTel signal type from index mapping fields.
+     * Traces: Data Prepper otel-v1-apm-span standard template fields.
+     * Logs: SS4O log schema fields.
+     * Metrics: intentionally deferred — key-value schema requires filter-by-name support.
+     */
+    private OtelSignalType detectOtelSignal(Map<String, String> fields) {
+        if (fields.containsKey("traceId")
+            && fields.containsKey("spanId")
+            && fields.containsKey("durationInNanos")
+            && fields.containsKey("serviceName")) {
+            return OtelSignalType.TRACES;
+        }
+        if (fields.containsKey("severityNumber")
+            && fields.containsKey("severityText")
+            && fields.containsKey("resource.attributes.service.name")) {
+            return OtelSignalType.LOGS;
+        }
+        return null;
+    }
+
+    /** Predefined OTel detector configuration. */
+    private static class OtelDetectorSpec {
+        final String nameSuffix;
+        final String timeField;
+        final String categoryField;
+        final String featureField;
+        final org.opensearch.index.query.QueryBuilder filter;
+
+        OtelDetectorSpec(String nameSuffix, String timeField, String categoryField,
+                         String featureField, org.opensearch.index.query.QueryBuilder filter) {
+            this.nameSuffix = nameSuffix;
+            this.timeField = timeField;
+            this.categoryField = categoryField;
+            this.featureField = featureField;
+            this.filter = filter;
+        }
+    }
+
+    private List<OtelDetectorSpec> buildOtelSpecs(OtelSignalType type) {
+        List<OtelDetectorSpec> specs = new ArrayList<>();
+        if (type == OtelSignalType.TRACES) {
+            // trace-errors: count spans where status.code=2
+            specs.add(new OtelDetectorSpec(
+                "trace-errors", "startTime", "serviceName", "startTime",
+                QueryBuilders.boolQuery().must(QueryBuilders.termQuery("status.code", 2))
+            ));
+            // trace-throughput: count all spans
+            specs.add(new OtelDetectorSpec(
+                "trace-throughput", "startTime", "serviceName", "startTime",
+                QueryBuilders.matchAllQuery()
+            ));
+        } else {
+            // log-errors: count logs with severityNumber>=17
+            specs.add(new OtelDetectorSpec(
+                "log-errors", "time", "resource.attributes.service.name", "time",
+                QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("severityNumber").gte(17))
+            ));
+            // log-volume: count all logs
+            specs.add(new OtelDetectorSpec(
+                "log-volume", "time", "resource.attributes.service.name", "time",
+                QueryBuilders.matchAllQuery()
+            ));
+        }
+        return specs;
+    }
+
+    private <T> void createOtelDetectors(String indexName, OtelSignalType type, ActionListener<T> listener) {
+        List<OtelDetectorSpec> specs = buildOtelSpecs(type);
+        List<Map<String, Object>> results = new ArrayList<>();
+        createOtelDetectorSequentially(specs, indexName, 0, results, listener);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void createOtelDetectorSequentially(
+        List<OtelDetectorSpec> specs, String indexName, int idx,
+        List<Map<String, Object>> results, ActionListener<T> listener
+    ) {
+        if (idx >= specs.size()) {
+            log.info("OTel detectors done for '{}': {}/{} succeeded",
+                indexName, results.stream().filter(r -> "success".equals(r.get("status"))).count(), results.size());
+            listener.onResponse((T) gson.toJson(results));
+            return;
+        }
+        OtelDetectorSpec spec = specs.get(idx);
+        String detectorName = indexName + "-" + spec.nameSuffix + "-" + UUIDs.randomBase64UUID().substring(0, 6);
+
+        AggregationBuilder agg = AnomalyDetectorToolHelper.createAggregationBuilder("count", spec.featureField);
+        Feature feature = new Feature(UUIDs.randomBase64UUID(), spec.nameSuffix.replace("-", "_"), true, agg);
+
+        AnomalyDetector detector = new AnomalyDetector(
+            null, null, detectorName, DEFAULT_DETECTOR_DESCRIPTION,
+            spec.timeField, List.of(indexName), List.of(feature), spec.filter,
+            new IntervalTimeConfiguration(DEFAULT_OTEL_INTERVAL_MINUTES, ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(DEFAULT_WINDOW_DELAY_MINUTES, ChronoUnit.MINUTES),
+            DEFAULT_SHINGLE_SIZE, null, DEFAULT_SCHEMA_VERSION, Instant.now(),
+            List.of(spec.categoryField),
+            null, null, null, null, null, null, null, null, null, null, null, null,
+            new IntervalTimeConfiguration(DEFAULT_OTEL_INTERVAL_MINUTES, ChronoUnit.MINUTES), true
+        );
+
+        // Use suggest API to find optimal interval, then create
+        suggestAndCreateOtelDetector(detector, specs, indexName, idx, results, listener);
+    }
+
+    /** Call suggest API for interval optimization, then create and start the detector. */
+    @SuppressWarnings("unchecked")
+    private <T> void suggestAndCreateOtelDetector(
+        AnomalyDetector detector, List<OtelDetectorSpec> specs, String indexName, int idx,
+        List<Map<String, Object>> results, ActionListener<T> listener
+    ) {
+        SuggestConfigParamRequest suggestRequest = new SuggestConfigParamRequest(
+            AnalysisType.AD, detector, "interval",
+            TimeValue.timeValueSeconds(SUGGEST_API_TIMEOUT_SECONDS)
+        );
+
+        adClient.suggestAnomalyDetector(suggestRequest, ActionListener.wrap(
+            suggestResp -> {
+                AnomalyDetector optimized = suggestResp.getInterval() != null
+                    ? applySuggestionsToDetector(detector, suggestResp)
+                    : detector;
+                createAndStartOtelDetector(optimized, specs, indexName, idx, results, listener);
+            },
+            e -> {
+                log.warn("Suggest API failed for OTel detector '{}', using default interval: {}", detector.getName(), e.getMessage());
+                createAndStartOtelDetector(detector, specs, indexName, idx, results, listener);
+            }
+        ));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void createAndStartOtelDetector(
+        AnomalyDetector detector, List<OtelDetectorSpec> specs, String indexName, int idx,
+        List<Map<String, Object>> results, ActionListener<T> listener
+    ) {
+        String detectorName = detector.getName();
+        IndexAnomalyDetectorRequest createReq = new IndexAnomalyDetectorRequest("", detector, RestRequest.Method.POST);
+        adClient.createAnomalyDetector(createReq, ActionListener.wrap(
+            createResp -> {
+                String detectorId = createResp.getId();
+                log.info("OTel detector created: {} ({})", detectorName, detectorId);
+                JobRequest startReq = new JobRequest(detectorId, ".opendistro-anomaly-detectors", null, false,
+                    "/_plugins/_anomaly_detection/detectors/" + detectorId + "/_start");
+                adClient.startAnomalyDetector(startReq, ActionListener.wrap(
+                    startResp -> {
+                        results.add(DetectorResult.success(indexName, detectorId, detectorName,
+                            "Detector created successfully", "Detector started successfully").toMap());
+                        createOtelDetectorSequentially(specs, indexName, idx + 1, results, listener);
+                    },
+                    e -> {
+                        log.error("Failed to start OTel detector {}: {}", detectorName, e.getMessage());
+                        results.add(DetectorResult.failedStart(indexName, detectorId, e.getMessage()).toMap());
+                        createOtelDetectorSequentially(specs, indexName, idx + 1, results, listener);
+                    }
+                ));
+            },
+            e -> {
+                log.error("Failed to create OTel detector {}: {}", detectorName, e.getMessage());
+                results.add(DetectorResult.failedCreate(indexName, e.getMessage()).toMap());
+                createOtelDetectorSequentially(specs, indexName, idx + 1, results, listener);
+            }
+        ));
     }
 
     /**
@@ -463,6 +641,10 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     }
 
     private AnomalyDetector buildAnomalyDetectorFromSuggestions(Map<String, String> suggestions) {
+        return buildAnomalyDetectorFromSuggestions(suggestions, null);
+    }
+
+    private AnomalyDetector buildAnomalyDetectorFromSuggestions(Map<String, String> suggestions, org.opensearch.index.query.QueryBuilder filterQuery) {
         String indexName = suggestions.get(OUTPUT_KEY_INDEX);
         String categoryField = suggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
         String aggregationFields = suggestions.get(OUTPUT_KEY_AGGREGATION_FIELD);
@@ -535,7 +717,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             timeField,
             List.of(indexName),
             features,
-            QueryBuilders.matchAllQuery(),
+            filterQuery != null ? filterQuery : QueryBuilders.matchAllQuery(),
             new IntervalTimeConfiguration(intervalMinutes, ChronoUnit.MINUTES),
             new IntervalTimeConfiguration(DEFAULT_WINDOW_DELAY_MINUTES, ChronoUnit.MINUTES),
             DEFAULT_SHINGLE_SIZE,
@@ -605,7 +787,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             default:
                 throw new IllegalArgumentException("Unknown status: " + status);
         }
-        listener.onResponse((T) result.toJson());
+        listener.onResponse((T) gson.toJson(List.of(result.toMap())));
     }
 
     private <T> void retryWithFormatFix(
@@ -988,7 +1170,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                         } else {
                             DetectorResult result = DetectorResult
                                 .failedValidation(detector.getIndices().get(0), "Non-blocking warning: " + errorMessage);
-                            listener.onResponse((T) result.toJson());
+                            listener.onResponse((T) gson.toJson(List.of(result.toMap())));
                         }
                     }
                     return;
@@ -1003,7 +1185,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                     retryModelValidation(detector, e.getMessage(), tenantId, maxRetries, currentRetry + 1, listener);
                 } else {
                     DetectorResult result = DetectorResult.failedValidation(detector.getIndices().get(0), "API failure: " + e.getMessage());
-                    listener.onResponse((T) result.toJson());
+                    listener.onResponse((T) gson.toJson(List.of(result.toMap())));
                 }
             }
         });
@@ -1053,7 +1235,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                         log.error("Error building detector from LLM fix: {}", e.getMessage());
                         DetectorResult result = DetectorResult
                             .failedValidation(detector.getIndices().get(0), "Failed to build detector: " + e.getMessage());
-                        listenerCallback.onResponse((T) result.toJson());
+                        listenerCallback.onResponse((T) gson.toJson(List.of(result.toMap())));
                     }
                 }
             );
@@ -1061,7 +1243,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             log.error("LLM fix request failed: {}", e.getMessage());
             DetectorResult result = DetectorResult
                 .failedValidation(detector.getIndices().get(0), "LLM fix request failed: " + e.getMessage());
-            listener.onResponse((T) result.toJson());
+            listener.onResponse((T) gson.toJson(List.of(result.toMap())));
         }));
     }
 
@@ -1094,7 +1276,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         adClient.startAnomalyDetector(request, ActionListener.wrap(response -> {
             DetectorResult result = DetectorResult
                 .success(indexName, detectorId, detectorName, "Detector created successfully", "Detector started successfully");
-            listener.onResponse((T) result.toJson());
+            listener.onResponse((T) gson.toJson(List.of(result.toMap())));
         }, e -> {
             log.error("Failed to start detector: {}", e.getMessage());
             respondWithError(listener, indexName, "start", e.getMessage());
@@ -1240,20 +1422,33 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         final Map<String, String> filteredMapping;
         final Set<String> dateFields;
         final String indexInsight;
+        final List<String> detectorDecisions;
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields) {
-            this(indexName, filteredMapping, dateFields, null);
+            this(indexName, filteredMapping, dateFields, null, new ArrayList<>());
         }
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields, String indexInsight) {
+            this(indexName, filteredMapping, dateFields, indexInsight, new ArrayList<>());
+        }
+
+        MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields,
+                       String indexInsight, List<String> detectorDecisions) {
             this.indexName = indexName;
             this.filteredMapping = filteredMapping;
             this.dateFields = dateFields;
             this.indexInsight = indexInsight;
+            this.detectorDecisions = detectorDecisions;
         }
 
         MappingContext withIndexInsight(String insight) {
-            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, insight);
+            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, insight, this.detectorDecisions);
+        }
+
+        MappingContext withDecision(String decision) {
+            List<String> updated = new ArrayList<>(this.detectorDecisions);
+            updated.add(decision);
+            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, this.indexInsight, updated);
         }
     }
 
