@@ -57,6 +57,7 @@ public abstract class AbstractRetrieverTool implements Tool {
           "required": ["input"],
           "additionalProperties": false
         }""";
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
 
     protected String description = DEFAULT_DESCRIPTION;
     protected Client client;
@@ -79,8 +80,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         this.index = index;
         this.sourceFields = sourceFields;
         this.docSize = docSize == null ? DEFAULT_DOC_SIZE : docSize;
-        this.attributes = new HashMap<>();
-        this.attributes.put(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
+        this.attributes = new HashMap<>(DEFAULT_ATTRIBUTES);
     }
 
     protected abstract String getQueryBody(String queryText);

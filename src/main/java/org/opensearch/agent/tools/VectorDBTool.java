@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -66,6 +67,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
           "required": ["input"],
           "additionalProperties": false
         }""";
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, VECTOR_DB_TOOL_INPUT_SCHEMA);
 
     private String name = TYPE;
     private String modelId;
@@ -90,7 +92,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
         this.embeddingField = embeddingField;
         this.k = k;
         this.nestedPath = nestedPath;
-        this.attributes.put(TOOL_INPUT_SCHEMA_FIELD, VECTOR_DB_TOOL_INPUT_SCHEMA);
+        this.attributes = new HashMap<>(DEFAULT_ATTRIBUTES);
     }
 
     @Override
