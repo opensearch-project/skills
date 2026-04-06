@@ -18,6 +18,26 @@ import static org.opensearch.ml.common.utils.StringUtils.gson;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.Assert;
+import org.mockito.ArgumentCaptor;
+import org.opensearch.agent.tools.utils.AnomalyDetectorToolHelper;
+import org.opensearch.ml.common.indexInsight.IndexInsight;
+import org.opensearch.ml.common.indexInsight.IndexInsightTaskStatus;
+import org.opensearch.ml.common.indexInsight.MLIndexInsightType;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetAction;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetResponse;
+import org.opensearch.search.aggregations.AggregationBuilder;
+import org.opensearch.timeseries.model.Feature;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
+import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.search.SearchHit;
+import org.opensearch.search.SearchHits;
+import org.apache.lucene.search.TotalHits;
 import java.util.Map;
 
 import org.junit.Before;
@@ -485,8 +505,299 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             );
     }
 
-    private void initMLTensors() {
 
+    // ===== NEW TESTS FOR COMMIT 1 CHANGES =====
+
+    @Test
+    public void testGetAggMethod_ReturnsActualType() {
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
+
+        // Build features with different aggregation types and verify getAggMethod extracts them correctly
+        AggregationBuilder avgAgg = AnomalyDetectorToolHelper.createAggregationBuilder("avg", "bytes");
+        Feature avgFeature = new Feature("id1", "feature_bytes", true, avgAgg);
+        assertEquals("avg", tool.getAggMethod(avgFeature));
+
+        AggregationBuilder sumAgg = AnomalyDetectorToolHelper.createAggregationBuilder("sum", "bytes");
+        Feature sumFeature = new Feature("id2", "feature_bytes", true, sumAgg);
+        assertEquals("sum", tool.getAggMethod(sumFeature));
+
+        // count maps to value_count internally — verify it maps back to "count"
+        AggregationBuilder countAgg = AnomalyDetectorToolHelper.createAggregationBuilder("count", "requests");
+        Feature countFeature = new Feature("id3", "feature_requests", true, countAgg);
+        assertEquals("count", tool.getAggMethod(countFeature));
+
+        AggregationBuilder maxAgg = AnomalyDetectorToolHelper.createAggregationBuilder("max", "latency");
+        Feature maxFeature = new Feature("id4", "feature_latency", true, maxAgg);
+        assertEquals("max", tool.getAggMethod(maxFeature));
+
+        AggregationBuilder minAgg = AnomalyDetectorToolHelper.createAggregationBuilder("min", "latency");
+        Feature minFeature = new Feature("id5", "feature_latency", true, minAgg);
+        assertEquals("min", tool.getAggMethod(minFeature));
+    }
+
+
+    @Test
+    public void testIndexInsightSuccess_InsightReachesLLMPrompt() throws Exception {
+        // Mock Index Insight to return content
+        mockFullDetectorCreationChain();
+        String insightContent = "dataSource: web_logs, recommendedFeatures: bytes_sent";
+        IndexInsight insight = IndexInsight.builder()
+            .index(mockedIndexName)
+            .content(insightContent)
+            .status(IndexInsightTaskStatus.COMPLETED)
+            .taskType(MLIndexInsightType.ALL)
+            .lastUpdatedTime(Instant.now())
+            .build();
+        MLIndexInsightGetResponse insightResponse = new MLIndexInsightGetResponse(insight);
+
+        doAnswer(invocation -> {
+            ActionListener<MLIndexInsightGetResponse> listener = (ActionListener<MLIndexInsightGetResponse>) invocation.getArguments()[2];
+            listener.onResponse(insightResponse);
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        // Capture the LLM prompt to verify insight was injected
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+
+        // Re-mock LLM call to capture the request AND return a valid response
+        String validResponse = "{category_field=|aggregation_field=response|aggregation_method=count|interval=10}";
+        modelReturns = Collections.singletonMap("response", validResponse);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+
+        // Override LLM mock to also capture the prompt
+        doAnswer(invocation -> {
+            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1]; RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset(); capturedPrompt.set(ds.getParameters().toString());
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            listener.onResponse(mlTaskResponse);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(response -> {
+                responseRef.set(response);
+                latch.countDown();
+            }, e -> {
+                responseRef.set("ERROR: " + e.getMessage());
+                latch.countDown();
+            })
+        );
+
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        // The key assertion: the insight content must appear in the prompt sent to the LLM
+        Assert.assertNotNull("LLM should have been called", capturedPrompt.get());
+        Assert.assertTrue(
+            "Prompt must contain the Index Insight content, but was: " + capturedPrompt.get(),
+            capturedPrompt.get().contains("INDEX ANALYSIS") || capturedPrompt.get().contains(insightContent)
+        );
+    }
+
+    @Test
+    public void testIndexInsightFailure_StillCreatesDetector() throws Exception {
+        // Mock Index Insight to fail
+        mockFullDetectorCreationChain();
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("Index Insight not available"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        // Capture the LLM prompt to verify NO insight was injected
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+
+        String validResponse = "{category_field=|aggregation_field=response|aggregation_method=count|interval=10}";
+        modelReturns = Collections.singletonMap("response", validResponse);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+
+        doAnswer(invocation -> {
+            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1]; RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset(); capturedPrompt.set(ds.getParameters().toString());
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            listener.onResponse(mlTaskResponse);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(response -> {
+                responseRef.set(response);
+                latch.countDown();
+            }, e -> {
+                responseRef.set("ERROR: " + e.getMessage());
+                latch.countDown();
+            })
+        );
+
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        // Verify the LLM was still called (tool didn't abort)
+        Assert.assertNotNull("LLM should have been called despite insight failure", capturedPrompt.get());
+        // Verify no insight was injected into the prompt
+        Assert.assertFalse(
+            "Prompt must NOT contain INDEX ANALYSIS when insight failed",
+            capturedPrompt.get().contains("INDEX ANALYSIS")
+        );
+    }
+
+    @Test
+    public void testTemplateVariableLeak_ReplacedWithActualField() throws Exception {
+        // LLM returns literal ${dateFields} instead of the actual date field name
+        mockFullDetectorCreationChain();
+        String leakyResponse = "{category_field=|aggregation_field=${dateFields},responseLatency|aggregation_method=count,avg|interval=10}";
+        modelReturns = Collections.singletonMap("response", leakyResponse);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+
+        // Mock Index Insight to fail fast (skip insight, go straight to LLM)
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(response -> {
+                responseRef.set(response);
+                latch.countDown();
+            }, e -> {
+                responseRef.set("ERROR: " + e.getMessage());
+                latch.countDown();
+            })
+        );
+
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        // The response must NOT contain the literal template variable — it should have been replaced
+        Assert.assertFalse(
+            "Template variable ${dateFields} should have been replaced with actual date field, but response was: " + response,
+            response.contains("${dateFields}")
+        );
+        Assert.assertFalse(
+            "Template variable ${indexInfo.dateFields} should not appear in output",
+            response.contains("${indexInfo.dateFields}")
+        );
+    }
+
+    @Test
+    public void testEmptyAggregationFields_FailsWithMessage() throws Exception {
+        // LLM returns empty aggregation fields — all fields are blank after split
+        mockFullDetectorCreationChain();
+        String emptyFieldsResponse = "{category_field=|aggregation_field=,|aggregation_method=,|interval=10}";
+        modelReturns = Collections.singletonMap("response", emptyFieldsResponse);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+
+        // Mock Index Insight to fail fast
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(response -> {
+                responseRef.set(response);
+                latch.countDown();
+            }, e -> {
+                responseRef.set("ERROR: " + e.getMessage());
+                latch.countDown();
+            })
+        );
+
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        // Must NOT report success — empty features should fail
+        Assert.assertFalse(
+            "Empty aggregation fields must not produce a successful detector",
+            response.contains("\"status\":\"success\"")
+        );
+    }
+
+
+    private void mockSearchForDateFieldSelection() {
+        SearchResponse searchResponse = org.mockito.Mockito.mock(SearchResponse.class);
+        SearchHits searchHits = new SearchHits(new SearchHit[0], new TotalHits(100, TotalHits.Relation.EQUAL_TO), 1.0f);
+        when(searchResponse.getHits()).thenReturn(searchHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = (ActionListener<SearchResponse>) invocation.getArguments()[1];
+            listener.onResponse(searchResponse);
+            return null;
+        }).when(client).search(any(), any());
+    }
+
+    /**
+     * Mocks the full async chain: search (date field selection), validate, suggest, create, start.
+     */
+    private void mockFullDetectorCreationChain() {
+        mockSearchForDateFieldSelection();
+
+        // Validate detector — return no issues
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.ValidateConfigResponse((org.opensearch.timeseries.model.ConfigValidationIssue) null));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.ValidateAnomalyDetectorAction.INSTANCE), any(), any());
+
+        // Suggest hyperparameters — return defaults
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.SuggestConfigParamResponse(null, null, null, null));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.SuggestAnomalyDetectorParamAction.INSTANCE), any(), any());
+
+        // Create detector
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
+                "test-detector-id", 1L, 1L, 1L, null, org.opensearch.core.rest.RestStatus.CREATED));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.IndexAnomalyDetectorAction.INSTANCE), any(), any());
+
+        // Start detector
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.JobResponse("test-detector-id"));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.AnomalyDetectorJobAction.INSTANCE), any(), any());
+    }
+
+    private void initMLTensors() {
         when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
         when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
         when(mlTaskResponse.getOutput()).thenReturn(modelTensorOutput);

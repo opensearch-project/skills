@@ -49,12 +49,16 @@ import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
+import org.opensearch.ml.common.indexInsight.IndexInsight;
+import org.opensearch.ml.common.indexInsight.MLIndexInsightType;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetAction;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetRequest;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.ToolUtils;
@@ -291,29 +295,70 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         });
     }
 
-    // Flow: get mappings -> LLM generates config -> validate config -> optimize params -> validate model -> create detector
+    // Flow: get index insight -> get mappings -> LLM generates config -> validate config -> optimize params -> validate model -> create detector
     private void processSingleIndex(String indexName, String tenantId, int maxRetries, ActionListener<String> listener) {
-        getMappingsAndFilterFields(
-            indexName,
-            ActionListener
-                .wrap(
-                    mappingContext -> generateAndParseConfig(
-                        mappingContext,
-                        tenantId,
-                        maxRetries,
-                        listener,
-                        (suggestions, listenerCallback) -> validateDetectorPhase(
-                            suggestions,
-                            mappingContext,
-                            tenantId,
-                            maxRetries,
-                            0,
-                            listenerCallback
-                        )
-                    ),
+        // First, try to get Index Insight analysis (graceful fallback if unavailable)
+        getIndexInsight(indexName, tenantId, ActionListener.wrap(
+            indexInsight -> {
+                getMappingsAndFilterFields(indexName, ActionListener.wrap(
+                    mappingContext -> {
+                        MappingContext enhancedContext = mappingContext.withIndexInsight(indexInsight);
+                        proceedWithLLM(enhancedContext, tenantId, maxRetries, listener);
+                    },
                     listener::onFailure
-                )
+                ));
+            },
+            e -> {
+                log.warn("Index Insight failed for '{}', proceeding without: {}", indexName, e.getMessage());
+                getMappingsAndFilterFields(indexName, ActionListener.wrap(
+                    mappingContext -> proceedWithLLM(mappingContext, tenantId, maxRetries, listener),
+                    listener::onFailure
+                ));
+            }
+        ));
+    }
+
+    private <T> void proceedWithLLM(MappingContext mappingContext, String tenantId, int maxRetries, ActionListener<T> listener) {
+        generateAndParseConfig(
+            mappingContext,
+            tenantId,
+            maxRetries,
+            listener,
+            (suggestions, listenerCallback) -> validateDetectorPhase(
+                suggestions,
+                mappingContext,
+                tenantId,
+                maxRetries,
+                0,
+                listenerCallback
+            )
         );
+    }
+
+    /**
+     * Get Index Insight analysis for the given index using ALL type.
+     * Returns null content on empty response; calls onFailure if API is unavailable.
+     */
+    private void getIndexInsight(String indexName, String tenantId, ActionListener<String> listener) {
+        log.info("Fetching Index Insight for index '{}'", indexName);
+
+        MLIndexInsightGetRequest request = new MLIndexInsightGetRequest(indexName, MLIndexInsightType.ALL, tenantId);
+
+        client.execute(MLIndexInsightGetAction.INSTANCE, request, ActionListener.wrap(response -> {
+            IndexInsight insight = response.getIndexInsight();
+            String content = insight != null ? insight.getContent() : null;
+
+            if (content != null && !content.isEmpty()) {
+                log.info("Index Insight for '{}': {} chars", indexName, content.length());
+                listener.onResponse(content);
+            } else {
+                log.warn("Index Insight returned empty content for '{}'", indexName);
+                listener.onResponse(null);
+            }
+        }, e -> {
+            log.warn("Index Insight API call failed for '{}': {} ({})", indexName, e.getMessage(), e.getClass().getSimpleName());
+            listener.onFailure(e);
+        }));
     }
 
     private String extractResponseFromDataAsMap(Map<String, Object> dataAsMap) {
@@ -369,18 +414,42 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
      * @param fieldsToType the flattened field-> field type mapping
      * @param indexName the index name
      * @param dateFields the comma-separated date fields
+     * @param indexInsight the index insight analysis (can be null)
      * @return the prompt about creating anomaly detector
      */
-    private String constructPrompt(final Map<String, String> fieldsToType, final String indexName, final String dateFields) {
+    private String constructPrompt(
+        final Map<String, String> fieldsToType,
+        final String indexName,
+        final String dateFields,
+        final String indexInsight
+    ) {
         StringJoiner tableInfoJoiner = new StringJoiner("\n");
         for (Map.Entry<String, String> entry : fieldsToType.entrySet()) {
             tableInfoJoiner.add("- " + entry.getKey() + ": " + entry.getValue());
         }
 
+        String insightSection = "";
+        if (indexInsight != null && !indexInsight.isEmpty()) {
+            insightSection = "\n\nINDEX ANALYSIS (from Index Insight):\n" + indexInsight
+                + "\n\nUse the above analysis to inform your detector configuration choices.";
+        }
+
         Map<String, String> indexInfo = ImmutableMap
-            .of("indexName", indexName, "indexMapping", tableInfoJoiner.toString(), "dateFields", dateFields);
+            .of("indexName", indexName, "indexMapping", tableInfoJoiner.toString(), "dateFields", dateFields, "indexInsight", insightSection);
         StringSubstitutor substitutor = new StringSubstitutor(indexInfo, "${indexInfo.", "}");
-        return substitutor.replace(contextPrompt);
+
+        String basePrompt = substitutor.replace(contextPrompt);
+        // If prompt template doesn't have ${indexInfo.indexInsight} placeholder, append insight before OUTPUT FORMAT
+        if (!contextPrompt.contains("${indexInfo.indexInsight}") && !insightSection.isEmpty()) {
+            int outputFormatIndex = basePrompt.indexOf("OUTPUT FORMAT:");
+            if (outputFormatIndex > 0) {
+                basePrompt = basePrompt.substring(0, outputFormatIndex) + insightSection + "\n\n" + basePrompt.substring(outputFormatIndex);
+            } else {
+                basePrompt = basePrompt + insightSection;
+            }
+        }
+
+        return basePrompt;
     }
 
     @Override
@@ -427,10 +496,25 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             }
 
             String cleanField = field.startsWith("feature_") ? field.substring(8) : field;
+            // Handle template variable leak - LLM sometimes outputs literal template variables
+            String actualDateField = dateFields.split(",")[0].trim();
+            cleanField = cleanField.replace("${dateFields}", actualDateField)
+                                   .replace("${indexInfo.dateFields}", actualDateField);
 
             AggregationBuilder aggregation = AnomalyDetectorToolHelper.createAggregationBuilder(method, cleanField);
             Feature feature = new Feature(UUIDs.randomBase64UUID(), "feature_" + cleanField, true, aggregation);
             features.add(feature);
+        }
+
+        if (features.isEmpty()) {
+            throw new IllegalArgumentException(
+                "No valid features could be built from LLM suggestions. "
+                    + "Fields: ["
+                    + aggregationFields
+                    + "], Methods: ["
+                    + aggregationMethods
+                    + "]"
+            );
         }
 
         List<String> categoryFields = null;
@@ -582,6 +666,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         ActionListener<T> listener,
         java.util.function.BiConsumer<Map<String, String>, ActionListener<T>> nextPhaseCallback
     ) {
+        log.debug("LLM_RESPONSE,index={},retry={},response={}", indexName, currentRetry, llmResponse);
         Matcher matcher = EXTRACT_INFO_PATTERN.matcher(llmResponse);
 
         if (!matcher.matches()) {
@@ -768,6 +853,9 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String fixPrompt = createFixPrompt(originalSuggestions, validationError);
         String fullPrompt = contextBuilder.toString() + fixPrompt;
 
+        log.info("LLM_FIX_PROMPT,index={},retry={},error={}", indexName, currentRetry,
+            validationError != null ? validationError.substring(0, Math.min(200, validationError.length())) : "unknown error");
+
         callLLM(fullPrompt, tenantId, ActionListener.wrap(fixedResponse -> {
             parseAndRetryWithLLM(
                 fixedResponse,
@@ -938,7 +1026,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 OUTPUT_KEY_AGGREGATION_FIELD,
                 detector.getFeatureAttributes().stream().map(Feature::getName).collect(java.util.stream.Collectors.joining(",")),
                 OUTPUT_KEY_AGGREGATION_METHOD,
-                detector.getFeatureAttributes().stream().map(f -> "avg").collect(java.util.stream.Collectors.joining(",")),
+                detector.getFeatureAttributes().stream().map(this::getAggMethod).collect(java.util.stream.Collectors.joining(",")),
                 OUTPUT_KEY_DATE_FIELDS,
                 detector.getTimeField(),
                 "interval",
@@ -1013,6 +1101,11 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         }));
     }
 
+    String getAggMethod(Feature feature) {
+        String type = feature.getAggregation().getType();
+        return "value_count".equals(type) ? "count" : type;
+    }
+
     private void selectOptimalDateField(String indexName, String[] suggestedDateFields, ActionListener<String> listener) {
         // Query each date field to count recent documents (last 30 days)
         List<CompletableFuture<Map.Entry<String, Long>>> futures = new ArrayList<>();
@@ -1066,6 +1159,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     }
 
     private String createFixPrompt(Map<String, String> originalSuggestions, String validationError) {
+        validationError = validationError != null ? validationError : "unknown error";
         String currentInterval = originalSuggestions.getOrDefault("interval", "10");
         String categoryField = originalSuggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
 
@@ -1076,8 +1170,21 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 || validationError.contains("960")
                 || validationError.contains("1440"));
 
+        // Check if this is a field type incompatibility error
+        boolean isFieldTypeError = validationError.contains("not supported for aggregation")
+            || validationError.contains("Text fields are not optimised");
+
         String sparseDataGuidance = "";
-        if (isUnreasonableInterval) {
+        if (isFieldTypeError) {
+            sparseDataGuidance = "\n**FIELD TYPE ERROR - CRITICAL FIX REQUIRED**:\n"
+                + "- You selected a keyword/text field with avg/sum/max/min aggregation - THIS WILL NOT WORK\n"
+                + "- RULE: keyword/text fields can ONLY use 'count' aggregation\n"
+                + "- RULE: avg/sum/max/min ONLY work on numeric fields (long, integer, double, float)\n"
+                + "- FIX OPTIONS:\n"
+                + "  1. Change aggregation method to 'count' for the keyword field, OR\n"
+                + "  2. Pick a DIFFERENT field that is numeric (long/integer/double/float)\n"
+                + "- Look at the field types in the mapping and pick numeric fields for avg/sum/max/min\n";
+        } else if (isUnreasonableInterval) {
             sparseDataGuidance = "\n**HIGH INTERVAL DETECTED**:\n"
                 + "- Validation suggests interval >4 hours\n"
                 + "- For operational metrics (latency, errors, CPU, memory): intervals >4 hours are too slow for actionable alerts\n"
@@ -1114,23 +1221,39 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             + "2. For operational metrics with intervals >240 min: REMOVE category field (set to empty string)\n"
             + "3. For business metrics: accept suggested interval if appropriate for use case\n"
             + "4. For 'invalid query' errors: fix only the problematic field/method\n\n"
-            + "CRITICAL: Return ONLY the corrected configuration in this EXACT format:\n"
+            + "CRITICAL RULES:\n"
+            + "- ONLY valid aggregation methods: avg, sum, min, max, count\n"
+            + "- Keyword fields can ONLY use 'count'\n"
+            + "- NEVER sum/avg status_code or http_status - use bytes, duration instead\n"
+            + "- Prefer numeric fields: bytes_sent, total_time, response.bytes, duration\n"
+            + "- Keep the same aggregation method unless it caused the error\n\n"
+            + "Return ONLY the corrected configuration in this EXACT format:\n"
             + "{category_field=FIELD_OR_EMPTY|aggregation_field=FIELD1,FIELD2|aggregation_method=METHOD1,METHOD2|interval=MINUTES}\n\n"
             + "Use empty string for category_field if removing it. DO NOT include explanations.";
     }
 
     /**
-     * Context object to hold mapping data
+     * Context object to hold mapping data and index insight
      */
     private static class MappingContext {
         final String indexName;
         final Map<String, String> filteredMapping;
         final Set<String> dateFields;
+        final String indexInsight;
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields) {
+            this(indexName, filteredMapping, dateFields, null);
+        }
+
+        MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields, String indexInsight) {
             this.indexName = indexName;
             this.filteredMapping = filteredMapping;
             this.dateFields = dateFields;
+            this.indexInsight = indexInsight;
+        }
+
+        MappingContext withIndexInsight(String insight) {
+            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, insight);
         }
     }
 
@@ -1276,7 +1399,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         StringJoiner dateFieldsJoiner = new StringJoiner(",");
         mappingContext.dateFields.forEach(dateFieldsJoiner::add);
 
-        String prompt = constructPrompt(mappingContext.filteredMapping, mappingContext.indexName, dateFieldsJoiner.toString());
+        String prompt = constructPrompt(mappingContext.filteredMapping, mappingContext.indexName, dateFieldsJoiner.toString(), mappingContext.indexInsight);
 
         RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
             .builder()
