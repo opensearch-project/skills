@@ -96,7 +96,8 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
     }
 
     // Runtime params for 'embedding_field' and 'index' take priority over values set at registration time.
-    @Override(Map<String, String> parameters) throws IOException {
+    @Override
+    protected synchronized <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String originalEmbeddingField = this.embeddingField;
         try {
             if (parameters.containsKey(EMBEDDING_FIELD)) {
