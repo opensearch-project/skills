@@ -153,29 +153,22 @@ public class VectorDBToolTests {
     public void testBuildSearchRequestWithEmbeddingFieldOverride() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
         String overrideField = "override_embedding";
-        // Simulate runtime override and verify original is restored
-        String originalField = tool.getEmbeddingField();
-        Map<String, String> runtimeParams = Map.of("input", TEST_QUERY_TEXT, VectorDBTool.EMBEDDING_FIELD, overrideField);
-        // getQueryBody is called inside buildSearchRequest; verify the override takes effect
-        // by checking the query body uses the override field, then original is restored
-        assertEquals(TEST_EMBEDDING_FIELD, originalField);
-        // We can't call buildSearchRequest without xContentRegistry, so verify getQueryBody
-        // after manually simulating the override/restore pattern
-        tool.setEmbeddingField(overrideField);
-        String queryBody = tool.getQueryBody(TEST_QUERY_TEXT);
-        assertTrue(queryBody.contains(overrideField));
-        tool.setEmbeddingField(originalField);
         assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        // Verify override field produces correct query body
+        tool.setEmbeddingField(overrideField);
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(overrideField));
+        // Verify original field is unchanged after restoring
+        tool.setEmbeddingField(TEST_EMBEDDING_FIELD);
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(TEST_EMBEDDING_FIELD));
     }
 
     @Test
     @SneakyThrows
     public void testBuildSearchRequestWithoutEmbeddingFieldOverride() {
         VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
-        // Without override, embedding field stays as registered
         assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
-        String queryBody = tool.getQueryBody(TEST_QUERY_TEXT);
-        assertTrue(queryBody.contains(TEST_EMBEDDING_FIELD));
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(TEST_EMBEDDING_FIELD));
     }
 
     @Test

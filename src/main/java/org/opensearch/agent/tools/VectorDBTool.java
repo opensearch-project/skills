@@ -94,7 +94,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
     }
 
     @Override
-    protected <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
+    protected synchronized <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
         String originalEmbeddingField = this.embeddingField;
         try {
             if (parameters.containsKey(EMBEDDING_FIELD)) {
