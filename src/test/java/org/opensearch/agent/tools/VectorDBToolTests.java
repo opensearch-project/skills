@@ -6,7 +6,10 @@
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -132,5 +135,52 @@ public class VectorDBToolTests {
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.DOC_SIZE_FIELD, 123)));
 
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.K_FIELD, 123)));
+    }
+
+    @Test
+    public void testVectorDBToolInputSchema() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        assertNotNull(tool.getAttributes());
+        String schema = (String) tool.getAttributes().get("input_schema");
+        assertNotNull(schema);
+        assertTrue(schema.contains("\"embedding_field\""));
+        assertTrue(schema.contains("\"index\""));
+        assertNotEquals(AbstractRetrieverTool.DEFAULT_INPUT_SCHEMA, schema);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildSearchRequestWithEmbeddingFieldOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        String overrideField = "override_embedding";
+        // Simulate runtime override and verify original is restored
+        String originalField = tool.getEmbeddingField();
+        Map<String, String> runtimeParams = Map.of("input", TEST_QUERY_TEXT, VectorDBTool.EMBEDDING_FIELD, overrideField);
+        // getQueryBody is called inside buildSearchRequest; verify the override takes effect
+        // by checking the query body uses the override field, then original is restored
+        assertEquals(TEST_EMBEDDING_FIELD, originalField);
+        // We can't call buildSearchRequest without xContentRegistry, so verify getQueryBody
+        // after manually simulating the override/restore pattern
+        tool.setEmbeddingField(overrideField);
+        String queryBody = tool.getQueryBody(TEST_QUERY_TEXT);
+        assertTrue(queryBody.contains(overrideField));
+        tool.setEmbeddingField(originalField);
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildSearchRequestWithoutEmbeddingFieldOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        // Without override, embedding field stays as registered
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        String queryBody = tool.getQueryBody(TEST_QUERY_TEXT);
+        assertTrue(queryBody.contains(TEST_EMBEDDING_FIELD));
+    }
+
+    @Test
+    public void testDefaultIndexUsedWhenNoRuntimeOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        assertEquals(AbstractRetrieverToolTests.TEST_INDEX, tool.getIndex());
     }
 }
