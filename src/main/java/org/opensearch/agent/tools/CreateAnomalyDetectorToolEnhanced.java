@@ -36,6 +36,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.transport.IndexAnomalyDetectorRequest;
+import org.opensearch.ad.transport.IndexAnomalyDetectorResponse;
 import org.opensearch.agent.tools.utils.AnomalyDetectorToolHelper;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.cluster.metadata.MappingMetadata;
@@ -46,6 +47,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.index.IndexNotFoundException;
+import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
@@ -64,6 +66,7 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.search.aggregations.AggregationBuilder;
+import org.opensearch.search.aggregations.AggregationBuilders;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.timeseries.AnalysisType;
 import org.opensearch.timeseries.model.Feature;
@@ -376,41 +379,39 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         final String timeField;
         final String categoryField;
         final String featureField;
-        final org.opensearch.index.query.QueryBuilder filter;
+        final QueryBuilder featureFilter; // null = plain count, non-null = filter-wrapped count
 
         OtelDetectorSpec(String nameSuffix, String timeField, String categoryField,
-                         String featureField, org.opensearch.index.query.QueryBuilder filter) {
+                         String featureField, QueryBuilder featureFilter) {
             this.nameSuffix = nameSuffix;
             this.timeField = timeField;
             this.categoryField = categoryField;
             this.featureField = featureField;
-            this.filter = filter;
+            this.featureFilter = featureFilter;
         }
     }
 
     private List<OtelDetectorSpec> buildOtelSpecs(OtelSignalType type) {
         List<OtelDetectorSpec> specs = new ArrayList<>();
         if (type == OtelSignalType.TRACES) {
-            // trace-errors: count spans where status.code=2
+            // trace-errors: count spans where status.code=2 (filter in feature for HC entity support)
             specs.add(new OtelDetectorSpec(
                 "trace-errors", "startTime", "serviceName", "startTime",
-                QueryBuilders.boolQuery().must(QueryBuilders.termQuery("status.code", 2))
+                QueryBuilders.termQuery("status.code", 2)
             ));
-            // trace-throughput: count all spans
+            // trace-throughput: count all spans (no filter)
             specs.add(new OtelDetectorSpec(
-                "trace-throughput", "startTime", "serviceName", "startTime",
-                QueryBuilders.matchAllQuery()
+                "trace-throughput", "startTime", "serviceName", "startTime", null
             ));
         } else {
-            // log-errors: count logs with severityNumber>=17
+            // log-errors: count logs with severityNumber>=17 (filter in feature for HC entity support)
             specs.add(new OtelDetectorSpec(
                 "log-errors", "time", "resource.attributes.service.name", "time",
-                QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("severityNumber").gte(17))
+                QueryBuilders.rangeQuery("severityNumber").gte(17)
             ));
-            // log-volume: count all logs
+            // log-volume: count all logs (no filter)
             specs.add(new OtelDetectorSpec(
-                "log-volume", "time", "resource.attributes.service.name", "time",
-                QueryBuilders.matchAllQuery()
+                "log-volume", "time", "resource.attributes.service.name", "time", null
             ));
         }
         return specs;
@@ -436,12 +437,18 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         OtelDetectorSpec spec = specs.get(idx);
         String detectorName = indexName + "-" + spec.nameSuffix + "-" + UUIDs.randomBase64UUID().substring(0, 6);
 
-        AggregationBuilder agg = AnomalyDetectorToolHelper.createAggregationBuilder("count", spec.featureField);
-        Feature feature = new Feature(UUIDs.randomBase64UUID(), spec.nameSuffix.replace("-", "_"), true, agg);
+        AggregationBuilder innerAgg = AnomalyDetectorToolHelper.createAggregationBuilder("count", spec.featureField);
+        // Wrap filter inside the feature aggregation (not on the detector) so HC entities
+        // with 0 matching docs still get a model with value=0, enabling 0→N anomaly detection.
+        AggregationBuilder featureAgg = spec.featureFilter != null
+            ? AggregationBuilders.filter(spec.nameSuffix.replace("-", "_"), spec.featureFilter)
+                .subAggregation(innerAgg)
+            : innerAgg;
+        Feature feature = new Feature(UUIDs.randomBase64UUID(), spec.nameSuffix.replace("-", "_"), true, featureAgg);
 
         AnomalyDetector detector = new AnomalyDetector(
             null, null, detectorName, DEFAULT_DETECTOR_DESCRIPTION,
-            spec.timeField, List.of(indexName), List.of(feature), spec.filter,
+            spec.timeField, List.of(indexName), List.of(feature), QueryBuilders.matchAllQuery(),
             new IntervalTimeConfiguration(DEFAULT_OTEL_INTERVAL_MINUTES, ChronoUnit.MINUTES),
             new IntervalTimeConfiguration(DEFAULT_WINDOW_DELAY_MINUTES, ChronoUnit.MINUTES),
             DEFAULT_SHINGLE_SIZE, null, DEFAULT_SCHEMA_VERSION, Instant.now(),
@@ -543,33 +550,31 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         if (dataAsMap == null) {
             return null;
         }
-
         if (dataAsMap.containsKey("response")) {
             return (String) dataAsMap.get("response");
-        } else if (dataAsMap.containsKey("output")) {
-            // Parse Bedrock format: output.message.content[0].text
+        }
+        // Bedrock and Claude both end with content[0].text — just navigate to the content array
+        List<Map<String, Object>> content = null;
+        if (dataAsMap.containsKey("output")) {
             try {
                 Map<String, Object> output = (Map<String, Object>) dataAsMap.get("output");
                 Map<String, Object> message = (Map<String, Object>) output.get("message");
-                List<Map<String, Object>> content = (List<Map<String, Object>>) message.get("content");
-                return (String) content.getFirst().get("text");
+                content = (List<Map<String, Object>>) message.get("content");
             } catch (Exception e) {
                 log.error("Failed to parse Bedrock response format", e);
-                return null;
             }
         } else if (dataAsMap.containsKey("content")) {
-            // Parse Claude format: content field as array
             try {
-                List<Map<String, Object>> content = (List<Map<String, Object>>) dataAsMap.get("content");
-                return (String) content.getFirst().get("text");
+                content = (List<Map<String, Object>>) dataAsMap.get("content");
             } catch (Exception e) {
                 log.error("Failed to parse Claude content format", e);
-                return null;
             }
-        } else {
-            log.error("Unknown response format. Available keys: {}", dataAsMap.keySet());
-            return null;
         }
+        if (content != null && !content.isEmpty()) {
+            return (String) content.getFirst().get("text");
+        }
+        log.error("Unknown or unparseable response format. Available keys: {}", dataAsMap.keySet());
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -644,7 +649,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         return buildAnomalyDetectorFromSuggestions(suggestions, null);
     }
 
-    private AnomalyDetector buildAnomalyDetectorFromSuggestions(Map<String, String> suggestions, org.opensearch.index.query.QueryBuilder filterQuery) {
+    private AnomalyDetector buildAnomalyDetectorFromSuggestions(Map<String, String> suggestions, QueryBuilder filterQuery) {
         String indexName = suggestions.get(OUTPUT_KEY_INDEX);
         String categoryField = suggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
         String aggregationFields = suggestions.get(OUTPUT_KEY_AGGREGATION_FIELD);
@@ -756,9 +761,17 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
 
         client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
             ModelTensorOutput output = (ModelTensorOutput) mlTaskResponse.getOutput();
-            ModelTensors tensors = output.getMlModelOutputs().get(0);
-            ModelTensor tensor = tensors.getMlModelTensors().get(0);
-            Map<String, Object> dataAsMap = (Map<String, Object>) tensor.getDataAsMap();
+            List<ModelTensors> outputList = output != null ? output.getMlModelOutputs() : null;
+            if (outputList == null || outputList.isEmpty()) {
+                listener.onFailure(new IllegalStateException("Remote endpoint returned empty output."));
+                return;
+            }
+            List<ModelTensor> tensorList = outputList.get(0).getMlModelTensors();
+            if (tensorList == null || tensorList.isEmpty()) {
+                listener.onFailure(new IllegalStateException("Remote endpoint returned empty tensors."));
+                return;
+            }
+            Map<String, Object> dataAsMap = (Map<String, Object>) tensorList.get(0).getDataAsMap();
             String response = extractResponseFromDataAsMap(dataAsMap);
 
             if (Strings.isNullOrEmpty(response)) {
@@ -937,6 +950,11 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         int currentRetry,
         ActionListener<T> listener
     ) {
+        if (currentRetry >= MAX_DETECTOR_VALIDATION_RETRIES) {
+            listener.onFailure(new RuntimeException(
+                "Detector validation failed after " + MAX_DETECTOR_VALIDATION_RETRIES + " retries"));
+            return;
+        }
         try {
             log.info("Validating detector configuration");
             AnomalyDetector detector = buildAnomalyDetectorFromSuggestions(suggestions);
@@ -1110,7 +1128,8 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         );
     }
 
-    // Use AD suggest API to find better interval/window-delay/history intervals based on the historical data
+    // Use AD suggest API to find better interval/window-delay/history based on actual data density.
+    // Intentionally overrides LLM's interval — LLM guesses from field names, suggest API uses real data.
     private <T> void suggestHyperParametersPhase(AnomalyDetector detector, String tenantId, int maxRetries, ActionListener<T> listener) {
         log.info("Starting suggest api step");
 
@@ -1249,9 +1268,9 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
 
     private <T> void createDetector(AnomalyDetector detector, ActionListener<T> listener) {
         IndexAnomalyDetectorRequest request = new IndexAnomalyDetectorRequest("", detector, RestRequest.Method.POST);
-        adClient.createAnomalyDetector(request, new ActionListener<org.opensearch.ad.transport.IndexAnomalyDetectorResponse>() {
+        adClient.createAnomalyDetector(request, new ActionListener<IndexAnomalyDetectorResponse>() {
             @Override
-            public void onResponse(org.opensearch.ad.transport.IndexAnomalyDetectorResponse response) {
+            public void onResponse(IndexAnomalyDetectorResponse response) {
                 String detectorId = response.getId();
                 startDetector(detector.getIndices().get(0), detectorId, detector.getName(), listener);
             }
@@ -1345,12 +1364,14 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String currentInterval = originalSuggestions.getOrDefault("interval", "10");
         String categoryField = originalSuggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
 
-        // Check if this is a sparse data issue with unreasonably high suggested interval
-        boolean isUnreasonableInterval = validationError.contains("interval")
-            && (validationError.contains("240")
-                || validationError.contains("480")
-                || validationError.contains("960")
-                || validationError.contains("1440"));
+        // Check if this is a sparse data issue with unreasonably high suggested interval (>= 4 hours)
+        boolean isUnreasonableInterval = false;
+        if (validationError.contains("interval")) {
+            java.util.regex.Matcher intervalMatcher = java.util.regex.Pattern.compile("(\\d+)\\s*[Mm]inute").matcher(validationError);
+            if (intervalMatcher.find()) {
+                isUnreasonableInterval = Integer.parseInt(intervalMatcher.group(1)) >= 240;
+            }
+        }
 
         // Check if this is a field type incompatibility error
         boolean isFieldTypeError = validationError.contains("not supported for aggregation")
@@ -1455,9 +1476,27 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     /**
      * Result object to track detector creation status per index
      */
+    private enum DetectorStatus {
+        SUCCESS("success"),
+        FAILED_VALIDATION("failed_validation"),
+        FAILED_CREATE("failed_create"),
+        FAILED_START("failed_start");
+
+        private final String value;
+
+        DetectorStatus(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+    }
+
     private static class DetectorResult {
         String indexName;
-        String status; // "success", "failed_validation", "failed_create", "failed_start"
+        DetectorStatus status;
         String detectorId;
         String detectorName;
         String error;
@@ -1473,7 +1512,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             if (indexName != null)
                 map.put("indexName", indexName);
             if (status != null)
-                map.put("status", status);
+                map.put("status", status.toString());
             if (detectorId != null)
                 map.put("detectorId", detectorId);
             if (detectorName != null)
@@ -1490,7 +1529,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         static DetectorResult failedValidation(String indexName, String error) {
             DetectorResult result = new DetectorResult();
             result.indexName = indexName;
-            result.status = "failed_validation";
+            result.status = DetectorStatus.FAILED_VALIDATION;
             result.error = error;
             return result;
         }
@@ -1498,7 +1537,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         static DetectorResult failedCreate(String indexName, String error) {
             DetectorResult result = new DetectorResult();
             result.indexName = indexName;
-            result.status = "failed_create";
+            result.status = DetectorStatus.FAILED_CREATE;
             result.error = error;
             return result;
         }
@@ -1506,7 +1545,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         static DetectorResult failedStart(String indexName, String detectorId, String error) {
             DetectorResult result = new DetectorResult();
             result.indexName = indexName;
-            result.status = "failed_start";
+            result.status = DetectorStatus.FAILED_START;
             result.detectorId = detectorId;
             result.error = error;
             return result;
@@ -1521,7 +1560,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         ) {
             DetectorResult result = new DetectorResult();
             result.indexName = indexName;
-            result.status = "success";
+            result.status = DetectorStatus.SUCCESS;
             result.detectorId = detectorId;
             result.detectorName = detectorName;
             result.createResponse = createResponse;
@@ -1596,36 +1635,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
 
         String prompt = constructPrompt(mappingContext.filteredMapping, mappingContext.indexName, dateFieldsJoiner.toString(), mappingContext.indexInsight);
 
-        RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
-            .builder()
-            .parameters(Collections.singletonMap("prompt", prompt))
-            .build();
-
-        ActionRequest request = new MLPredictionTaskRequest(
-            modelId,
-            MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(inputDataSet).build(),
-            null,
-            tenantId
-        );
-
-        client.execute(MLPredictionTaskAction.INSTANCE, request, ActionListener.wrap(mlTaskResponse -> {
-            ModelTensorOutput modelTensorOutput = (ModelTensorOutput) mlTaskResponse.getOutput();
-            ModelTensors modelTensors = modelTensorOutput.getMlModelOutputs().get(0);
-            ModelTensor modelTensor = modelTensors.getMlModelTensors().get(0);
-            Map<String, Object> dataAsMap = (Map<String, Object>) modelTensor.getDataAsMap();
-
-            if (dataAsMap == null) {
-                listener.onFailure(new IllegalStateException("Remote endpoint fails to inference."));
-                return;
-            }
-
-            String finalResponse = extractResponseFromDataAsMap(dataAsMap);
-            if (Strings.isNullOrEmpty(finalResponse)) {
-                listener.onFailure(new IllegalStateException("Remote endpoint fails to inference, no response found."));
-                return;
-            }
-
-            // Parse response and continue to next phase
+        callLLM(prompt, tenantId, ActionListener.wrap(finalResponse -> {
             parseAndRetryWithLLM(
                 finalResponse,
                 mappingContext.indexName,
@@ -1637,7 +1647,6 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 listener,
                 nextPhaseCallback
             );
-
         }, e -> {
             log.error("Model prediction failed: {}", e.getMessage());
             listener.onFailure(e);
@@ -1651,7 +1660,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         private Client client;
         private NamedWriteableRegistry namedWriteableRegistry;
 
-        private static CreateAnomalyDetectorToolEnhanced.Factory INSTANCE;
+        private static volatile CreateAnomalyDetectorToolEnhanced.Factory INSTANCE;
 
         /**
          * Create or return the singleton factory instance
