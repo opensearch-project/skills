@@ -92,12 +92,17 @@ public class LogPatternAnalysisTool implements Tool {
     public static final String STRICT_FIELD = "strict";
 
     // Constants
-    private static final String DEFAULT_DESCRIPTION =
-        "This is a tool used to detect selection log patterns by the patterns command in PPL or to detect selection log sequences by the log clustering algorithm.";
+    private static final String DEFAULT_DESCRIPTION = "Analyzes log patterns in a target time range, optionally compared to a baseline. "
+        + "Use when investigating incidents to find new, spiking, or anomalous log messages. "
+        + "Three modes: "
+        + "(1) Sequence analysis (traceFieldName + baseline): groups logs by trace ID, returns exceptional trace sequences. "
+        + "(2) Pattern diff (baseline, no traceFieldName): compares pattern frequencies, returns highest-lift patterns. "
+        + "(3) Log insight (no baseline): finds top error/warning patterns with sample logs.";
     private static final double LOG_VECTORS_CLUSTERING_THRESHOLD = 0.5;
     private static final double LOG_PATTERN_THRESHOLD = 0.75;
     private static final double LOG_PATTERN_LIFT = 3;
     private static final String DEFAULT_TIME_FIELD = "@timestamp";
+    private static final int MAX_LOG_SAMPLE_SIZE = 10000;
 
     public static final String DEFAULT_INPUT_SCHEMA =
         """
@@ -106,35 +111,39 @@ public class LogPatternAnalysisTool implements Tool {
                 "properties": {
                     "index": {
                         "type": "string",
-                        "description": "Target OpenSearch index name containing log data (e.g., 'ss4o_logs-otel-2025.06.24')"
+                        "description": "Target OpenSearch index name"
                     },
                     "timeField": {
                         "type": "string",
-                        "description": "Date/time field in the index mapping used for time-based filtering"
+                        "description": "Date/time field for filtering"
                     },
                     "logFieldName": {
                         "type": "string",
-                        "description": "Field containing raw log messages to analyze (e.g., 'body', 'message', 'log')"
+                        "description": "Field containing log message text"
                     },
                     "traceFieldName": {
                         "type": "string",
-                        "description": "[OPTIONAL] Field for trace/correlation ID to enable sequence analysis (e.g., 'traceId', 'correlationId'). Leave empty for pattern-only analysis."
+                        "description": "Trace/correlation ID field. Enables sequence analysis mode when provided with baseline time range"
                     },
                     "baseTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:33:05')"
+                        "description": "Start of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baseTimeRangeEnd"
                     },
                     "baseTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for baseline comparison period (date string in utc timezone, e.g., '2025-06-24 07:51:27')"
+                        "description": "End of baseline period (format: yyyy-MM-dd HH:mm:ss). Must pair with baseTimeRangeStart"
                     },
                     "selectionTimeRangeStart": {
                         "type": "string",
-                        "description": "Start time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:50:26')"
+                        "description": "Start of target/incident period (format: yyyy-MM-dd HH:mm:ss)"
                     },
                     "selectionTimeRangeEnd": {
                         "type": "string",
-                        "description": "End time for analysis target period (date string in utc timezone, e.g., '2025-06-24 07:55:56')"
+                        "description": "End of target/incident period (format: yyyy-MM-dd HH:mm:ss)"
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "PPL boolean expression to filter logs (e.g. serviceName='ts-auth-service' or severity='ERROR'). Applied as additional where clause. Not applicable for sequence analysis mode (when traceFieldName is provided with baseline), as sequence analysis requires all logs within a trace"
                     }
                 },
                 "required": [
@@ -148,7 +157,8 @@ public class LogPatternAnalysisTool implements Tool {
             }
             """;
 
-    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA, STRICT_FIELD, false);
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map
+        .of(TOOL_INPUT_SCHEMA_FIELD, gson.toJson(gson.fromJson(DEFAULT_INPUT_SCHEMA, Map.class)), STRICT_FIELD, false);
 
     // Compiled regex patterns for better performance
     private static final Pattern REPEATED_WILDCARDS_PATTERN = Pattern.compile("(<\\*>)(\\s+<\\*>)+");
@@ -165,6 +175,7 @@ public class LogPatternAnalysisTool implements Tool {
         final String baseTimeRangeEnd;
         final String selectionTimeRangeStart;
         final String selectionTimeRangeEnd;
+        final String filter;
 
         AnalysisParameters(Map<String, String> parameters) {
             this.index = parameters.getOrDefault("index", "");
@@ -175,6 +186,7 @@ public class LogPatternAnalysisTool implements Tool {
             this.baseTimeRangeEnd = parameters.getOrDefault("baseTimeRangeEnd", "");
             this.selectionTimeRangeStart = parameters.getOrDefault("selectionTimeRangeStart", "");
             this.selectionTimeRangeEnd = parameters.getOrDefault("selectionTimeRangeEnd", "");
+            this.filter = parameters.getOrDefault("filter", "");
         }
 
         private void validate() {
@@ -299,9 +311,12 @@ public class LogPatternAnalysisTool implements Tool {
     }
 
     private <T> void logSequenceAnalysis(AnalysisParameters params, ActionListener<T> listener) {
+        if (!Strings.isEmpty(params.filter)) {
+            log.warn("Filter parameter is ignored for sequence analysis mode as it requires all logs within a trace");
+        }
         // Step 1: Analyze selection time range
         analyzeSelectionTimeRange(params, ActionListener.wrap(selectionResult -> {
-            log.debug("Base time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
+            log.debug("Selection time range analysis completed, found {} traces", selectionResult.tracePatternMap.size());
 
             if (selectionResult.tracePatternMap.isEmpty()) {
                 Map<String, Map<String, String>> emptyResult = buildFinalResult(
@@ -316,7 +331,7 @@ public class LogPatternAnalysisTool implements Tool {
 
             // Step 2: Analyze base time range
             analyzeBaseTimeRange(params, ActionListener.wrap(baseResult -> {
-                log.debug("Selection time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
+                log.debug("Base time range analysis completed, found {} traces", baseResult.tracePatternMap.size());
 
                 // Step 3: Generate comparison result
                 generateSequenceComparisonResult(baseResult, selectionResult, listener);
@@ -334,7 +349,8 @@ public class LogPatternAnalysisTool implements Tool {
             params.logFieldName,
             params.traceFieldName,
             params.baseTimeRangeStart,
-            params.baseTimeRangeEnd
+            params.baseTimeRangeEnd,
+            ""
         );
 
         executePPL(baseTimeRangeLogPatternPPL, listener);
@@ -347,7 +363,8 @@ public class LogPatternAnalysisTool implements Tool {
             params.logFieldName,
             params.traceFieldName,
             params.selectionTimeRangeStart,
-            params.selectionTimeRangeEnd
+            params.selectionTimeRangeEnd,
+            ""
         );
 
         executePPL(selectionTimeRangeLogPatternPPL, listener);
@@ -388,24 +405,24 @@ public class LogPatternAnalysisTool implements Tool {
         String logFieldName,
         String traceFieldName,
         String startTime,
-        String endTime
+        String endTime,
+        String filter
     ) {
-        return String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s!='' | where %s>'%s' and %s<'%s' | patterns %s method=brain "
-                    + "variable_count_threshold=3 | fields %s, patterns_field, %s | sort %s",
-                index,
-                traceFieldName,
-                timeField,
-                startTime,
-                timeField,
-                endTime,
-                logFieldName,
-                traceFieldName,
-                timeField,
-                timeField
-            );
+        String filterClause = Strings.isEmpty(filter) ? "" : String.format(Locale.ROOT, " | where %s", filter);
+
+        String pplTemplate =
+            "source={INDEX} | where {TRACE_FIELD}!='' | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+                + "| fields {TRACE_FIELD}, {LOG_FIELD}, {TIME_FIELD} | patterns {LOG_FIELD} method=brain variable_count_threshold=3 "
+                + "| fields {TRACE_FIELD}, patterns_field, {TIME_FIELD} | sort {TIME_FIELD}";
+
+        return pplTemplate
+            .replace("{INDEX}", index)
+            .replace("{TRACE_FIELD}", traceFieldName)
+            .replace("{TIME_FIELD}", timeField)
+            .replace("{START_TIME}", startTime)
+            .replace("{END_TIME}", endTime)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", logFieldName);
     }
 
     private Map<String, Double> vectorizePattern(Map<String, Set<String>> patternCountMap, int totalTraceCount) {
@@ -616,7 +633,8 @@ public class LogPatternAnalysisTool implements Tool {
             params.timeField,
             params.logFieldName,
             params.baseTimeRangeStart,
-            params.baseTimeRangeEnd
+            params.baseTimeRangeEnd,
+            params.filter
         );
         Function<List<List<Object>>, Map<String, Double>> dataRowsParser = dataRows -> {
             Map<String, Double> patternMap = new HashMap<>();
@@ -648,7 +666,8 @@ public class LogPatternAnalysisTool implements Tool {
                             params.timeField,
                             params.logFieldName,
                             params.selectionTimeRangeStart,
-                            params.selectionTimeRangeEnd
+                            params.selectionTimeRangeEnd,
+                            params.filter
                         );
 
                         log.debug("Executing selection time range pattern PPL: {}", selectionTimeRangeLogPatternPPL);
@@ -749,22 +768,23 @@ public class LogPatternAnalysisTool implements Tool {
                 "violation"
             );
 
-        String selectionTimeRangeLogPatternPPL = String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s>'%s' and %s<'%s' | where match(%s, '%s') | patterns %s method=brain "
-                    + "mode=aggregation max_sample_count=5 "
-                    + "variable_count_threshold=3 | fields patterns_field, pattern_count, sample_logs "
-                    + "| sort -pattern_count | head 5",
-                params.index,
-                params.timeField,
-                params.selectionTimeRangeStart,
-                params.timeField,
-                params.selectionTimeRangeEnd,
-                params.logFieldName,
-                String.join(" ", errorKeywords),
-                params.logFieldName
-            );
+        String filterClause = Strings.isEmpty(params.filter) ? "" : String.format(Locale.ROOT, " | where %s", params.filter);
+
+        String pplTemplate = "source={INDEX} | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+            + "| where match({LOG_FIELD}, '{ERROR_KEYWORDS}') | head "
+            + MAX_LOG_SAMPLE_SIZE
+            + " | fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain "
+            + "mode=aggregation max_sample_count=5 variable_count_threshold=3 "
+            + "| fields patterns_field, pattern_count, sample_logs | sort -pattern_count | head 5";
+
+        String selectionTimeRangeLogPatternPPL = pplTemplate
+            .replace("{INDEX}", params.index)
+            .replace("{TIME_FIELD}", params.timeField)
+            .replace("{START_TIME}", params.selectionTimeRangeStart)
+            .replace("{END_TIME}", params.selectionTimeRangeEnd)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", params.logFieldName)
+            .replace("{ERROR_KEYWORDS}", String.join(" ", errorKeywords));
 
         Function<List<List<Object>>, List<PatternWithSamples>> dataRowsParser = dataRows -> {
             List<PatternWithSamples> patternWithSamplesList = new ArrayList<>();
@@ -800,19 +820,27 @@ public class LogPatternAnalysisTool implements Tool {
             );
     }
 
-    private String buildLogPatternPPL(String index, String timeField, String logFieldName, String startTime, String endTime) {
-        return String
-            .format(
-                Locale.ROOT,
-                "source=%s | where %s>'%s' and %s<'%s' | patterns %s method=brain mode=aggregation "
-                    + "variable_count_threshold=3 | fields pattern_count, patterns_field",
-                index,
-                timeField,
-                startTime,
-                timeField,
-                endTime,
-                logFieldName
-            );
+    private String buildLogPatternPPL(
+        String index,
+        String timeField,
+        String logFieldName,
+        String startTime,
+        String endTime,
+        String filter
+    ) {
+        String filterClause = Strings.isEmpty(filter) ? "" : String.format(Locale.ROOT, " | where %s", filter);
+
+        String pplTemplate = "source={INDEX} | where {TIME_FIELD}>'{START_TIME}' and {TIME_FIELD}<'{END_TIME}'{FILTER} "
+            + "| fields {LOG_FIELD} | patterns {LOG_FIELD} method=brain mode=aggregation variable_count_threshold=3 "
+            + "| fields pattern_count, patterns_field";
+
+        return pplTemplate
+            .replace("{INDEX}", index)
+            .replace("{TIME_FIELD}", timeField)
+            .replace("{START_TIME}", startTime)
+            .replace("{END_TIME}", endTime)
+            .replace("{FILTER}", filterClause)
+            .replace("{LOG_FIELD}", logFieldName);
     }
 
     private List<PatternDiffResult> calculatePatternDifferences(Map<String, Double> basePatterns, Map<String, Double> selectionPatterns) {

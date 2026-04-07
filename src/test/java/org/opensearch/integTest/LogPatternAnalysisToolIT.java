@@ -59,6 +59,9 @@ public class LogPatternAnalysisToolIT extends BaseAgentToolsIT {
                 + "      },\n"
                 + "      \"traceId\": {\n"
                 + "        \"type\": \"keyword\"\n"
+                + "      },\n"
+                + "      \"serviceName\": {\n"
+                + "        \"type\": \"keyword\"\n"
                 + "      }\n"
                 + "    }\n"
                 + "  }\n"
@@ -69,52 +72,52 @@ public class LogPatternAnalysisToolIT extends BaseAgentToolsIT {
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "base1",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 09:30:00", "System startup completed", "trace-base-001")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 09:30:00", "System startup completed", "trace-base-001", "auth-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "base2",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 09:45:00", "Database connection established", "trace-base-002")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 09:45:00", "Database connection established", "trace-base-002", "db-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "base3",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 09:50:00", "User session initialized", "trace-base-003")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 09:50:00", "User session initialized", "trace-base-003", "auth-service")
         );
 
         // Add test log data with error keywords for logInsight
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "1",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 10:00:00", "User login successful", "trace-001")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 10:00:00", "User login successful", "trace-001", "auth-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "2",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 10:01:00", "Database connection established", "trace-001")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 10:01:00", "Database connection established", "trace-001", "db-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "3",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 10:02:00", "Error connection timeout failed", "trace-002")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 10:02:00", "Error connection timeout failed", "trace-002", "db-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "4",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 10:03:00", "User logout completed", "trace-001")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 10:03:00", "User logout completed", "trace-001", "auth-service")
         );
         addDocToIndex(
             TEST_LOG_INDEX_NAME,
             "5",
-            List.of("@timestamp", "message", "traceId"),
-            List.of("2025-01-01 10:04:00", "Exception in authentication service", "trace-003")
+            List.of("@timestamp", "message", "traceId", "serviceName"),
+            List.of("2025-01-01 10:04:00", "Exception in authentication service", "trace-003", "auth-service")
         );
     }
 
@@ -204,6 +207,51 @@ public class LogPatternAnalysisToolIT extends BaseAgentToolsIT {
             )
         );
         MatcherAssert.assertThat(exception.getMessage(), containsString("not a valid term"));
+    }
+
+    @SneakyThrows
+    public void testLogPatternAnalysisToolLogInsightWithFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"timeField\": \"@timestamp\", \"logFieldName\": \"message\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 10:05:00\", \"filter\": \"serviceName='db-service'\"}}",
+                    TEST_LOG_INDEX_NAME
+                )
+        );
+        assertNotNull(result);
+        assertTrue(result.contains("logInsights"));
+    }
+
+    @SneakyThrows
+    public void testLogPatternAnalysisToolWithBaseTimeRangeAndFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"timeField\": \"@timestamp\", \"logFieldName\": \"message\", \"baseTimeRangeStart\": \"2025-01-01 09:00:00\", \"baseTimeRangeEnd\": \"2025-01-01 10:00:00\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 10:05:00\", \"filter\": \"serviceName='auth-service'\"}}",
+                    TEST_LOG_INDEX_NAME
+                )
+        );
+        assertNotNull(result);
+        assertTrue(result.contains("patternMapDifference"));
+    }
+
+    @SneakyThrows
+    public void testLogPatternAnalysisToolWithTraceFieldAndFilter() {
+        String result = executeAgent(
+            agentId,
+            String
+                .format(
+                    Locale.ROOT,
+                    "{\"parameters\": {\"index\": \"%s\", \"timeField\": \"@timestamp\", \"logFieldName\": \"message\", \"traceFieldName\": \"traceId\", \"baseTimeRangeStart\": \"2025-01-01 09:00:00\", \"baseTimeRangeEnd\": \"2025-01-01 10:00:00\", \"selectionTimeRangeStart\": \"2025-01-01 10:00:00\", \"selectionTimeRangeEnd\": \"2025-01-01 10:05:00\", \"filter\": \"serviceName='auth-service'\"}}",
+                    TEST_LOG_INDEX_NAME
+                )
+        );
+        assertNotNull(result);
+        assertTrue(result.contains("BASE") || result.contains("EXCEPTIONAL"));
     }
 
     @SneakyThrows

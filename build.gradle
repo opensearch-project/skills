@@ -11,7 +11,7 @@ import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "3.5.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.6.1-SNAPSHOT")
          buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         version_tokens = opensearch_version.tokenize('-')
@@ -154,11 +154,11 @@ dependencies {
     compileOnly(group: 'software.amazon.awssdk', name: 'utils', version: "${versions.aws}")
     compileOnly(group: 'software.amazon.awssdk', name: 'sdk-core', version: "${versions.aws}")
 
-    spark 'org.apache.spark:spark-sql-api_2.13:3.5.4'
-    spark ('org.apache.spark:spark-core_2.13:3.5.4') {
+    spark 'org.apache.spark:spark-sql-api_2.13:3.5.8'
+    spark ('org.apache.spark:spark-core_2.13:3.5.8') {
         exclude group: 'org.eclipse.jetty', module: 'jetty-server'
     }
-    spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.4'
+    spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.8'
 
     implementation 'org.scala-lang:scala-library:2.13.9'
     implementation group: 'org.antlr', name: 'antlr4-runtime', version: '4.9.3'
@@ -217,9 +217,9 @@ task addSparkJar(type: Copy) {
     into sparkDir
 
     doLast {
-        def jarA = file("$sparkDir/spark-sql-api_2.13-3.5.4.jar")
-        def jarB = file("$sparkDir/spark-core_2.13-3.5.4.jar")
-        def jarC = file("$sparkDir/spark-common-utils_2.13-3.5.4.jar")
+        def jarA = file("$sparkDir/spark-sql-api_2.13-3.5.8.jar")
+        def jarB = file("$sparkDir/spark-core_2.13-3.5.8.jar")
+        def jarC = file("$sparkDir/spark-common-utils_2.13-3.5.8.jar")
 
         // 3a. Extract jar A to manipulate it
         def jarAContents = file("$buildDir/tmp/JarAContents")
