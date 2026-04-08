@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -92,7 +91,7 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
         this.embeddingField = embeddingField;
         this.k = k;
         this.nestedPath = nestedPath;
-        this.attributes = new HashMap<>(DEFAULT_ATTRIBUTES);
+        this.attributes = DEFAULT_ATTRIBUTES;
     }
 
     // Runtime params for 'embedding_field' and 'index' take priority over values set at registration time.
