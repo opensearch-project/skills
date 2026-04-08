@@ -80,7 +80,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         this.index = index;
         this.sourceFields = sourceFields;
         this.docSize = docSize == null ? DEFAULT_DOC_SIZE : docSize;
-        this.attributes = new HashMap<>(DEFAULT_ATTRIBUTES);
+        this.attributes = DEFAULT_ATTRIBUTES;
     }
 
     protected abstract String getQueryBody(String queryText);
