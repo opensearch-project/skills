@@ -12,7 +12,13 @@
 
 ## OpenSearch skills
 
-OpenSearch skills is focused on providing tools for ml-common's agent framework [OpenSearch ml-commons](https://github.com/opensearch-project/ml-commons).
+OpenSearch skills provides tools exclusively for the ml-commons agent framework [OpenSearch ml-commons](https://github.com/opensearch-project/ml-commons).
+
+For agent skills that give agents the ability to work with OpenSearch across Claude Code, Cursor, Kiro, and any agent supporting the Agent Skills standard, check out [opensearch-agent-skills](https://github.com/opensearch-project/opensearch-agent-skills).
+
+```bash
+npx skills add opensearch-project/opensearch-agent-skills
+```
 
 ## Contributing
 
