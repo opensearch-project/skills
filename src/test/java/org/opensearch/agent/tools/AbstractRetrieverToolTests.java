@@ -191,6 +191,15 @@ public class AbstractRetrieverToolTests {
     }
 
     @Test
+    public void testDefaultInputSchema() {
+        assertNotNull(mockedImpl.getAttributes());
+        assertTrue(mockedImpl.getAttributes().containsKey("input_schema"));
+        String schema = (String) mockedImpl.getAttributes().get("input_schema");
+        assertTrue(schema.contains("\"input\""));
+        assertTrue(schema.contains("\"required\""));
+    }
+
+    @Test
     public void testGetQueryBodySuccess() {
         assertEquals(mockedImpl.getQueryBody(TEST_QUERY), TEST_QUERY);
     }

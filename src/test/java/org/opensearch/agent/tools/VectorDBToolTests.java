@@ -6,7 +6,10 @@
 package org.opensearch.agent.tools;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
@@ -132,5 +135,45 @@ public class VectorDBToolTests {
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.DOC_SIZE_FIELD, 123)));
 
         assertThrows(ClassCastException.class, () -> VectorDBTool.Factory.getInstance().create(Map.of(VectorDBTool.K_FIELD, 123)));
+    }
+
+    @Test
+    public void testVectorDBToolInputSchema() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        assertNotNull(tool.getAttributes());
+        String schema = (String) tool.getAttributes().get("input_schema");
+        assertNotNull(schema);
+        assertTrue(schema.contains("\"embedding_field\""));
+        assertTrue(schema.contains("\"index\""));
+        assertNotEquals(AbstractRetrieverTool.DEFAULT_INPUT_SCHEMA, schema);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildSearchRequestWithEmbeddingFieldOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        String overrideField = "override_embedding";
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        // Verify override field produces correct query body
+        tool.setEmbeddingField(overrideField);
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(overrideField));
+        // Verify original field is unchanged after restoring
+        tool.setEmbeddingField(TEST_EMBEDDING_FIELD);
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(TEST_EMBEDDING_FIELD));
+    }
+
+    @Test
+    @SneakyThrows
+    public void testBuildSearchRequestWithoutEmbeddingFieldOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        assertEquals(TEST_EMBEDDING_FIELD, tool.getEmbeddingField());
+        assertTrue(tool.getQueryBody(TEST_QUERY_TEXT).contains(TEST_EMBEDDING_FIELD));
+    }
+
+    @Test
+    public void testDefaultIndexUsedWhenNoRuntimeOverride() {
+        VectorDBTool tool = VectorDBTool.Factory.getInstance().create(params);
+        assertEquals(AbstractRetrieverToolTests.TEST_INDEX, tool.getIndex());
     }
 }

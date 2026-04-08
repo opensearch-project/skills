@@ -6,8 +6,10 @@
 package org.opensearch.agent.tools;
 
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.opensearch.action.search.SearchRequest;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.ml.common.spi.tools.ToolAnnotation;
 import org.opensearch.ml.common.spi.tools.WithModelTool;
@@ -36,11 +39,34 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
     public static final String TYPE = "VectorDBTool";
 
     public static String DEFAULT_DESCRIPTION =
-        "Use this tool to performs knn-based dense retrieval. It takes 1 argument named input which is a string query for dense retrieval. The tool returns the dense retrieval results for the query.";
+        "Use this tool to perform knn-based dense retrieval. It takes an 'input' argument (natural language query string)."
+            + " Optionally accepts 'index' (index name) and 'embedding_field' (knn_vector field name) to override registered defaults."
+            + " The tool returns the dense retrieval results for the query.";
     public static final String EMBEDDING_FIELD = "embedding_field";
     public static final String K_FIELD = "k";
     public static final Integer DEFAULT_K = 10;
     public static final String NESTED_PATH_FIELD = "nested_path";
+    public static final String VECTOR_DB_TOOL_INPUT_SCHEMA = """
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "Natural language query for dense vector retrieval"
+            },
+            "index": {
+              "type": "string",
+              "description": "Index name to search against"
+            },
+            "embedding_field": {
+              "type": "string",
+              "description": "Name of the knn_vector field in the index"
+            }
+          },
+          "required": ["input"],
+          "additionalProperties": false
+        }""";
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, VECTOR_DB_TOOL_INPUT_SCHEMA);
 
     private String name = TYPE;
     private String modelId;
@@ -65,6 +91,21 @@ public class VectorDBTool extends AbstractRetrieverTool implements WithModelTool
         this.embeddingField = embeddingField;
         this.k = k;
         this.nestedPath = nestedPath;
+        this.attributes = DEFAULT_ATTRIBUTES;
+    }
+
+    // Runtime params for 'embedding_field' and 'index' take priority over values set at registration time.
+    @Override
+    protected synchronized <T> SearchRequest buildSearchRequest(Map<String, String> parameters) throws IOException {
+        String originalEmbeddingField = this.embeddingField;
+        try {
+            if (parameters.containsKey(EMBEDDING_FIELD)) {
+                this.embeddingField = parameters.get(EMBEDDING_FIELD);
+            }
+            return super.buildSearchRequest(parameters);
+        } finally {
+            this.embeddingField = originalEmbeddingField;
+        }
     }
 
     @Override

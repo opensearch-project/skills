@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.io.IOException;
@@ -44,6 +45,19 @@ public abstract class AbstractRetrieverTool implements Tool {
     public static final String SOURCE_FIELD = "source_field";
     public static final String DOC_SIZE_FIELD = "doc_size";
     public static final int DEFAULT_DOC_SIZE = 2;
+    public static final String DEFAULT_INPUT_SCHEMA = """
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "Natural language query for retrieval"
+            }
+          },
+          "required": ["input"],
+          "additionalProperties": false
+        }""";
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
 
     protected String description = DEFAULT_DESCRIPTION;
     protected Client client;
@@ -66,6 +80,7 @@ public abstract class AbstractRetrieverTool implements Tool {
         this.index = index;
         this.sourceFields = sourceFields;
         this.docSize = docSize == null ? DEFAULT_DOC_SIZE : docSize;
+        this.attributes = DEFAULT_ATTRIBUTES;
     }
 
     protected abstract String getQueryBody(String queryText);
