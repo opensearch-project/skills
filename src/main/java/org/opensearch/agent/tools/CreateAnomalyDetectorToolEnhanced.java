@@ -33,6 +33,7 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.search.SearchHit;
 import org.opensearch.ad.client.AnomalyDetectionNodeClient;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.transport.IndexAnomalyDetectorRequest;
@@ -142,6 +143,14 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     private static final String EXTRACT_INFORMATION_REGEX =
         "(?s).*\\{category_field=([^|]*)\\|aggregation_field=([^|]*)\\|aggregation_method=([^|]*)\\|interval=([^}]*)}.*";
     private static final Pattern EXTRACT_INFO_PATTERN = Pattern.compile(EXTRACT_INFORMATION_REGEX);
+
+    // Extended format with optional filter field
+    private static final String EXTRACT_INFO_WITH_FILTER_REGEX =
+        "(?s).*\\{category_field=([^|]*)\\|aggregation_field=([^|]*)\\|aggregation_method=([^|]*)\\|filter=([^|]*)\\|interval=([^}]*)}.*";
+    private static final Pattern EXTRACT_INFO_WITH_FILTER_PATTERN = Pattern.compile(EXTRACT_INFO_WITH_FILTER_REGEX);
+
+    private static final String NONE_SIGNAL = "{NONE}";
+    private static final int MAX_DETECTORS_PER_INDEX = 3;
 
     private static final Set<String> VALID_FIELD_TYPES = Set
         .of(
@@ -332,20 +341,19 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             return;
         }
 
-        generateAndParseConfig(
-            mappingContext,
-            tenantId,
-            maxRetries,
-            listener,
-            (suggestions, listenerCallback) -> validateDetectorPhase(
-                suggestions,
-                mappingContext,
-                tenantId,
-                maxRetries,
-                0,
-                listenerCallback
-            )
-        );
+        // Gather additional context, then run sequential multi-detector loop
+        String dateField = mappingContext.dateFields.iterator().next();
+        getSampleDocuments(mappingContext.indexName, 10, ActionListener.wrap(sampleDocs -> {
+            getDataDensity(mappingContext.indexName, dateField, ActionListener.wrap(density -> {
+                MappingContext enrichedCtx = mappingContext.withSampleDocs(sampleDocs).withDataDensity(density);
+                createMultipleDetectors(enrichedCtx, tenantId, maxRetries, new ArrayList<>(), new ArrayList<>(), 0, listener);
+            }, e -> {
+                MappingContext enrichedCtx = mappingContext.withSampleDocs(sampleDocs);
+                createMultipleDetectors(enrichedCtx, tenantId, maxRetries, new ArrayList<>(), new ArrayList<>(), 0, listener);
+            }));
+        }, e -> {
+            createMultipleDetectors(mappingContext, tenantId, maxRetries, new ArrayList<>(), new ArrayList<>(), 0, listener);
+        }));
     }
 
     // ── OTel fast-path ────────────────────────────────────────────────────────
@@ -546,6 +554,35 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         }));
     }
 
+    private void getSampleDocuments(String indexName, int size, ActionListener<String> listener) {
+        SearchRequest request = new SearchRequest(indexName)
+            .source(new SearchSourceBuilder().size(size).query(QueryBuilders.matchAllQuery())
+                .sort("_doc").trackTotalHits(false));
+        client.search(request, ActionListener.wrap(response -> {
+            SearchHit[] hits = response.getHits().getHits();
+            if (hits.length == 0) { listener.onResponse(null); return; }
+            List<Map<String, Object>> docs = new ArrayList<>();
+            for (SearchHit hit : hits) { docs.add(hit.getSourceAsMap()); }
+            listener.onResponse(gson.toJson(docs));
+        }, e -> {
+            log.warn("Failed to fetch sample docs for '{}': {}", indexName, e.getMessage());
+            listener.onResponse(null);
+        }));
+    }
+
+    private void getDataDensity(String indexName, String dateField, ActionListener<Long> listener) {
+        SearchRequest request = new SearchRequest(indexName)
+            .source(new SearchSourceBuilder().size(0)
+                .query(QueryBuilders.rangeQuery(dateField).gte("now-24h")).trackTotalHits(true));
+        client.search(request, ActionListener.wrap(
+            response -> listener.onResponse(response.getHits().getTotalHits().value()),
+            e -> {
+                log.warn("Failed to get data density for '{}': {}", indexName, e.getMessage());
+                listener.onResponse(-1L);
+            }
+        ));
+    }
+
     private String extractResponseFromDataAsMap(Map<String, Object> dataAsMap) {
         if (dataAsMap == null) {
             return null;
@@ -657,6 +694,13 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String dateFields = suggestions.get(OUTPUT_KEY_DATE_FIELDS);
         String intervalStr = suggestions.getOrDefault("interval", String.valueOf(DEFAULT_INTERVAL_MINUTES));
 
+        // Parse filter from suggestions if present (from LLM output)
+        QueryBuilder featureFilter = filterQuery;
+        if (featureFilter == null) {
+            String filterExpr = suggestions.get("filter");
+            featureFilter = parseFilterExpression(filterExpr);
+        }
+
         // Parse interval (default to 10 minutes)
         int intervalMinutes = DEFAULT_INTERVAL_MINUTES;
         try {
@@ -673,7 +717,14 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             throw new IllegalArgumentException("Number of aggregation fields and methods must match");
         }
 
+        // Determine if this is an HC detector (has category field)
+        boolean isHC = categoryField != null
+            && !categoryField.trim().isEmpty()
+            && !categoryField.trim().equalsIgnoreCase("null")
+            && !categoryField.trim().equalsIgnoreCase("none");
+
         List<Feature> features = new ArrayList<>();
+        boolean filterAppliedInFeature = false;
         for (int i = 0; i < fields.length; i++) {
             String field = fields[i].trim();
             String method = methods[i].trim();
@@ -688,8 +739,18 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             cleanField = cleanField.replace("${dateFields}", actualDateField)
                                    .replace("${indexInfo.dateFields}", actualDateField);
 
-            AggregationBuilder aggregation = AnomalyDetectorToolHelper.createAggregationBuilder(method, cleanField);
-            Feature feature = new Feature(UUIDs.randomBase64UUID(), "feature_" + cleanField, true, aggregation);
+            AggregationBuilder innerAgg = AnomalyDetectorToolHelper.createAggregationBuilder(method, cleanField);
+            // For HC detectors with count: put filter inside feature (entities with 0 matches still get a model)
+            // For SE detectors or non-count: filter goes on detector level
+            AggregationBuilder featureAgg;
+            if (featureFilter != null && isHC && "count".equalsIgnoreCase(method)) {
+                featureAgg = AggregationBuilders.filter("feature_" + cleanField + "_filter", featureFilter)
+                    .subAggregation(innerAgg);
+                filterAppliedInFeature = true;
+            } else {
+                featureAgg = innerAgg;
+            }
+            Feature feature = new Feature(UUIDs.randomBase64UUID(), "feature_" + cleanField, true, featureAgg);
             features.add(feature);
         }
 
@@ -704,13 +765,12 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             );
         }
 
-        List<String> categoryFields = null;
-        if (categoryField != null
-            && !categoryField.trim().isEmpty()
-            && !categoryField.trim().equalsIgnoreCase("null")
-            && !categoryField.trim().equalsIgnoreCase("none")) {
-            categoryFields = List.of(categoryField.trim());
-        }
+        List<String> categoryFields = isHC ? List.of(categoryField.trim()) : null;
+
+        // If filter was applied inside feature agg, detector-level is matchAll.
+        // Otherwise, put filter on detector level.
+        QueryBuilder detectorFilter = (featureFilter != null && !filterAppliedInFeature)
+            ? featureFilter : QueryBuilders.matchAllQuery();
 
         String timeField = dateFields.split(",")[0].trim();
 
@@ -722,7 +782,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             timeField,
             List.of(indexName),
             features,
-            filterQuery != null ? filterQuery : QueryBuilders.matchAllQuery(),
+            detectorFilter,
             new IntervalTimeConfiguration(intervalMinutes, ChronoUnit.MINUTES),
             new IntervalTimeConfiguration(DEFAULT_WINDOW_DELAY_MINUTES, ChronoUnit.MINUTES),
             DEFAULT_SHINGLE_SIZE,
@@ -862,7 +922,15 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         java.util.function.BiConsumer<Map<String, String>, ActionListener<T>> nextPhaseCallback
     ) {
         log.debug("LLM_RESPONSE,index={},retry={},response={}", indexName, currentRetry, llmResponse);
-        Matcher matcher = EXTRACT_INFO_PATTERN.matcher(llmResponse);
+
+        // Try extended format with filter first, fall back to original format
+        Matcher matcher = EXTRACT_INFO_WITH_FILTER_PATTERN.matcher(llmResponse);
+        String filterExpr = null;
+        if (matcher.matches()) {
+            filterExpr = matcher.group(4).replaceAll("\"", "").strip();
+        } else {
+            matcher = EXTRACT_INFO_PATTERN.matcher(llmResponse);
+        }
 
         if (!matcher.matches()) {
             log.error("Regex parsing failed for response: {}", llmResponse);
@@ -889,29 +957,28 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String categoryField = matcher.group(1).replaceAll("\"", "").strip();
         String aggregationField = matcher.group(2).replaceAll("\"", "").strip();
         String aggregationMethod = matcher.group(3).replaceAll("\"", "").strip();
-        String interval = matcher.group(4).replaceAll("\"", "").strip();
+        // Filter regex: groups are 1=category, 2=field, 3=method, 4=filter, 5=interval
+        // Original regex: groups are 1=category, 2=field, 3=method, 4=interval
+        String interval = filterExpr != null ? matcher.group(5).replaceAll("\"", "").strip()
+                                             : matcher.group(4).replaceAll("\"", "").strip();
+        final String parsedFilter = filterExpr;
 
         // Select optimal date field from all available date fields
         String[] dateFieldArray = dateFields.split(",");
         selectOptimalDateField(indexName, dateFieldArray, new ActionListener<String>() {
             @Override
             public void onResponse(String optimalDateField) {
-                Map<String, String> suggestions = Map
-                    .of(
-                        OUTPUT_KEY_INDEX,
-                        indexName,
-                        OUTPUT_KEY_CATEGORY_FIELD,
-                        categoryField,
-                        OUTPUT_KEY_AGGREGATION_FIELD,
-                        aggregationField,
-                        OUTPUT_KEY_AGGREGATION_METHOD,
-                        aggregationMethod,
-                        OUTPUT_KEY_DATE_FIELDS,
-                        optimalDateField,
-                        "interval",
-                        interval
-                    );
-
+                Map<String, String> suggestions = new HashMap<>(Map.of(
+                    OUTPUT_KEY_INDEX, indexName,
+                    OUTPUT_KEY_CATEGORY_FIELD, categoryField,
+                    OUTPUT_KEY_AGGREGATION_FIELD, aggregationField,
+                    OUTPUT_KEY_AGGREGATION_METHOD, aggregationMethod,
+                    OUTPUT_KEY_DATE_FIELDS, optimalDateField,
+                    "interval", interval
+                ));
+                if (parsedFilter != null && !parsedFilter.isEmpty()) {
+                    suggestions.put("filter", parsedFilter);
+                }
                 nextPhaseCallback.accept(suggestions, listener);
             }
 
@@ -920,21 +987,17 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 log.error("Failed to select optimal date field, using first available: {}", e.getMessage());
                 String fallbackDateField = dateFieldArray.length > 0 ? dateFieldArray[0].trim() : dateFields.split(",")[0];
 
-                Map<String, String> suggestions = Map
-                    .of(
-                        OUTPUT_KEY_INDEX,
-                        indexName,
-                        OUTPUT_KEY_CATEGORY_FIELD,
-                        categoryField,
-                        OUTPUT_KEY_AGGREGATION_FIELD,
-                        aggregationField,
-                        OUTPUT_KEY_AGGREGATION_METHOD,
-                        aggregationMethod,
-                        OUTPUT_KEY_DATE_FIELDS,
-                        fallbackDateField,
-                        "interval",
-                        interval
-                    );
+                Map<String, String> suggestions = new HashMap<>(Map.of(
+                    OUTPUT_KEY_INDEX, indexName,
+                    OUTPUT_KEY_CATEGORY_FIELD, categoryField,
+                    OUTPUT_KEY_AGGREGATION_FIELD, aggregationField,
+                    OUTPUT_KEY_AGGREGATION_METHOD, aggregationMethod,
+                    OUTPUT_KEY_DATE_FIELDS, fallbackDateField,
+                    "interval", interval
+                ));
+                if (parsedFilter != null && !parsedFilter.isEmpty()) {
+                    suggestions.put("filter", parsedFilter);
+                }
 
                 nextPhaseCallback.accept(suggestions, listener);
             }
@@ -1307,6 +1370,37 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         return "value_count".equals(type) ? "count" : type;
     }
 
+    /**
+     * Parse a filter expression (field:operator:value) into a QueryBuilder.
+     * Returns null if the expression is empty, invalid, or unparseable.
+     */
+    private QueryBuilder parseFilterExpression(String filterExpr) {
+        if (filterExpr == null || filterExpr.isEmpty()) return null;
+        String[] parts = filterExpr.split(":", 3);
+        if (parts.length != 3) {
+            log.warn("Invalid filter expression '{}', ignoring", filterExpr);
+            return null;
+        }
+        try {
+            String field = parts[0].trim();
+            String operator = parts[1].trim().toLowerCase(Locale.ROOT);
+            String value = parts[2].trim();
+            switch (operator) {
+                case "gte": return QueryBuilders.rangeQuery(field).gte(value);
+                case "gt":  return QueryBuilders.rangeQuery(field).gt(value);
+                case "lte": return QueryBuilders.rangeQuery(field).lte(value);
+                case "lt":  return QueryBuilders.rangeQuery(field).lt(value);
+                case "eq":  return QueryBuilders.termQuery(field, value);
+                default:
+                    log.warn("Unknown filter operator '{}', ignoring filter", operator);
+                    return null;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse filter expression '{}': {}", filterExpr, e.getMessage());
+            return null;
+        }
+    }
+
     private void selectOptimalDateField(String indexName, String[] suggestedDateFields, ActionListener<String> listener) {
         // Query each date field to count recent documents (last 30 days)
         List<CompletableFuture<Map.Entry<String, Long>>> futures = new ArrayList<>();
@@ -1444,32 +1538,44 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         final Set<String> dateFields;
         final String indexInsight;
         final List<String> detectorDecisions;
+        final String sampleDocs;
+        final long dataDensity24h;
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields) {
-            this(indexName, filteredMapping, dateFields, null, new ArrayList<>());
+            this(indexName, filteredMapping, dateFields, null, new ArrayList<>(), null, -1L);
         }
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields, String indexInsight) {
-            this(indexName, filteredMapping, dateFields, indexInsight, new ArrayList<>());
+            this(indexName, filteredMapping, dateFields, indexInsight, new ArrayList<>(), null, -1L);
         }
 
         MappingContext(String indexName, Map<String, String> filteredMapping, Set<String> dateFields,
-                       String indexInsight, List<String> detectorDecisions) {
+                       String indexInsight, List<String> detectorDecisions, String sampleDocs, long dataDensity24h) {
             this.indexName = indexName;
             this.filteredMapping = filteredMapping;
             this.dateFields = dateFields;
             this.indexInsight = indexInsight;
             this.detectorDecisions = detectorDecisions;
+            this.sampleDocs = sampleDocs;
+            this.dataDensity24h = dataDensity24h;
         }
 
         MappingContext withIndexInsight(String insight) {
-            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, insight, this.detectorDecisions);
+            return new MappingContext(indexName, filteredMapping, dateFields, insight, detectorDecisions, sampleDocs, dataDensity24h);
         }
 
         MappingContext withDecision(String decision) {
-            List<String> updated = new ArrayList<>(this.detectorDecisions);
+            List<String> updated = new ArrayList<>(detectorDecisions);
             updated.add(decision);
-            return new MappingContext(this.indexName, this.filteredMapping, this.dateFields, this.indexInsight, updated);
+            return new MappingContext(indexName, filteredMapping, dateFields, indexInsight, updated, sampleDocs, dataDensity24h);
+        }
+
+        MappingContext withSampleDocs(String docs) {
+            return new MappingContext(indexName, filteredMapping, dateFields, indexInsight, detectorDecisions, docs, dataDensity24h);
+        }
+
+        MappingContext withDataDensity(long density) {
+            return new MappingContext(indexName, filteredMapping, dateFields, indexInsight, detectorDecisions, sampleDocs, density);
         }
     }
 
@@ -1620,8 +1726,128 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         }));
     }
 
+    // ── Multi-detector sequential creation ──────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private <T> void createMultipleDetectors(
+        MappingContext ctx, String tenantId, int maxRetries,
+        List<String> alreadyCreated, List<Map<String, Object>> results,
+        int totalAttempts, ActionListener<T> listener
+    ) {
+        if (alreadyCreated.size() >= MAX_DETECTORS_PER_INDEX || totalAttempts >= MAX_DETECTORS_PER_INDEX + 2) {
+            listener.onResponse((T) gson.toJson(results));
+            return;
+        }
+
+        String alreadyCreatedContext = buildAlreadyCreatedContext(alreadyCreated);
+
+        // Build prompt with context prepended
+        StringJoiner dateFieldsJoiner = new StringJoiner(",");
+        ctx.dateFields.forEach(dateFieldsJoiner::add);
+        String basePrompt = constructPrompt(ctx.filteredMapping, ctx.indexName, dateFieldsJoiner.toString(), ctx.indexInsight);
+
+        // Inject sample docs and data density
+        StringBuilder extraContext = new StringBuilder();
+        if (ctx.dataDensity24h >= 0) {
+            extraContext.append("DATA DENSITY: ").append(ctx.dataDensity24h).append(" documents in the last 24 hours\n");
+            if (ctx.dataDensity24h == 0) {
+                extraContext.append("WARNING: This index has no data in the last 24 hours.\n");
+            }
+        }
+        if (ctx.sampleDocs != null) {
+            String truncated = ctx.sampleDocs.length() > 2000
+                ? ctx.sampleDocs.substring(0, 2000) + "..." : ctx.sampleDocs;
+            extraContext.append("\nSAMPLE DOCUMENTS:\n").append(truncated).append("\n");
+        }
+
+        String fullPrompt = alreadyCreatedContext + extraContext + basePrompt;
+
+        callLLM(fullPrompt, tenantId, ActionListener.wrap(llmResponse -> {
+            // Check for NONE signal before parsing — only valid in multi-detector loop
+            if (llmResponse != null && llmResponse.contains(NONE_SIGNAL)) {
+                log.info("LLM returned NONE for '{}' after {} detectors", ctx.indexName, alreadyCreated.size());
+                listener.onResponse((T) gson.toJson(results));
+                return;
+            }
+            parseAndRetryWithLLM(
+                llmResponse, ctx.indexName, dateFieldsJoiner.toString(), tenantId, maxRetries, 0, "model", listener,
+                (suggestions, listenerCallback) -> {
+                    // Run through existing validation pipeline
+                    validateDetectorPhase(suggestions, ctx, tenantId, maxRetries, 0, new ActionListener<T>() {
+                        @Override
+                        public void onResponse(T resultJson) {
+                            List<Map<String, Object>> detectorResults = gson.fromJson((String) resultJson, List.class);
+                            Map<String, Object> result = detectorResults.get(0);
+                            results.add(result);
+
+                            // Stop on systemic failures
+                            String error = (String) result.get("error");
+                            if (error != null && error.contains("GENERAL_SETTINGS")) {
+                                listenerCallback.onResponse((T) gson.toJson(results));
+                                return;
+                            }
+
+                            // Build summary and continue
+                            if (DetectorStatus.SUCCESS.toString().equals(result.get("status"))) {
+                                List<String> updated = new ArrayList<>(alreadyCreated);
+                                updated.add(buildDetectorSummary(suggestions));
+                                createMultipleDetectors(ctx, tenantId, maxRetries, updated, results, totalAttempts + 1, listenerCallback);
+                            } else {
+                                // Non-systemic failure — still try next detector
+                                createMultipleDetectors(ctx, tenantId, maxRetries, alreadyCreated, results, totalAttempts + 1, listenerCallback);
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Exception e) {
+                            results.add(DetectorResult.failedValidation(ctx.indexName, e.getMessage()).toMap());
+                            listenerCallback.onResponse((T) gson.toJson(results));
+                        }
+                    });
+                }
+            );
+        }, e -> {
+            log.error("LLM call failed for multi-detector on '{}': {}", ctx.indexName, e.getMessage());
+            if (results.isEmpty()) {
+                // First call failed — propagate failure
+                listener.onFailure(e);
+            } else {
+                // Subsequent call failed — return what we have
+                listener.onResponse((T) gson.toJson(results));
+            }
+        }));
+    }
+
+    private String buildAlreadyCreatedContext(List<String> summaries) {
+        if (summaries.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        sb.append("ALREADY CREATED DETECTORS FOR THIS INDEX (do NOT create similar detectors):\n\n");
+        for (int i = 0; i < summaries.size(); i++) {
+            sb.append("Detector ").append(i + 1).append(": ").append(summaries.get(i)).append("\n");
+        }
+        sb.append("\nCreate a DIFFERENT detector monitoring a DIFFERENT signal.\n");
+        sb.append("Do NOT use the same aggregation field or monitor the same type of anomaly.\n");
+        sb.append("If no more useful, non-overlapping signals exist, return exactly: ").append(NONE_SIGNAL).append("\n\n");
+        sb.append("---\n\n");
+        return sb.toString();
+    }
+
+    private String buildDetectorSummary(Map<String, String> suggestions) {
+        String field = suggestions.get(OUTPUT_KEY_AGGREGATION_FIELD);
+        String method = suggestions.get(OUTPUT_KEY_AGGREGATION_METHOD);
+        String category = suggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
+        String filter = suggestions.getOrDefault("filter", "");
+        StringBuilder sb = new StringBuilder();
+        sb.append(method).append("(").append(field).append(")");
+        if (!filter.isEmpty()) sb.append(" WHERE ").append(filter);
+        if (category != null && !category.isEmpty()) sb.append(" per ").append(category);
+        return sb.toString();
+    }
+
     /**
-     * Step 3-6: Generate config with LLM, parse, and select date field
+     * Step 3-6: Generate config with LLM, parse, and select date field.
+     * Note: The multi-detector loop (createMultipleDetectors) reimplements this flow inline.
+     * This method is retained as a standalone entry point for single-detector creation.
      */
     private <T> void generateAndParseConfig(
         MappingContext mappingContext,
