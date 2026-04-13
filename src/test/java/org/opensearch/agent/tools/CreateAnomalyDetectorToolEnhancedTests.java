@@ -927,6 +927,191 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 
+    // ===== COMMIT 5: Sequential Multi-Detector Tests =====
+
+    @Test
+    public void testFilterExpression_AppliedToDetector() throws Exception {
+        // LLM returns a response with filter=status:gte:400
+        String responseWithFilter = "{category_field=host|aggregation_field=status|aggregation_method=count|filter=status:gte:400|interval=10}";
+        modelReturns = Collections.singletonMap("response", responseWithFilter);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        Assert.assertFalse("Should not error", response.startsWith("ERROR"));
+        // The detector should have been created (filter parsed successfully)
+        Assert.assertTrue("Should contain success status", response.contains("success"));
+    }
+
+    @Test
+    public void testNoneSignal_StopsLoop() throws Exception {
+        // First call returns a valid detector, second call returns {NONE}
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        // Track LLM call count and return {NONE} on second call
+        final int[] callCount = {0};
+        doAnswer(invocation -> {
+            callCount[0]++;
+            ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
+            if (callCount[0] == 1) {
+                // First call: valid response
+                modelReturns = Collections.singletonMap("response",
+                    "{category_field=host|aggregation_field=response|aggregation_method=count|filter=|interval=10}");
+                modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+                when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
+                when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
+                when(mlTaskResponse.getOutput()).thenReturn(modelTensorOutput);
+            } else {
+                // Second call: {NONE}
+                modelReturns = Collections.singletonMap("response", "{NONE}");
+                modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+                when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
+                when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
+                when(mlTaskResponse.getOutput()).thenReturn(modelTensorOutput);
+            }
+            listener.onResponse(mlTaskResponse);
+            return null;
+        }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(10, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        // Should have exactly 1 detector (first call succeeded, second returned NONE)
+        Assert.assertTrue("Should contain success", response.contains("success"));
+        // LLM was called exactly 2 times (once for detector, once got NONE)
+        Assert.assertEquals("LLM should be called exactly 2 times", 2, callCount[0]);
+    }
+
+    @Test
+    public void testInvalidFilter_GracefulDegradation() throws Exception {
+        // LLM returns an invalid filter expression — should create detector without filter
+        String responseWithBadFilter = "{category_field=|aggregation_field=response|aggregation_method=count|filter=invalid_no_colons|interval=10}";
+        modelReturns = Collections.singletonMap("response", responseWithBadFilter);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        // Should still create the detector — invalid filter is silently ignored
+        Assert.assertTrue("Should contain success despite bad filter", response.contains("success"));
+    }
+
+    @Test
+    public void testOldFormatWithoutFilter_StillWorks() throws Exception {
+        // LLM returns old format without filter= field — should fall back to old regex
+        String oldFormatResponse = "{category_field=host|aggregation_field=response|aggregation_method=count|interval=10}";
+        modelReturns = Collections.singletonMap("response", oldFormatResponse);
+        modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
+        initMLTensors();
+        mockFullDetectorCreationChain();
+
+        doAnswer(invocation -> {
+            ActionListener<?> listener = (ActionListener<?>) invocation.getArguments()[2];
+            listener.onFailure(new RuntimeException("skip"));
+            return null;
+        }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> responseRef = new AtomicReference<>();
+
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        tool.run(
+            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
+                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
+        );
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+
+        String response = responseRef.get();
+        Assert.assertNotNull("Should get a response", response);
+        Assert.assertTrue("Old format should still work via fallback regex", response.contains("success"));
+    }
+
+    @Test
+    public void testParseFilterExpression() {
+        CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
+            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+
+        // Valid range operators
+        Assert.assertNotNull("gte should parse", tool.parseFilterExpression("status:gte:400"));
+        Assert.assertNotNull("gt should parse", tool.parseFilterExpression("latency:gt:5000"));
+        Assert.assertNotNull("lte should parse", tool.parseFilterExpression("severity:lte:3"));
+        Assert.assertNotNull("lt should parse", tool.parseFilterExpression("count:lt:10"));
+
+        // Valid term operator
+        Assert.assertNotNull("eq should parse", tool.parseFilterExpression("status.code:eq:2"));
+
+        // Null/empty → null
+        Assert.assertNull("null input", tool.parseFilterExpression(null));
+        Assert.assertNull("empty input", tool.parseFilterExpression(""));
+
+        // Invalid format → null (graceful)
+        Assert.assertNull("no colons", tool.parseFilterExpression("invalid_no_colons"));
+        Assert.assertNull("one colon", tool.parseFilterExpression("field:value"));
+        Assert.assertNull("unknown operator", tool.parseFilterExpression("field:between:1"));
+    }
+
     /** Mocks suggest + create + start for OTel path (no validate needed). */
     private void mockOtelDetectorCreationChain() {
         // Suggest — return null interval (use default)
