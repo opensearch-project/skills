@@ -18,10 +18,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
@@ -66,8 +68,13 @@ import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.ToolUtils;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.search.aggregations.Aggregation;
 import org.opensearch.search.aggregations.AggregationBuilder;
 import org.opensearch.search.aggregations.AggregationBuilders;
+import org.opensearch.search.aggregations.AggregatorFactories;
+import org.opensearch.search.aggregations.bucket.filter.InternalFilter;
+import org.opensearch.search.aggregations.bucket.sampler.InternalSampler;
+import org.opensearch.search.aggregations.bucket.sampler.SamplerAggregationBuilder;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.timeseries.AnalysisType;
 import org.opensearch.timeseries.model.Feature;
@@ -194,6 +201,10 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     private static final String DATE_FIELD_LOOKBACK_PERIOD = "now-30d";
 
     private static final String DEFAULT_CUSTOM_RESULT_INDEX = "opensearch-ad-plugin-result-auto-insights";
+    private static final int MAX_FREQUENCY_MINUTES = 1440; // 24 hours
+    private static final int FIELD_FILTER_THRESHOLD = 30;
+    private static final int FIELD_FILTER_SAMPLE_SIZE = 100000;
+    private static final double FIELD_NULL_THRESHOLD = 0.001; // drop fields present in <0.1% of docs
 
     private String name = TYPE;
     private String description = DEFAULT_DESCRIPTION;
@@ -315,7 +326,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         });
     }
 
-    // Flow: get index insight -> get mappings -> LLM generates config -> validate config -> optimize params -> validate model -> create detector
+    // Flow: get index insight -> get mappings -> filter null fields -> LLM generates config -> validate -> create detector
     private void processSingleIndex(String indexName, String tenantId, int maxRetries, ActionListener<String> listener) {
         // First, try to get Index Insight analysis (graceful fallback if unavailable)
         getIndexInsight(indexName, tenantId, ActionListener.wrap(
@@ -323,7 +334,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 getMappingsAndFilterFields(indexName, ActionListener.wrap(
                     mappingContext -> {
                         MappingContext enhancedContext = mappingContext.withIndexInsight(indexInsight);
-                        proceedWithLLM(enhancedContext, tenantId, maxRetries, listener);
+                        filterNullFieldsIfNeeded(enhancedContext, tenantId, maxRetries, listener);
                     },
                     listener::onFailure
                 ));
@@ -331,9 +342,36 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             e -> {
                 log.warn("Index Insight failed for '{}', proceeding without: {}", indexName, e.getMessage());
                 getMappingsAndFilterFields(indexName, ActionListener.wrap(
-                    mappingContext -> proceedWithLLM(mappingContext, tenantId, maxRetries, listener),
+                    mappingContext -> filterNullFieldsIfNeeded(mappingContext, tenantId, maxRetries, listener),
                     listener::onFailure
                 ));
+            }
+        ));
+    }
+
+    /**
+     * If mapping has more than FIELD_FILTER_THRESHOLD fields, run a sampler aggregation to drop
+     * fields that are null in >99.9% of sampled docs (same approach as Index Insight).
+     * Otherwise, proceed directly.
+     */
+    private <T> void filterNullFieldsIfNeeded(MappingContext ctx, String tenantId, int maxRetries, ActionListener<T> listener) {
+        if (ctx.filteredMapping.size() <= FIELD_FILTER_THRESHOLD) {
+            proceedWithLLM(ctx, tenantId, maxRetries, listener);
+            return;
+        }
+        log.info("Index '{}' has {} fields (>{} threshold), running null field filter",
+            ctx.indexName, ctx.filteredMapping.size(), FIELD_FILTER_THRESHOLD);
+
+        filterNullFields(ctx.indexName, ctx.filteredMapping, ActionListener.wrap(
+            filtered -> {
+                log.info("Null filter reduced '{}' from {} to {} fields", ctx.indexName, ctx.filteredMapping.size(), filtered.size());
+                MappingContext filteredCtx = new MappingContext(ctx.indexName, filtered, ctx.dateFields,
+                    ctx.indexInsight, ctx.detectorDecisions, ctx.sampleDocs, ctx.dataDensity24h);
+                proceedWithLLM(filteredCtx, tenantId, maxRetries, listener);
+            },
+            e -> {
+                log.warn("Null field filter failed for '{}', using unfiltered mapping: {}", ctx.indexName, e.getMessage());
+                proceedWithLLM(ctx, tenantId, maxRetries, listener);
             }
         ));
     }
@@ -468,7 +506,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             DEFAULT_SHINGLE_SIZE, null, DEFAULT_SCHEMA_VERSION, Instant.now(),
             List.of(spec.categoryField),
             null, customResultIndex, null, null, null, null, null, null, null, null, null, null,
-            new IntervalTimeConfiguration(DEFAULT_OTEL_INTERVAL_MINUTES, ChronoUnit.MINUTES), true
+            new IntervalTimeConfiguration(calculateFrequencyMinutes(DEFAULT_OTEL_INTERVAL_MINUTES), ChronoUnit.MINUTES), true
         );
 
         // Use suggest API to find optimal interval, then create
@@ -557,6 +595,53 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         }, e -> {
             log.warn("Index Insight API call failed for '{}': {} ({})", indexName, e.getMessage(), e.getClass().getSimpleName());
             listener.onFailure(e);
+        }));
+    }
+
+    /**
+     * Run a sampler aggregation with not_null filters per field to drop fields that are
+     * null in >99.9% of sampled docs. Same approach as Index Insight's StatisticalDataTask.
+     */
+    private void filterNullFields(String indexName, Map<String, String> mapping, ActionListener<Map<String, String>> listener) {
+        AggregatorFactories.Builder filters = new AggregatorFactories.Builder();
+        // Use index-based names to avoid collisions from dot-to-underscore replacement
+        List<String> fieldOrder = new ArrayList<>(mapping.keySet());
+        for (int i = 0; i < fieldOrder.size(); i++) {
+            filters.addAggregator(AggregationBuilders.filter(
+                "f_" + i,
+                QueryBuilders.existsQuery(fieldOrder.get(i))
+            ));
+        }
+        SamplerAggregationBuilder sampler = AggregationBuilders.sampler("sample")
+            .shardSize(FIELD_FILTER_SAMPLE_SIZE).subAggregations(filters);
+
+        SearchRequest request = new SearchRequest(indexName)
+            .source(new SearchSourceBuilder().size(0).query(QueryBuilders.matchAllQuery()).aggregation(sampler));
+
+        client.search(request, ActionListener.wrap(response -> {
+            InternalSampler sampleAgg = (InternalSampler) response.getAggregations().getAsMap().get("sample");
+            long totalDocs = sampleAgg.getDocCount();
+            if (totalDocs == 0) {
+                listener.onResponse(mapping);
+                return;
+            }
+            Map<String, Aggregation> aggMap = sampleAgg.getAggregations().getAsMap();
+            Map<String, String> result = new LinkedHashMap<>();
+            for (int i = 0; i < fieldOrder.size(); i++) {
+                Aggregation agg = aggMap.get("f_" + i);
+                if (agg instanceof InternalFilter) {
+                    long docCount = ((InternalFilter) agg).getDocCount();
+                    if (docCount >= FIELD_NULL_THRESHOLD * totalDocs) {
+                        String fieldName = fieldOrder.get(i);
+                        result.put(fieldName, mapping.get(fieldName));
+                    }
+                }
+            }
+            // Safety: if filter is too aggressive, fall back to original
+            listener.onResponse(result.size() >= 5 ? result : mapping);
+        }, e -> {
+            log.warn("Sampler aggregation failed for '{}': {}", indexName, e.getMessage());
+            listener.onResponse(mapping);
         }));
     }
 
@@ -688,6 +773,17 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         return TYPE;
     }
 
+    /**
+     * Calculate a jittered frequency as a random multiple of interval between 2×interval and 24h.
+     * Spreads detector queries across time to avoid concurrent load spikes.
+     */
+    private static int calculateFrequencyMinutes(int intervalMinutes) {
+        int minFreq = intervalMinutes * 2;
+        if (minFreq >= MAX_FREQUENCY_MINUTES) return MAX_FREQUENCY_MINUTES;
+        int multiples = (MAX_FREQUENCY_MINUTES - minFreq) / intervalMinutes;
+        return minFreq + ThreadLocalRandom.current().nextInt(multiples + 1) * intervalMinutes;
+    }
+
     private AnomalyDetector buildAnomalyDetectorFromSuggestions(Map<String, String> suggestions) {
         return buildAnomalyDetectorFromSuggestions(suggestions, null);
     }
@@ -750,13 +846,13 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             // For SE detectors or non-count: filter goes on detector level
             AggregationBuilder featureAgg;
             if (featureFilter != null && isHC && "count".equalsIgnoreCase(method)) {
-                featureAgg = AggregationBuilders.filter("feature_" + cleanField + "_filter", featureFilter)
+                featureAgg = AggregationBuilders.filter("feature_" + cleanField + "_" + method + "_filter", featureFilter)
                     .subAggregation(innerAgg);
                 filterAppliedInFeature = true;
             } else {
                 featureAgg = innerAgg;
             }
-            Feature feature = new Feature(UUIDs.randomBase64UUID(), "feature_" + cleanField, true, featureAgg);
+            Feature feature = new Feature(UUIDs.randomBase64UUID(), "feature_" + cleanField + "_" + method, true, featureAgg);
             features.add(feature);
         }
 
@@ -808,7 +904,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             null,
             null,
             null,
-            new IntervalTimeConfiguration(intervalMinutes, ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(calculateFrequencyMinutes(intervalMinutes), ChronoUnit.MINUTES),
             true
         );
     }
@@ -1108,21 +1204,13 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         int currentRetry,
         ActionListener<T> listener
     ) {
-        String indexName = originalSuggestions.get(OUTPUT_KEY_INDEX);
+        // Record this failed attempt for retry memory
+        MappingContext updatedCtx = mappingContext.withDecision(buildAttemptSummary(originalSuggestions, validationError));
 
-        StringBuilder contextBuilder = new StringBuilder();
-        contextBuilder.append("You are creating an anomaly detector for the following index:\n\n");
-        contextBuilder.append("Index: ").append(indexName).append("\n");
-        contextBuilder.append("Available fields:\n");
-        for (Map.Entry<String, String> field : mappingContext.filteredMapping.entrySet()) {
-            contextBuilder.append("- ").append(field.getKey()).append(": ").append(field.getValue()).append("\n");
-        }
-        contextBuilder.append("Available date fields: ").append(String.join(", ", mappingContext.dateFields)).append("\n\n");
+        String fixPrompt = createFixPrompt(originalSuggestions, validationError, updatedCtx.detectorDecisions);
+        String fullPrompt = buildRetryContext(updatedCtx) + fixPrompt;
 
-        String fixPrompt = createFixPrompt(originalSuggestions, validationError);
-        String fullPrompt = contextBuilder.toString() + fixPrompt;
-
-        log.info("LLM_FIX_PROMPT,index={},retry={},error={}", indexName, currentRetry,
+        log.info("LLM_FIX_PROMPT,index={},retry={},error={}", updatedCtx.indexName, currentRetry,
             validationError != null ? validationError.substring(0, Math.min(200, validationError.length())) : "unknown error");
 
         callLLM(fullPrompt, tenantId, ActionListener.wrap(fixedResponse -> {
@@ -1137,7 +1225,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 listener,
                 (suggestions, listenerCallback) -> validateDetectorPhase(
                     suggestions,
-                    mappingContext,
+                    updatedCtx,
                     tenantId,
                     maxRetries,
                     currentRetry,
@@ -1148,6 +1236,19 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             log.error("LLM fix request failed: {}", e.getMessage());
             listener.onFailure(e);
         }));
+    }
+
+    /** Build mapping context string for retry prompts. Shared by detector and model validation retries. */
+    private static String buildRetryContext(MappingContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are creating an anomaly detector for the following index:\n\n");
+        sb.append("Index: ").append(ctx.indexName).append("\n");
+        sb.append("Available fields:\n");
+        for (Map.Entry<String, String> field : ctx.filteredMapping.entrySet()) {
+            sb.append("- ").append(field.getKey()).append(": ").append(field.getValue()).append("\n");
+        }
+        sb.append("Available date fields: ").append(String.join(", ", ctx.dateFields)).append("\n\n");
+        return sb.toString();
     }
 
     private AnomalyDetector applySuggestionsToDetector(AnomalyDetector originalDetector, SuggestConfigParamResponse response) {
@@ -1215,17 +1316,17 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             public void onResponse(SuggestConfigParamResponse response) {
                 try {
                     AnomalyDetector optimizedDetector = applySuggestionsToDetector(detector, response);
-                    validateModelPhase(optimizedDetector, tenantId, maxRetries, 0, listener);
+                    validateModelPhase(optimizedDetector, tenantId, maxRetries, 0, List.of(), listener);
 
                 } catch (Exception e) {
-                    validateModelPhase(detector, tenantId, maxRetries, 0, listener);
+                    validateModelPhase(detector, tenantId, maxRetries, 0, List.of(), listener);
                 }
             }
 
             @Override
             public void onFailure(Exception e) {
                 // Continue to model validation with original detector even if suggest fails
-                validateModelPhase(detector, tenantId, maxRetries, 0, listener);
+                validateModelPhase(detector, tenantId, maxRetries, 0, List.of(), listener);
             }
         });
     }
@@ -1236,6 +1337,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String tenantId,
         int maxRetries,
         int currentRetry,
+        List<String> previousAttempts,
         ActionListener<T> listener
     ) {
         log.info("Starting model validation");
@@ -1249,7 +1351,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                     boolean isBlockingError = issueAspect != null && issueAspect.toLowerCase(Locale.ROOT).startsWith("detector");
                     String errorMessage = response.getIssue().getMessage();
                     if (currentRetry < MAX_MODEL_VALIDATION_RETRIES) {
-                        retryModelValidation(detector, errorMessage, tenantId, maxRetries, currentRetry + 1, listener);
+                        retryModelValidation(detector, errorMessage, tenantId, maxRetries, currentRetry + 1, previousAttempts, listener);
                     } else {
                         // Max retries reached
                         if (isBlockingError) {
@@ -1270,7 +1372,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             public void onFailure(Exception e) {
                 log.error("Model validation API failed: {}", e.getMessage(), e);
                 if (currentRetry < MAX_MODEL_VALIDATION_RETRIES) {
-                    retryModelValidation(detector, e.getMessage(), tenantId, maxRetries, currentRetry + 1, listener);
+                    retryModelValidation(detector, e.getMessage(), tenantId, maxRetries, currentRetry + 1, previousAttempts, listener);
                 } else {
                     DetectorResult result = DetectorResult.failedValidation(detector.getIndices().get(0), "API failure: " + e.getMessage());
                     listener.onResponse((T) gson.toJson(List.of(result.toMap())));
@@ -1285,6 +1387,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String tenantId,
         int maxRetries,
         int currentRetry,
+        List<String> previousAttempts,
         ActionListener<T> listener
     ) {
         Map<String, String> currentSuggestions = Map
@@ -1303,7 +1406,10 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 String.valueOf(detector.getIntervalInMinutes())
             );
 
-        String fixPrompt = createFixPrompt(currentSuggestions, validationError);
+        List<String> updatedAttempts = new ArrayList<>(previousAttempts);
+        updatedAttempts.add(buildAttemptSummary(currentSuggestions, validationError));
+
+        String fixPrompt = createFixPrompt(currentSuggestions, validationError, updatedAttempts);
 
         callLLM(fixPrompt, tenantId, ActionListener.wrap(fixedResponse -> {
             parseAndRetryWithLLM(
@@ -1318,7 +1424,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 (suggestions, listenerCallback) -> {
                     try {
                         AnomalyDetector newDetector = buildAnomalyDetectorFromSuggestions(suggestions);
-                        validateModelPhase(newDetector, tenantId, maxRetries, currentRetry, listenerCallback);
+                        validateModelPhase(newDetector, tenantId, maxRetries, currentRetry, updatedAttempts, listenerCallback);
                     } catch (Exception e) {
                         log.error("Error building detector from LLM fix: {}", e.getMessage());
                         DetectorResult result = DetectorResult
@@ -1460,6 +1566,10 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     }
 
     private String createFixPrompt(Map<String, String> originalSuggestions, String validationError) {
+        return createFixPrompt(originalSuggestions, validationError, List.of());
+    }
+
+    private String createFixPrompt(Map<String, String> originalSuggestions, String validationError, List<String> previousAttempts) {
         validationError = validationError != null ? validationError : "unknown error";
         String currentInterval = originalSuggestions.getOrDefault("interval", "10");
         String categoryField = originalSuggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
@@ -1534,9 +1644,28 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             + "- NEVER sum/avg status_code or http_status - use bytes, duration instead\n"
             + "- Prefer numeric fields: bytes_sent, total_time, response.bytes, duration\n"
             + "- Keep the same aggregation method unless it caused the error\n\n"
+            + formatPreviousAttempts(previousAttempts)
             + "Return ONLY the corrected configuration in this EXACT format:\n"
             + "{category_field=FIELD_OR_EMPTY|aggregation_field=FIELD1,FIELD2|aggregation_method=METHOD1,METHOD2|filter=FIELD:OP:VALUE_OR_EMPTY|interval=MINUTES}\n\n"
             + "Use empty string for category_field if removing it. DO NOT include explanations.";
+    }
+
+    private static String formatPreviousAttempts(List<String> attempts) {
+        if (attempts == null || attempts.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("PREVIOUS ATTEMPTS (do NOT repeat these):\n");
+        for (int i = 0; i < attempts.size(); i++) {
+            sb.append("- Attempt ").append(i + 1).append(": ").append(attempts.get(i)).append("\n");
+        }
+        sb.append("Your response MUST be different from all previous attempts.\n\n");
+        return sb.toString();
+    }
+
+    private static String buildAttemptSummary(Map<String, String> suggestions, String error) {
+        return "category=" + suggestions.getOrDefault(OUTPUT_KEY_CATEGORY_FIELD, "")
+            + ", field=" + suggestions.getOrDefault(OUTPUT_KEY_AGGREGATION_FIELD, "")
+            + ":" + suggestions.getOrDefault(OUTPUT_KEY_AGGREGATION_METHOD, "")
+            + ", interval=" + suggestions.getOrDefault("interval", "?")
+            + " → " + (error != null ? error.substring(0, Math.min(100, error.length())) : "unknown");
     }
 
     /**
@@ -1852,41 +1981,6 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         if (!filter.isEmpty()) sb.append(" WHERE ").append(filter);
         if (category != null && !category.isEmpty()) sb.append(" per ").append(category);
         return sb.toString();
-    }
-
-    /**
-     * Step 3-6: Generate config with LLM, parse, and select date field.
-     * Note: The multi-detector loop (createMultipleDetectors) reimplements this flow inline.
-     * This method is retained as a standalone entry point for single-detector creation.
-     */
-    private <T> void generateAndParseConfig(
-        MappingContext mappingContext,
-        String tenantId,
-        int maxRetries,
-        ActionListener<T> listener,
-        java.util.function.BiConsumer<Map<String, String>, ActionListener<T>> nextPhaseCallback
-    ) {
-        StringJoiner dateFieldsJoiner = new StringJoiner(",");
-        mappingContext.dateFields.forEach(dateFieldsJoiner::add);
-
-        String prompt = constructPrompt(mappingContext.filteredMapping, mappingContext.indexName, dateFieldsJoiner.toString(), mappingContext.indexInsight);
-
-        callLLM(prompt, tenantId, ActionListener.wrap(finalResponse -> {
-            parseAndRetryWithLLM(
-                finalResponse,
-                mappingContext.indexName,
-                dateFieldsJoiner.toString(),
-                tenantId,
-                maxRetries,
-                0,
-                "model",
-                listener,
-                nextPhaseCallback
-            );
-        }, e -> {
-            log.error("Model prediction failed: {}", e.getMessage());
-            listener.onFailure(e);
-        }));
     }
 
     /**
