@@ -193,6 +193,8 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     private static final int DATE_FIELD_SELECTION_TIMEOUT_SECONDS = 15;
     private static final String DATE_FIELD_LOOKBACK_PERIOD = "now-30d";
 
+    private static final String DEFAULT_CUSTOM_RESULT_INDEX = "opensearch-ad-plugin-result-auto-insights";
+
     private String name = TYPE;
     private String description = DEFAULT_DESCRIPTION;
     private String version;
@@ -201,6 +203,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
     private String modelId;
     private ModelType modelType;
     private String contextPrompt;
+    private String customResultIndex;
     private Map<String, Object> attributes;
 
     enum ModelType {
@@ -226,11 +229,14 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         String modelId,
         String modelType,
         String contextPrompt,
+        String customResultIndex,
         NamedWriteableRegistry namedWriteableRegistry
     ) {
         this.client = client;
         this.adClient = new AnomalyDetectionNodeClient(client, namedWriteableRegistry);
         this.modelId = modelId;
+        this.customResultIndex = (customResultIndex != null && !customResultIndex.isEmpty())
+            ? customResultIndex : DEFAULT_CUSTOM_RESULT_INDEX;
         if (!ModelType.OPENAI.toString().equalsIgnoreCase(modelType) && !ModelType.CLAUDE.toString().equalsIgnoreCase(modelType)) {
             throw new IllegalArgumentException("Unsupported model_type: " + modelType);
         }
@@ -461,7 +467,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             new IntervalTimeConfiguration(DEFAULT_WINDOW_DELAY_MINUTES, ChronoUnit.MINUTES),
             DEFAULT_SHINGLE_SIZE, null, DEFAULT_SCHEMA_VERSION, Instant.now(),
             List.of(spec.categoryField),
-            null, null, null, null, null, null, null, null, null, null, null, null,
+            null, customResultIndex, null, null, null, null, null, null, null, null, null, null,
             new IntervalTimeConfiguration(DEFAULT_OTEL_INTERVAL_MINUTES, ChronoUnit.MINUTES), true
         );
 
@@ -791,7 +797,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             Instant.now(),
             categoryFields,
             null,
-            null,
+            customResultIndex,
             null,
             null,
             null,
@@ -1374,7 +1380,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
      * Parse a filter expression (field:operator:value) into a QueryBuilder.
      * Returns null if the expression is empty, invalid, or unparseable.
      */
-    private QueryBuilder parseFilterExpression(String filterExpr) {
+    QueryBuilder parseFilterExpression(String filterExpr) {
         if (filterExpr == null || filterExpr.isEmpty()) return null;
         String[] parts = filterExpr.split(":", 3);
         if (parts.length != 3) {
@@ -1457,6 +1463,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
         validationError = validationError != null ? validationError : "unknown error";
         String currentInterval = originalSuggestions.getOrDefault("interval", "10");
         String categoryField = originalSuggestions.get(OUTPUT_KEY_CATEGORY_FIELD);
+        String filter = originalSuggestions.getOrDefault("filter", "");
 
         // Check if this is a sparse data issue with unreasonably high suggested interval (>= 4 hours)
         boolean isUnreasonableInterval = false;
@@ -1512,6 +1519,9 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             + "- Interval: "
             + currentInterval
             + " minutes\n"
+            + "- Filter: "
+            + (filter.isEmpty() ? "NONE" : filter)
+            + "\n"
             + sparseDataGuidance
             + "\n\nFIX STRATEGY:\n"
             + "1. Evaluate aggregation fields: operational metrics need shorter intervals, business metrics can use longer\n"
@@ -1525,7 +1535,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
             + "- Prefer numeric fields: bytes_sent, total_time, response.bytes, duration\n"
             + "- Keep the same aggregation method unless it caused the error\n\n"
             + "Return ONLY the corrected configuration in this EXACT format:\n"
-            + "{category_field=FIELD_OR_EMPTY|aggregation_field=FIELD1,FIELD2|aggregation_method=METHOD1,METHOD2|interval=MINUTES}\n\n"
+            + "{category_field=FIELD_OR_EMPTY|aggregation_field=FIELD1,FIELD2|aggregation_method=METHOD1,METHOD2|filter=FIELD:OP:VALUE_OR_EMPTY|interval=MINUTES}\n\n"
             + "Use empty string for category_field if removing it. DO NOT include explanations.";
     }
 
@@ -1764,7 +1774,7 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
 
         callLLM(fullPrompt, tenantId, ActionListener.wrap(llmResponse -> {
             // Check for NONE signal before parsing — only valid in multi-detector loop
-            if (llmResponse != null && llmResponse.contains(NONE_SIGNAL)) {
+            if (llmResponse != null && llmResponse.toUpperCase(Locale.ROOT).contains(NONE_SIGNAL)) {
                 log.info("LLM returned NONE for '{}' after {} detectors", ctx.indexName, alreadyCreated.size());
                 listener.onResponse((T) gson.toJson(results));
                 return;
@@ -1929,7 +1939,8 @@ public class CreateAnomalyDetectorToolEnhanced implements WithModelTool {
                 throw new IllegalArgumentException("Unsupported model_type: " + modelType);
             }
             String prompt = (String) map.getOrDefault("prompt", "");
-            return new CreateAnomalyDetectorToolEnhanced(client, modelId, modelType, prompt, namedWriteableRegistry);
+            String resultIndex = (String) map.getOrDefault("result_index", "");
+            return new CreateAnomalyDetectorToolEnhanced(client, modelId, modelType, prompt, resultIndex, namedWriteableRegistry);
         }
 
         @Override
