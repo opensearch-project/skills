@@ -15,46 +15,44 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.time.Instant;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.Assert;
-import org.mockito.ArgumentCaptor;
-import org.opensearch.agent.tools.utils.AnomalyDetectorToolHelper;
-import org.opensearch.ml.common.indexInsight.IndexInsight;
-import org.opensearch.ml.common.indexInsight.IndexInsightTaskStatus;
-import org.opensearch.ml.common.indexInsight.MLIndexInsightType;
-import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetAction;
-import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetResponse;
-import org.opensearch.search.aggregations.AggregationBuilder;
-import org.opensearch.timeseries.model.Feature;
-import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
-import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.SearchHits;
 import org.apache.lucene.search.TotalHits;
-import java.util.Map;
-
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.agent.tools.utils.AnomalyDetectorToolHelper;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
+import org.opensearch.ml.common.indexInsight.IndexInsight;
+import org.opensearch.ml.common.indexInsight.IndexInsightTaskStatus;
+import org.opensearch.ml.common.indexInsight.MLIndexInsightType;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.transport.MLTaskResponse;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetAction;
+import org.opensearch.ml.common.transport.indexInsight.MLIndexInsightGetResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
+import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
+import org.opensearch.search.SearchHit;
+import org.opensearch.search.SearchHits;
+import org.opensearch.search.aggregations.AggregationBuilder;
+import org.opensearch.timeseries.model.Feature;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
@@ -506,7 +504,6 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             );
     }
 
-
     // ===== NEW TESTS FOR COMMIT 1 CHANGES =====
 
     @Test
@@ -538,13 +535,13 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         assertEquals("min", tool.getAggMethod(minFeature));
     }
 
-
     @Test
     public void testIndexInsightSuccess_InsightReachesLLMPrompt() throws Exception {
         // Mock Index Insight to return content
         mockFullDetectorCreationChain();
         String insightContent = "dataSource: web_logs, recommendedFeatures: bytes_sent";
-        IndexInsight insight = IndexInsight.builder()
+        IndexInsight insight = IndexInsight
+            .builder()
             .index(mockedIndexName)
             .content(insightContent)
             .status(IndexInsightTaskStatus.COMPLETED)
@@ -570,7 +567,9 @@ public class CreateAnomalyDetectorToolEnhancedTests {
 
         // Override LLM mock to also capture the prompt
         doAnswer(invocation -> {
-            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1]; RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset(); capturedPrompt.set(ds.getParameters().toString());
+            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1];
+            RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset();
+            capturedPrompt.set(ds.getParameters().toString());
             ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
             listener.onResponse(mlTaskResponse);
             return null;
@@ -583,25 +582,27 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             .getInstance()
             .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(response -> {
-                responseRef.set(response);
-                latch.countDown();
-            }, e -> {
-                responseRef.set("ERROR: " + e.getMessage());
-                latch.countDown();
-            })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(response -> {
+                    responseRef.set(response);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
 
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         // The key assertion: the insight content must appear in the prompt sent to the LLM
         Assert.assertNotNull("LLM should have been called", capturedPrompt.get());
-        Assert.assertTrue(
-            "Prompt must contain the Index Insight content, but was: " + capturedPrompt.get(),
-            capturedPrompt.get().contains("INDEX ANALYSIS") || capturedPrompt.get().contains(insightContent)
-        );
+        Assert
+            .assertTrue(
+                "Prompt must contain the Index Insight content, but was: " + capturedPrompt.get(),
+                capturedPrompt.get().contains("INDEX ANALYSIS") || capturedPrompt.get().contains(insightContent)
+            );
     }
 
     @Test
@@ -623,7 +624,9 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         initMLTensors();
 
         doAnswer(invocation -> {
-            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1]; RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset(); capturedPrompt.set(ds.getParameters().toString());
+            MLPredictionTaskRequest req = (MLPredictionTaskRequest) invocation.getArguments()[1];
+            RemoteInferenceInputDataSet ds = (RemoteInferenceInputDataSet) req.getMlInput().getInputDataset();
+            capturedPrompt.set(ds.getParameters().toString());
             ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
             listener.onResponse(mlTaskResponse);
             return null;
@@ -636,26 +639,24 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             .getInstance()
             .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(response -> {
-                responseRef.set(response);
-                latch.countDown();
-            }, e -> {
-                responseRef.set("ERROR: " + e.getMessage());
-                latch.countDown();
-            })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(response -> {
+                    responseRef.set(response);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
 
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         // Verify the LLM was still called (tool didn't abort)
         Assert.assertNotNull("LLM should have been called despite insight failure", capturedPrompt.get());
         // Verify no insight was injected into the prompt
-        Assert.assertFalse(
-            "Prompt must NOT contain INDEX ANALYSIS when insight failed",
-            capturedPrompt.get().contains("INDEX ANALYSIS")
-        );
+        Assert.assertFalse("Prompt must NOT contain INDEX ANALYSIS when insight failed", capturedPrompt.get().contains("INDEX ANALYSIS"));
     }
 
     @Test
@@ -681,29 +682,32 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             .getInstance()
             .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(response -> {
-                responseRef.set(response);
-                latch.countDown();
-            }, e -> {
-                responseRef.set("ERROR: " + e.getMessage());
-                latch.countDown();
-            })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(response -> {
+                    responseRef.set(response);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
 
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
         String response = responseRef.get();
         Assert.assertNotNull("Should get a response", response);
         // The response must NOT contain the literal template variable — it should have been replaced
-        Assert.assertFalse(
-            "Template variable ${dateFields} should have been replaced with actual date field, but response was: " + response,
-            response.contains("${dateFields}")
-        );
-        Assert.assertFalse(
-            "Template variable ${indexInfo.dateFields} should not appear in output",
-            response.contains("${indexInfo.dateFields}")
-        );
+        Assert
+            .assertFalse(
+                "Template variable ${dateFields} should have been replaced with actual date field, but response was: " + response,
+                response.contains("${dateFields}")
+            );
+        Assert
+            .assertFalse(
+                "Template variable ${indexInfo.dateFields} should not appear in output",
+                response.contains("${indexInfo.dateFields}")
+            );
     }
 
     @Test
@@ -729,27 +733,24 @@ public class CreateAnomalyDetectorToolEnhancedTests {
             .getInstance()
             .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(response -> {
-                responseRef.set(response);
-                latch.countDown();
-            }, e -> {
-                responseRef.set("ERROR: " + e.getMessage());
-                latch.countDown();
-            })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(response -> {
+                    responseRef.set(response);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
 
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
         String response = responseRef.get();
         Assert.assertNotNull("Should get a response", response);
         // Must NOT report success — empty features should fail
-        Assert.assertFalse(
-            "Empty aggregation fields must not produce a successful detector",
-            response.contains("\"status\":\"success\"")
-        );
+        Assert.assertFalse("Empty aggregation fields must not produce a successful detector", response.contains("\"status\":\"success\""));
     }
-
 
     // ===== COMMIT 2: OTel Fast-Path Tests =====
 
@@ -757,16 +758,25 @@ public class CreateAnomalyDetectorToolEnhancedTests {
     public void testOtelTraceMapping_CreatesTwoDetectors_SkipsLLM() throws Exception {
         // Set up OTel trace mapping with the 4 required signature fields
         Map<String, Object> otelTraceMapping = new HashMap<>();
-        otelTraceMapping.put("properties", Map.of(
-            "traceId", ImmutableMap.of("type", "keyword"),
-            "spanId", ImmutableMap.of("type", "keyword"),
-            "durationInNanos", ImmutableMap.of("type", "long"),
-            "serviceName", ImmutableMap.of("type", "keyword"),
-            "startTime", ImmutableMap.of("type", "date_nanos"),
-            "status", ImmutableMap.of("type", "object", "properties", Map.of(
-                "code", ImmutableMap.of("type", "integer")
-            ))
-        ));
+        otelTraceMapping
+            .put(
+                "properties",
+                Map
+                    .of(
+                        "traceId",
+                        ImmutableMap.of("type", "keyword"),
+                        "spanId",
+                        ImmutableMap.of("type", "keyword"),
+                        "durationInNanos",
+                        ImmutableMap.of("type", "long"),
+                        "serviceName",
+                        ImmutableMap.of("type", "keyword"),
+                        "startTime",
+                        ImmutableMap.of("type", "date_nanos"),
+                        "status",
+                        ImmutableMap.of("type", "object", "properties", Map.of("code", ImmutableMap.of("type", "integer")))
+                    )
+            );
         when(mappingMetadata.getSourceAsMap()).thenReturn(otelTraceMapping);
         mockedMappings.put("otel-traces", mappingMetadata);
 
@@ -784,13 +794,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-traces")))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-traces")))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -808,23 +825,38 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         Assert.assertEquals("Should create exactly 2 detectors for traces", 2, detectors.size());
 
         // Verify LLM was never called (OTel path bypasses LLM)
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.never())
-            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 
     @Test
     public void testOtelLogMapping_CreatesTwoDetectors_SkipsLLM() throws Exception {
         Map<String, Object> otelLogMapping = new HashMap<>();
-        otelLogMapping.put("properties", Map.of(
-            "severityNumber", ImmutableMap.of("type", "integer"),
-            "severityText", ImmutableMap.of("type", "keyword"),
-            "time", ImmutableMap.of("type", "date"),
-            "resource", ImmutableMap.of("type", "object", "properties", Map.of(
-                "attributes", ImmutableMap.of("type", "object", "properties", Map.of(
-                    "service.name", ImmutableMap.of("type", "keyword")
-                ))
-            ))
-        ));
+        otelLogMapping
+            .put(
+                "properties",
+                Map
+                    .of(
+                        "severityNumber",
+                        ImmutableMap.of("type", "integer"),
+                        "severityText",
+                        ImmutableMap.of("type", "keyword"),
+                        "time",
+                        ImmutableMap.of("type", "date"),
+                        "resource",
+                        ImmutableMap
+                            .of(
+                                "type",
+                                "object",
+                                "properties",
+                                Map
+                                    .of(
+                                        "attributes",
+                                        ImmutableMap
+                                            .of("type", "object", "properties", Map.of("service.name", ImmutableMap.of("type", "keyword")))
+                                    )
+                            )
+                    )
+            );
         when(mappingMetadata.getSourceAsMap()).thenReturn(otelLogMapping);
         mockedMappings.put("otel-logs", mappingMetadata);
 
@@ -840,13 +872,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-logs")))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("otel-logs")))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -855,8 +894,7 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         Assert.assertTrue("OTel log result should be a List", otelResult instanceof List);
         Assert.assertEquals("Should create exactly 2 detectors for logs", 2, ((List<?>) otelResult).size());
 
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.never())
-            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 
     @Test
@@ -874,30 +912,45 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         // LLM SHOULD have been called (non-OTel falls through)
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce())
-            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce()).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 
     @Test
     public void testPartialOtelMapping_DoesNotTriggerFastPath() throws Exception {
         // Has durationInNanos + serviceName but missing spanId — should NOT detect as OTel
         Map<String, Object> partialMapping = new HashMap<>();
-        partialMapping.put("properties", Map.of(
-            "durationInNanos", ImmutableMap.of("type", "long"),
-            "serviceName", ImmutableMap.of("type", "keyword"),
-            "timestamp", ImmutableMap.of("type", "date"),
-            "responseCode", ImmutableMap.of("type", "integer")
-        ));
+        partialMapping
+            .put(
+                "properties",
+                Map
+                    .of(
+                        "durationInNanos",
+                        ImmutableMap.of("type", "long"),
+                        "serviceName",
+                        ImmutableMap.of("type", "keyword"),
+                        "timestamp",
+                        ImmutableMap.of("type", "date"),
+                        "responseCode",
+                        ImmutableMap.of("type", "integer")
+                    )
+            );
         when(mappingMetadata.getSourceAsMap()).thenReturn(partialMapping);
         mockedMappings.put("partial-otel", mappingMetadata);
 
@@ -913,18 +966,24 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("partial-otel")))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList("partial-otel")))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         // LLM should have been called — partial OTel should NOT trigger fast-path
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce())
-            .execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.atLeastOnce()).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
     }
 
     // ===== COMMIT 5: Sequential Multi-Detector Tests =====
@@ -932,7 +991,8 @@ public class CreateAnomalyDetectorToolEnhancedTests {
     @Test
     public void testFilterExpression_AppliedToDetector() throws Exception {
         // LLM returns a response with filter=status:gte:400
-        String responseWithFilter = "{category_field=host|aggregation_field=status|aggregation_method=count|filter=status:gte:400|interval=10}";
+        String responseWithFilter =
+            "{category_field=host|aggregation_field=status|aggregation_method=count|filter=status:gte:400|interval=10}";
         modelReturns = Collections.singletonMap("response", responseWithFilter);
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
         initMLTensors();
@@ -948,13 +1008,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -976,14 +1043,17 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         }).when(client).execute(eq(MLIndexInsightGetAction.INSTANCE), any(), any());
 
         // Track LLM call count and return {NONE} on second call
-        final int[] callCount = {0};
+        final int[] callCount = { 0 };
         doAnswer(invocation -> {
             callCount[0]++;
             ActionListener<MLTaskResponse> listener = (ActionListener<MLTaskResponse>) invocation.getArguments()[2];
             if (callCount[0] == 1) {
                 // First call: valid response
-                modelReturns = Collections.singletonMap("response",
-                    "{category_field=host|aggregation_field=response|aggregation_method=count|filter=|interval=10}");
+                modelReturns = Collections
+                    .singletonMap(
+                        "response",
+                        "{category_field=host|aggregation_field=response|aggregation_method=count|filter=|interval=10}"
+                    );
                 modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
                 when(modelTensors.getMlModelTensors()).thenReturn(Collections.singletonList(modelTensor));
                 when(modelTensorOutput.getMlModelOutputs()).thenReturn(Collections.singletonList(modelTensors));
@@ -1004,13 +1074,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(10, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -1024,7 +1101,8 @@ public class CreateAnomalyDetectorToolEnhancedTests {
     @Test
     public void testInvalidFilter_GracefulDegradation() throws Exception {
         // LLM returns an invalid filter expression — should create detector without filter
-        String responseWithBadFilter = "{category_field=|aggregation_field=response|aggregation_method=count|filter=invalid_no_colons|interval=10}";
+        String responseWithBadFilter =
+            "{category_field=|aggregation_field=response|aggregation_method=count|filter=invalid_no_colons|interval=10}";
         modelReturns = Collections.singletonMap("response", responseWithBadFilter);
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, modelReturns);
         initMLTensors();
@@ -1040,13 +1118,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -1074,13 +1159,20 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         AtomicReference<String> responseRef = new AtomicReference<>();
 
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
-        tool.run(
-            ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
-            ActionListener.<String>wrap(r -> { responseRef.set(r); latch.countDown(); },
-                                        e -> { responseRef.set("ERROR: " + e.getMessage()); latch.countDown(); })
-        );
+        tool
+            .run(
+                ImmutableMap.of("input", gson.toJson(ImmutableMap.of("indices", Collections.singletonList(mockedIndexName)))),
+                ActionListener.<String>wrap(r -> {
+                    responseRef.set(r);
+                    latch.countDown();
+                }, e -> {
+                    responseRef.set("ERROR: " + e.getMessage());
+                    latch.countDown();
+                })
+            );
         latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
 
         String response = responseRef.get();
@@ -1091,7 +1183,8 @@ public class CreateAnomalyDetectorToolEnhancedTests {
     @Test
     public void testParseFilterExpression() {
         CreateAnomalyDetectorToolEnhanced tool = CreateAnomalyDetectorToolEnhanced.Factory
-            .getInstance().create(ImmutableMap.of("model_id", "modelId"));
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId"));
 
         // Valid range operators
         Assert.assertNotNull("gte should parse", tool.parseFilterExpression("status:gte:400"));
@@ -1114,6 +1207,18 @@ public class CreateAnomalyDetectorToolEnhancedTests {
 
     /** Mocks suggest + create + start for OTel path (no validate needed). */
     private void mockOtelDetectorCreationChain() {
+        // Validate detector — return no issues
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener
+                .onResponse(
+                    new org.opensearch.timeseries.transport.ValidateConfigResponse(
+                        (org.opensearch.timeseries.model.ConfigValidationIssue) null
+                    )
+                );
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.ValidateAnomalyDetectorAction.INSTANCE), any(), any());
+
         // Suggest — return null interval (use default)
         doAnswer(invocation -> {
             ActionListener listener = (ActionListener) invocation.getArguments()[2];
@@ -1124,8 +1229,17 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         // Create detector
         doAnswer(invocation -> {
             ActionListener listener = (ActionListener) invocation.getArguments()[2];
-            listener.onResponse(new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
-                "otel-detector-id", 1L, 1L, 1L, null, org.opensearch.core.rest.RestStatus.CREATED));
+            listener
+                .onResponse(
+                    new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
+                        "otel-detector-id",
+                        1L,
+                        1L,
+                        1L,
+                        null,
+                        org.opensearch.core.rest.RestStatus.CREATED
+                    )
+                );
             return null;
         }).when(client).execute(eq(org.opensearch.ad.transport.IndexAnomalyDetectorAction.INSTANCE), any(), any());
 
@@ -1157,7 +1271,12 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         // Validate detector — return no issues
         doAnswer(invocation -> {
             ActionListener listener = (ActionListener) invocation.getArguments()[2];
-            listener.onResponse(new org.opensearch.timeseries.transport.ValidateConfigResponse((org.opensearch.timeseries.model.ConfigValidationIssue) null));
+            listener
+                .onResponse(
+                    new org.opensearch.timeseries.transport.ValidateConfigResponse(
+                        (org.opensearch.timeseries.model.ConfigValidationIssue) null
+                    )
+                );
             return null;
         }).when(client).execute(eq(org.opensearch.ad.transport.ValidateAnomalyDetectorAction.INSTANCE), any(), any());
 
@@ -1171,8 +1290,17 @@ public class CreateAnomalyDetectorToolEnhancedTests {
         // Create detector
         doAnswer(invocation -> {
             ActionListener listener = (ActionListener) invocation.getArguments()[2];
-            listener.onResponse(new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
-                "test-detector-id", 1L, 1L, 1L, null, org.opensearch.core.rest.RestStatus.CREATED));
+            listener
+                .onResponse(
+                    new org.opensearch.ad.transport.IndexAnomalyDetectorResponse(
+                        "test-detector-id",
+                        1L,
+                        1L,
+                        1L,
+                        null,
+                        org.opensearch.core.rest.RestStatus.CREATED
+                    )
+                );
             return null;
         }).when(client).execute(eq(org.opensearch.ad.transport.IndexAnomalyDetectorAction.INSTANCE), any(), any());
 
