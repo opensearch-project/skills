@@ -1114,6 +1114,13 @@ public class CreateAnomalyDetectorToolEnhancedTests {
 
     /** Mocks suggest + create + start for OTel path (no validate needed). */
     private void mockOtelDetectorCreationChain() {
+        // Validate detector — return no issues
+        doAnswer(invocation -> {
+            ActionListener listener = (ActionListener) invocation.getArguments()[2];
+            listener.onResponse(new org.opensearch.timeseries.transport.ValidateConfigResponse((org.opensearch.timeseries.model.ConfigValidationIssue) null));
+            return null;
+        }).when(client).execute(eq(org.opensearch.ad.transport.ValidateAnomalyDetectorAction.INSTANCE), any(), any());
+
         // Suggest — return null interval (use default)
         doAnswer(invocation -> {
             ActionListener listener = (ActionListener) invocation.getArguments()[2];

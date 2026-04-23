@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.Set;
 
@@ -87,14 +87,11 @@ public class ToolHelper {
      * @return set of field names that are date or date_nanos type
      */
     public static Set<String> findDateTypeFields(Map<String, String> fieldsToType) {
-        Set<String> result = new HashSet<>();
-        for (Map.Entry<String, String> entry : fieldsToType.entrySet()) {
-            String value = entry.getValue();
-            if (value.equals("date") || value.equals("date_nanos")) {
-                result.add(entry.getKey());
-            }
-        }
-        return result;
+        Set<String> dateTypes = Set.of("date", "date_nanos");
+        return fieldsToType.entrySet().stream()
+            .filter(e -> dateTypes.contains(e.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
     }
 
     /**
