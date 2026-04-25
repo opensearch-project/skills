@@ -7,6 +7,7 @@ package org.opensearch.agent.tools;
 
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.TENANT_ID_FIELD;
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.ToolUtils.NO_ESCAPE_PARAMS;
 
 import java.io.IOException;
@@ -87,7 +88,25 @@ public class PPLTool implements WithModelTool {
     private Client client;
 
     private static final String DEFAULT_DESCRIPTION =
-        "\"Use this tool when user ask question based on the data in the cluster or parse user statement about which index to use in a conversion.\nAlso use this tool when question only contains index information.\n1. If uesr question contain both question and index name, the input parameters are {'question': UserQuestion, 'index': IndexName}.\n2. If user question contain only question, the input parameter is {'question': UserQuestion}.\n3. If uesr question contain only index name, find the original human input from the conversation histroy and formulate parameter as {'question': UserQuestion, 'index': IndexName}\nThe index name should be exactly as stated in user's input.";
+        "Use this tool to answer user questions about data in the cluster by generating a PPL query.";
+
+    public static final String DEFAULT_INPUT_SCHEMA = """
+        {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The natural language question to generate PPL query for"
+                },
+                "index": {
+                    "type": "string",
+                    "description": "The index name to query against"
+                }
+            },
+            "required": ["question", "index"],
+            "additionalProperties": false
+        }
+        """;
 
     private static final String TABLE_INFO_KEY = "table_info";
     private static final String MAPPING_KEY = "mappings";
@@ -115,6 +134,9 @@ public class PPLTool implements WithModelTool {
     private Map<String, Object> attributes;
 
     private static Gson gson = org.opensearch.ml.common.utils.StringUtils.gson;
+
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map
+        .of(TOOL_INPUT_SCHEMA_FIELD, gson.toJson(gson.fromJson(DEFAULT_INPUT_SCHEMA, Map.class)));
 
     private static Map<String, String> DEFAULT_PROMPT_DICT;
 
@@ -203,6 +225,7 @@ public class PPLTool implements WithModelTool {
         this.previousToolKey = previousToolKey;
         this.head = head;
         this.execute = execute;
+        this.attributes = new HashMap<>(DEFAULT_ATTRIBUTES);
     }
 
     @SuppressWarnings("unchecked")
@@ -446,6 +469,11 @@ public class PPLTool implements WithModelTool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public Map<String, Object> getDefaultAttributes() {
+            return DEFAULT_ATTRIBUTES;
         }
 
         @Override
