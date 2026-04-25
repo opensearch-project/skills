@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 
 import org.opensearch.agent.tools.CreateAlertTool;
 import org.opensearch.agent.tools.CreateAnomalyDetectorTool;
+import org.opensearch.agent.tools.CreateAnomalyDetectorToolEnhanced;
 import org.opensearch.agent.tools.DataDistributionTool;
 import org.opensearch.agent.tools.LogPatternAnalysisTool;
 import org.opensearch.agent.tools.LogPatternTool;
@@ -100,6 +101,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
         SearchMonitorsTool.Factory.getInstance().init(client);
         CreateAlertTool.Factory.getInstance().init(client);
         CreateAnomalyDetectorTool.Factory.getInstance().init(client);
+        CreateAnomalyDetectorToolEnhanced.Factory.getInstance().init(client, namedWriteableRegistry);
         LogPatternTool.Factory.getInstance().init(client, xContentRegistry);
         WebSearchTool.Factory.getInstance().init(threadPool);
         LogPatternAnalysisTool.Factory.getInstance().init(client);
@@ -123,6 +125,7 @@ public class ToolPlugin extends Plugin implements MLCommonsExtension, ActionPlug
                 SearchMonitorsTool.Factory.getInstance(),
                 CreateAlertTool.Factory.getInstance(),
                 CreateAnomalyDetectorTool.Factory.getInstance(),
+                CreateAnomalyDetectorToolEnhanced.Factory.getInstance(),
                 LogPatternTool.Factory.getInstance(),
                 WebSearchTool.Factory.getInstance(),
                 LogPatternAnalysisTool.Factory.getInstance(),
