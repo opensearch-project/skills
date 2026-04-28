@@ -8,10 +8,16 @@ package org.opensearch.agent.tools;
 import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -168,7 +174,11 @@ public class WebSearchTool implements Tool {
                 } else {
                     SdkHttpFullRequest.Builder builder = SdkHttpFullRequest.builder().method(SdkHttpMethod.GET);
                     if (GOOGLE.equalsIgnoreCase(engine)) {
+                        // Validate endpoint before use
+                        validateUrlForSsrf(endpoint);
                         if (nextPage != null) {
+                            // Validate nextPage to prevent SSRF via pagination
+                            validateUrlForSsrf(nextPage);
                             builder.uri(nextPage);
                             parsedNextPage = buildGoogleNextPage(endpoint, engineId, query, apiKey, nextPage);
                         } else {
@@ -176,7 +186,11 @@ public class WebSearchTool implements Tool {
                             parsedNextPage = buildGoogleUrl(endpoint, engineId, query, apiKey, 10);
                         }
                     } else if (BING.equalsIgnoreCase(engine)) {
+                        // Validate endpoint before use
+                        validateUrlForSsrf(endpoint);
                         if (nextPage != null) {
+                            // Validate nextPage to prevent SSRF via pagination
+                            validateUrlForSsrf(nextPage);
                             builder.uri(nextPage);
                             parsedNextPage = buildBingNextPage(endpoint, query, nextPage);
                         } else {
@@ -185,7 +199,11 @@ public class WebSearchTool implements Tool {
                         }
                         builder.putHeader("Ocp-Apim-Subscription-Key", apiKey);
                     } else if (CUSTOM.equalsIgnoreCase(engine)) {
+                        // Validate custom endpoint before use
+                        validateUrlForSsrf(endpoint);
                         if (nextPage != null) {
+                            // Validate nextPage to prevent SSRF via pagination
+                            validateUrlForSsrf(nextPage);
                             builder.uri(nextPage);
                             parsedNextPage = buildCustomNextPage(endpoint, nextPage, queryKey, query, offsetKey, limitKey);
                         } else {
@@ -219,6 +237,104 @@ public class WebSearchTool implements Tool {
         } catch (Exception e) {
             listener.onFailure(new IllegalStateException(String.format(Locale.ROOT, "Web search failed: %s", e.getMessage())));
         }
+    }
+
+    /**
+     * Validates that a URL is safe to fetch (not pointing to private/internal addresses).
+     * Prevents SSRF attacks by blocking requests to:
+     * - localhost/loopback addresses (127.0.0.1/8)
+     * - private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+     * - link-local addresses (169.254.0.0/16)
+     * - non-HTTP(S) schemes
+     *
+     * This validation logic is aligned with MLValidatableAsyncHttpClient for consistency.
+     *
+     * @param urlString The URL to validate
+     * @throws IllegalArgumentException if the URL is not safe to fetch
+     */
+    private void validateUrlForSsrf(String urlString) {
+        try {
+            URI uri = new URI(urlString);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+
+            // Only allow HTTP and HTTPS schemes
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                log.error("Invalid URL scheme (only http/https allowed): {}", urlString);
+                throw new IllegalArgumentException(
+                    String.format(Locale.ROOT, "Invalid URL scheme. Only HTTP and HTTPS are allowed: %s", urlString)
+                );
+            }
+
+            // Validate host is not null
+            if (host == null || host.isEmpty()) {
+                log.error("Invalid URL: missing host: {}", urlString);
+                throw new IllegalArgumentException(String.format(Locale.ROOT, "Invalid URL: missing host: %s", urlString));
+            }
+
+            // Resolve hostname and check if it points to a private IP
+            // WebSearchTool does not allow private IP access (connectorPrivateIpEnabled = false)
+            try {
+                InetAddress[] addresses = InetAddress.getAllByName(host);
+                if (hasPrivateIpAddress(addresses)) {
+                    log.error("URL has private/internal IP address: {}", urlString);
+                    throw new IllegalArgumentException(
+                        String.format(Locale.ROOT, "Access to private/internal IP addresses is not allowed: %s", urlString)
+                    );
+                }
+            } catch (UnknownHostException e) {
+                log.error("Unable to resolve hostname: {}", urlString, e);
+                throw new IllegalArgumentException(String.format(Locale.ROOT, "Unable to resolve hostname: %s", urlString), e);
+            }
+
+        } catch (URISyntaxException e) {
+            log.error("Invalid URL format: {}", urlString, e);
+            throw new IllegalArgumentException(String.format(Locale.ROOT, "Invalid URL format: %s", urlString), e);
+        }
+    }
+
+    /**
+     * Check if any of the IP addresses are private/internal addresses.
+     * This method uses the same logic as MLValidatableAsyncHttpClient.hasPrivateIpAddress
+     * to maintain consistency across the codebase.
+     *
+     * @param ipAddress Array of InetAddress to check
+     * @return true if any address is private/internal, false otherwise
+     */
+    private boolean hasPrivateIpAddress(InetAddress[] ipAddress) {
+        for (InetAddress ip : ipAddress) {
+            if (ip instanceof Inet4Address) {
+                byte[] bytes = ip.getAddress();
+                if (bytes.length != 4) {
+                    return true;
+                } else {
+                    if (isPrivateIPv4(bytes)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return Arrays.stream(ipAddress).anyMatch(x -> x.isSiteLocalAddress() || x.isLoopbackAddress() || x.isAnyLocalAddress());
+    }
+
+    /**
+     * Check if an IPv4 address is in a private range.
+     * Private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8
+     * This method uses the same logic as MLValidatableAsyncHttpClient.isPrivateIPv4
+     *
+     * @param bytes The 4-byte IPv4 address
+     * @return true if the address is private, false otherwise
+     */
+    private boolean isPrivateIPv4(byte[] bytes) {
+        int first = bytes[0] & 0xff;
+        int second = bytes[1] & 0xff;
+
+        // 127.0.0.0/8 (loopback), 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (link-local)
+        return (first == 127)
+            || (first == 10)
+            || (first == 172 && second >= 16 && second <= 31)
+            || (first == 192 && second == 168)
+            || (first == 169 && second == 254);
     }
 
     private String buildDDGEndpoint(String endpoint, String query) {
@@ -275,6 +391,9 @@ public class WebSearchTool implements Tool {
 
     private <T> void fetchDuckDuckGoResult(String endpoint, ActionListener<T> listener) {
         try {
+            // Validate URL to prevent SSRF attacks
+            validateUrlForSsrf(endpoint);
+
             Document doc = Jsoup.connect(endpoint).timeout(10000).get();
             Optional<Elements> pageResult = Optional
                 .of(doc)
@@ -406,12 +525,20 @@ public class WebSearchTool implements Tool {
     }
 
     /**
-     * crawl a page and put the page content into the results map if it can be crawled successfully.
+     * Crawl a page and put the page content into the results map if it can be crawled successfully.
+     * This method validates URLs to prevent SSRF attacks, including URLs returned from
+     * external search APIs (Google, Bing, Custom) that could be malicious or compromised.
      *
-     * @param url The url to crawl
+     * @param url The url to crawl (validated for SSRF before crawling)
+     * @param authorization Optional authorization header
+     * @return Map containing url, title, and content, or null if crawl fails
      */
     public Map<String, String> crawlPage(String url, String authorization) {
         try {
+            // Validate URL to prevent SSRF attacks
+            // This is critical as URLs may come from external search APIs that could be compromised
+            validateUrlForSsrf(url);
+
             Connection connection = Jsoup.connect(url).timeout(10000).userAgent(USER_AGENT);
             if (authorization != null) {
                 connection.header(AUTHORIZATION, authorization);
