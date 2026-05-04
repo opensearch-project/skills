@@ -30,7 +30,7 @@ jobs:
       - name: Run start commands
         run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v4
@@ -60,7 +60,7 @@ jobs:
 
     steps:
       - name: Checkout skills
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v4
