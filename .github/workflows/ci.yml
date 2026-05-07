@@ -45,7 +45,7 @@ jobs:
                                ./gradlew publishToMavenLocal"
           
       - name: Upload Coverage Report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -101,7 +101,7 @@ jobs:
           ./gradlew publishToMavenLocal
           
       - name: Upload Coverage Report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
