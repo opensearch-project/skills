@@ -90,7 +90,9 @@ public class SearchMonitorsToolTests {
             new DataSources(),
             false,
             false,
-            ""
+            "",
+            Collections.emptyMap(),
+            null
         );
     }
 
