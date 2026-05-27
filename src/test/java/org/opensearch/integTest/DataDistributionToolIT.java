@@ -17,10 +17,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.opensearch.ml.common.utils.StringUtils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-
 import lombok.SneakyThrows;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 
 public class DataDistributionToolIT extends BaseAgentToolsIT {
 
@@ -469,7 +468,7 @@ public class DataDistributionToolIT extends BaseAgentToolsIT {
                     assertEquals(expectedTopChanges.get(j).get("value").asText(), resultTopChanges.get(j).get("value").asText());
                 }
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             fail("Failed to process jsons");
         }
     }

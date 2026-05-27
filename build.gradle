@@ -176,6 +176,7 @@ dependencies {
     compileOnly fileTree(dir: jsJarDirectory, include: ["opensearch-job-scheduler-${opensearch_build}.jar"])
     implementation fileTree(dir: adJarDirectory, include: ["opensearch-anomaly-detection-${opensearch_build}.jar"])
     implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar", "core-${opensearch_build}.jar"])
+    implementation fileTree(dir: sqlJarDirectory, include: ["calcite-*.jar"])
     implementation fileTree(dir: sparkDir, include: ["spark*.jar"])
     compileOnly "org.opensearch:common-utils:${opensearch_build}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -199,8 +200,9 @@ dependencies {
     testImplementation group: 'org.json', name: 'json', version: '20240303'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '5.14.2'
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
-    testImplementation("net.bytebuddy:byte-buddy:1.17.7")
-    testImplementation("net.bytebuddy:byte-buddy-agent:1.17.5")
+    testImplementation("net.bytebuddy:byte-buddy:1.18.8")
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.18.8")
+    testImplementation("tools.jackson.core:jackson-databind:3.1.3")
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
