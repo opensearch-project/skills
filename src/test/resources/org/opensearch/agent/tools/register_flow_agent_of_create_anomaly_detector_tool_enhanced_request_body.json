@@ -1,0 +1,13 @@
+{
+  "name": "Test_create_anomaly_detector_enhanced_flow_agent",
+  "type": "flow",
+  "tools": [
+    {
+      "type": "CreateAnomalyDetectorToolEnhanced",
+      "parameters": {
+        "model_id": "<MODEL_ID>",
+        "model_type": "CLAUDE"
+      }
+    }
+  ]
+}

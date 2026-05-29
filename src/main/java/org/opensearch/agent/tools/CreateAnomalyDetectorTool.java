@@ -16,7 +16,6 @@ import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -209,7 +208,7 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
             ToolHelper.extractFieldNamesTypes(mappingSource, fieldsToType, "", true);
 
             // find all date type fields from the mapping
-            final Set<String> dateFields = findDateTypeFields(fieldsToType);
+            final Set<String> dateFields = ToolHelper.findDateTypeFields(fieldsToType);
             if (dateFields.isEmpty()) {
                 throw new IllegalArgumentException(
                     "The index " + indexName + " doesn't have date type fields, cannot create an anomaly detector for it."
@@ -228,6 +227,8 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
 
             // construct the prompt
             String prompt = constructPrompt(filteredMapping, firstIndexName);
+            log.info("Using prompt for anomaly detector creation (simple): {}", prompt);
+
             RemoteInferenceInputDataSet inputDataSet = RemoteInferenceInputDataSet
                 .builder()
                 .parameters(Collections.singletonMap("prompt", prompt))
@@ -335,21 +336,8 @@ public class CreateAnomalyDetectorTool implements WithModelTool {
 
     /**
      *
-     * @param fieldsToType the flattened field-> field type mapping
-     * @return a list containing all the date type fields
-     */
-    private Set<String> findDateTypeFields(final Map<String, String> fieldsToType) {
-        Set<String> result = new HashSet<>();
-        for (Map.Entry<String, String> entry : fieldsToType.entrySet()) {
-            String value = entry.getValue();
-            if (value.equals("date") || value.equals("date_nanos")) {
-                result.add(entry.getKey());
-            }
-        }
-        return result;
-    }
-
     @SuppressWarnings("unchecked")
+    **/
     private static Map<String, String> loadDefaultPromptFromFile() {
         try (InputStream inputStream = CreateAnomalyDetectorTool.class.getResourceAsStream("CreateAnomalyDetectorDefaultPrompt.json")) {
             if (inputStream != null) {
