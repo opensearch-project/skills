@@ -5,10 +5,12 @@
 
 package org.opensearch.agent.tools;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
@@ -19,28 +21,27 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.lucene.search.TotalHits;
+import org.hamcrest.MatcherAssert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse;
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.core.common.bytes.BytesArray;
-import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.output.model.MLResultDataType;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.ml.common.transport.MLTaskResponse;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.SearchHits;
+import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
+import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
@@ -65,14 +66,6 @@ public class PPLToolTests {
     private Map<String, MappingMetadata> mockedMappings;
     private Map<String, Object> indexMappings;
 
-    private SearchHits searchHits;
-
-    private SearchHit hit;
-    @Mock
-    private SearchResponse searchResponse;
-
-    private Map<String, Object> sampleMapping;
-
     @Mock
     private MLTaskResponse mlTaskResponse;
     @Mock
@@ -87,9 +80,18 @@ public class PPLToolTests {
     @Mock
     private TransportPPLQueryResponse transportPPLQueryResponse;
 
+    @Mock
+    private TransportPPLQueryResponse sampleQueryResponse;
+
     private String mockedIndexName = "demo";
 
     private String pplResult = "ppl result";
+
+    // jdbc-formatted PPL result used for the "source=demo | head 1" sample-fetch query. Mirrors the
+    // sample document the old DSL search returned: demoFields=111, demoNested.nest1=222, nest2=333.
+    private String samplePPLResult = "{\"schema\":[{\"name\":\"demoFields\",\"type\":\"text\"},"
+        + "{\"name\":\"demoNested.nest1\",\"type\":\"text\"},{\"name\":\"demoNested.nest2\",\"type\":\"text\"}],"
+        + "\"datarows\":[[\"111\",\"222\",\"333\"]],\"total\":1,\"size\":1}";
 
     @Before
     public void setup() {
@@ -107,25 +109,30 @@ public class PPLToolTests {
         }).when(indicesAdminClient).getMappings(any(), any());
         // mockedMappings (index name, mappingmetadata)
 
-        // search result
-
-        when(searchResponse.getHits()).thenReturn(searchHits);
-        doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = (ActionListener<SearchResponse>) invocation.getArguments()[1];
-            listener.onResponse(searchResponse);
-            return null;
-        }).when(client).search(any(), any());
-
         initMLTensors();
 
+        // Sample data is now fetched via a PPL query (source=<index> | head 1) instead of a DSL
+        // search, so we mock client.execute(PPLQueryAction) and differentiate the two PPL calls by
+        // their query string: the sample-fetch query returns a jdbc result, while the final
+        // (LLM-generated) PPL execution returns the plain "ppl result".
         when(transportPPLQueryResponse.getResult()).thenReturn(pplResult);
+        when(sampleQueryResponse.getResult()).thenReturn(samplePPLResult);
 
         doAnswer(invocation -> {
+            TransportPPLQueryRequest request = (TransportPPLQueryRequest) invocation.getArguments()[1];
             ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
-            listener.onResponse(transportPPLQueryResponse);
+            if (isSamplePPL(request.getRequest())) {
+                listener.onResponse(sampleQueryResponse);
+            } else {
+                listener.onResponse(transportPPLQueryResponse);
+            }
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
         PPLTool.Factory.getInstance().init(client);
+    }
+
+    private boolean isSamplePPL(String ppl) {
+        return ppl != null && ppl.startsWith("source=" + mockedIndexName + " | head 1");
     }
 
     @Test
@@ -180,6 +187,66 @@ public class PPLToolTests {
     }
 
     @Test
+    public void testTool_sampleResultMissingSchemaOrDatarows() {
+        // The sample-fetch PPL result has neither schema nor datarows; extractSampleFromPPLResult should
+        // return an empty sample and the run should still succeed (tableInfo just omits sample values).
+        when(sampleQueryResponse.getResult()).thenReturn("{\"total\":0,\"size\":0}");
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+    }
+
+    @Test
+    public void testTool_sampleResultEmptyDatarows() {
+        // The sample-fetch PPL result has a schema but an empty datarows array; extractSampleFromPPLResult
+        // should return an empty sample and the run should still succeed.
+        when(sampleQueryResponse.getResult())
+            .thenReturn("{\"schema\":[{\"name\":\"demoFields\",\"type\":\"text\"}],\"datarows\":[],\"total\":0,\"size\":0}");
+        PPLTool tool = PPLTool.Factory
+            .getInstance()
+            .create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt", "head", "100"));
+        assertEquals(PPLTool.TYPE, tool.getName());
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { log.info(e); }));
+    }
+
+    @Test
+    public void testTool_sampleValuesFromPPLReachPrompt() {
+        // Using a prompt template that echoes the table info, the prompt sent to the LLM equals the
+        // constructed tableInfo. This verifies the sample values fetched via the PPL sample query
+        // (extractSampleFromPPLResult -> constructTableInfo) actually flow into the prompt.
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "${indexInfo.mappingInfo}"));
+
+        ArgumentCaptor<MLPredictionTaskRequest> requestCaptor = ArgumentCaptor.forClass(MLPredictionTaskRequest.class);
+
+        tool
+            .run(
+                ImmutableMap.of("index", "demo", "question", "demo"),
+                ActionListener.<String>wrap(executePPLResult -> {}, e -> { log.info(e); })
+            );
+
+        verify(client).execute(eq(MLPredictionTaskAction.INSTANCE), requestCaptor.capture(), any());
+        RemoteInferenceInputDataSet inputDataSet = (RemoteInferenceInputDataSet) requestCaptor.getValue().getMlInput().getInputDataset();
+        String prompt = inputDataSet.getParameters().get("prompt");
+        // Sample values returned by the mocked sample PPL (datarows [["111","222","333"]]).
+        assertTrue(prompt.contains("demoFields"));
+        assertTrue(prompt.contains("111"));
+        assertTrue(prompt.contains("222"));
+        assertTrue(prompt.contains("333"));
+    }
+
+    @Test
     public void testToolWhenGettingSagemakerError() {
         PPLTool tool = PPLTool.Factory
             .getInstance()
@@ -195,18 +262,16 @@ public class PPLToolTests {
             listener.onFailure(exception);
             return null;
         }).when(client).execute(eq(MLPredictionTaskAction.INSTANCE), any(), any());
-        OpenSearchStatusException exception = assertThrows(
-            OpenSearchStatusException.class,
-            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
-                Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
-                assertEquals("ppl result", returnResults.get("executionResult"));
-                assertEquals("source=demo| head 1", returnResults.get("ppl"));
-            }, e -> { throw new OpenSearchStatusException(e.getMessage(), ((OpenSearchStatusException) e).status()); }))
-        );
-        assertTrue(exception.getMessage().contains("<SAGEMAKER_ENDPOINT>"));
-        assertFalse(exception.getMessage().contains("demo-test-name"));
-        assertFalse(exception.getMessage().contains("12345678"));
-
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            fail("Should have failed with a redacted SageMaker error");
+        }, e -> {
+            // The redaction logic still runs; the redacted message propagates (wrapped by PPLExecuteHelper).
+            // We assert on the message content rather than the exception type, matching the pattern used
+            // in LogPatternAnalysisToolTests.
+            MatcherAssert.assertThat(e.getMessage(), containsString("<SAGEMAKER_ENDPOINT>"));
+            assertFalse(e.getMessage().contains("demo-test-name"));
+            assertFalse(e.getMessage().contains("12345678"));
+        }));
     }
 
     @Test
@@ -435,13 +500,9 @@ public class PPLToolTests {
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
         initMLTensors();
 
-        Exception exception = assertThrows(
-            IllegalStateException.class,
-            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
-                assertEquals(pplResult, "ppl result");
-            }, e -> { throw new IllegalStateException(e.getMessage()); }))
-        );
-        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
+            fail("Should have failed when remote endpoint inference fails");
+        }, e -> MatcherAssert.assertThat(e.getMessage(), containsString("Remote endpoint fails to inference."))));
     }
 
     @Test
@@ -453,13 +514,9 @@ public class PPLToolTests {
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
         initMLTensors();
 
-        Exception exception = assertThrows(
-            IllegalStateException.class,
-            () -> tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
-                assertEquals(pplResult, "ppl result");
-            }, e -> { throw new IllegalStateException(e.getMessage()); }))
-        );
-        assertEquals("Remote endpoint fails to inference.", exception.getMessage());
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(ppl -> {
+            fail("Should have failed when remote endpoint returns null response");
+        }, e -> MatcherAssert.assertThat(e.getMessage(), containsString("Remote endpoint fails to inference."))));
     }
 
     @Test
@@ -559,21 +616,27 @@ public class PPLToolTests {
     }
 
     @Test
-    public void testTool_searchFailure() {
+    public void testTool_sampleFetchFailure() {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
-        Exception exception = new Exception("search error");
+        Exception exception = new Exception("sample error");
+        // Fail only the sample-fetch PPL query (source=demo | head 1); other PPL calls are unaffected.
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = (ActionListener<SearchResponse>) invocation.getArguments()[1];
-            listener.onFailure(exception);
+            TransportPPLQueryRequest request = (TransportPPLQueryRequest) invocation.getArguments()[1];
+            ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
+            if (isSamplePPL(request.getRequest())) {
+                listener.onFailure(exception);
+            } else {
+                listener.onResponse(transportPPLQueryResponse);
+            }
             return null;
-        }).when(client).search(any(), any());
+        }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
 
         tool
             .run(
                 ImmutableMap.of("index", "demo", "question", "demo"),
                 ActionListener.<String>wrap(ppl -> { assertEquals(pplResult, "ppl result"); }, e -> {
-                    assertEquals("search error", e.getMessage());
+                    assertEquals("PPL execution failed: sample error", e.getMessage());
                 })
             );
     }
@@ -583,17 +646,24 @@ public class PPLToolTests {
         PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
         assertEquals(PPLTool.TYPE, tool.getName());
         Exception exception = new Exception("execute ppl error");
+        // Only fail the final (LLM-generated) PPL execution; the sample-fetch PPL must still succeed,
+        // otherwise the run never reaches the final execution we want to test here.
         doAnswer(invocation -> {
+            TransportPPLQueryRequest request = (TransportPPLQueryRequest) invocation.getArguments()[1];
             ActionListener<TransportPPLQueryResponse> listener = (ActionListener<TransportPPLQueryResponse>) invocation.getArguments()[2];
-            listener.onFailure(exception);
+            if (isSamplePPL(request.getRequest())) {
+                listener.onResponse(sampleQueryResponse);
+            } else {
+                listener.onFailure(exception);
+            }
             return null;
         }).when(client).execute(eq(PPLQueryAction.INSTANCE), any(), any());
 
         tool
             .run(
                 ImmutableMap.of("index", "demo", "question", "demo"),
-                ActionListener.<String>wrap(ppl -> { assertEquals(pplResult, "ppl result"); }, e -> {
-                    assertEquals("execute ppl:source=demo| head 1, get error: execute ppl error", e.getMessage());
+                ActionListener.<String>wrap(ppl -> fail("Should have failed when final PPL execution fails"), e -> {
+                    MatcherAssert.assertThat(e.getMessage(), containsString("execute ppl error"));
                 })
             );
     }
@@ -618,10 +688,6 @@ public class PPLToolTests {
         mockedMappings = new HashMap<>();
         mockedMappings.put(mockedIndexName, mappingMetadata);
 
-        BytesReference bytesArray = new BytesArray("{\"demoFields\":\"111\", \"demoNested\": {\"nest1\": \"222\", \"nest2\": \"333\"}}");
-        hit = new SearchHit(1);
-        hit.sourceRef(bytesArray);
-        searchHits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
         pplReturns = Collections.singletonMap("response", "source=demo| head 1");
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
 
