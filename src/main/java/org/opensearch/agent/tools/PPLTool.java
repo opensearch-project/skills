@@ -42,13 +42,12 @@ import org.opensearch.OpenSearchStatusException;
 import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest;
-import org.opensearch.action.search.SearchRequest;
+import org.opensearch.agent.tools.utils.PPLExecuteHelper;
 import org.opensearch.agent.tools.utils.ToolHelper;
 import org.opensearch.agent.tools.utils.mergeMetaData.MergeRuleHelper;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
-import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.ml.common.FunctionName;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
@@ -60,8 +59,6 @@ import org.opensearch.ml.common.spi.tools.WithModelTool;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskAction;
 import org.opensearch.ml.common.transport.prediction.MLPredictionTaskRequest;
 import org.opensearch.ml.common.utils.ToolUtils;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.sql.plugin.transport.PPLQueryAction;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest;
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse;
@@ -344,15 +341,23 @@ public class PPLTool implements WithModelTool {
                     throw new IllegalArgumentException("No matching mapping with index name: " + index);
                 }
                 String firstIndexName = (String) mappings.keySet().toArray()[0];
-                SearchRequest searchRequest = buildSearchRequest(firstIndexName);
-                client.search(searchRequest, ActionListener.wrap(searchResponse -> {
-                    SearchHit[] searchHits = searchResponse.getHits().getHits();
-                    Map<String, Object> finalMappings = new HashMap<>();
-                    for (MappingMetadata mappingMetadata : mappings.values()) {
-                        Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-                        MergeRuleHelper.merge(mappingSource, finalMappings);
+                // Merge all mapping metadata into a single field->type map. This does not depend on the
+                // sample data, so we compute it before fetching samples.
+                Map<String, Object> finalMappings = new HashMap<>();
+                for (MappingMetadata mappingMetadata : mappings.values()) {
+                    Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
+                    MergeRuleHelper.merge(mappingSource, finalMappings);
+                }
+                // Fetch one sample document via PPL instead of a DSL match_all search.
+                String samplePPL = "source=" + firstIndexName + " | head 1";
+                PPLExecuteHelper.executePPLAndParseResult(client, samplePPL, pplResult -> {
+                    Map<String, Object> sampleSource = extractSampleFromPPLResult(pplResult);
+                    try {
+                        return constructTableInfo(sampleSource, finalMappings);
+                    } catch (PrivilegedActionException e) {
+                        throw new RuntimeException("Failed to construct table info for index: " + firstIndexName, e);
                     }
-                    String tableInfo = constructTableInfo(searchHits, finalMappings);
+                }, ActionListener.wrap(tableInfo -> {
                     tableInfos.put(index, tableInfo);
                     mappingInfos.put(index, finalMappings);
                     latch.countDown();
@@ -361,7 +366,12 @@ public class PPLTool implements WithModelTool {
                         actionsAfterTableinfo.onResponse(Map.of(TABLE_INFO_KEY, mergedTableInfo, MAPPING_KEY, mappingInfos));
                     }
                 }, e -> {
-                    log.error(String.format(Locale.ROOT, "fail to search index: %s with error: %s", firstIndexName, e.getMessage()), e);
+                    log
+                        .error(
+                            String
+                                .format(Locale.ROOT, "fail to get sample data of index: %s with error: %s", firstIndexName, e.getMessage()),
+                            e
+                        );
                     listener.onFailure(e);
                 }));
             }, e -> {
@@ -452,13 +462,6 @@ public class PPLTool implements WithModelTool {
         public List<String> getAllModelKeys() {
             return List.of(COMMON_MODEL_ID_FIELD);
         }
-    }
-
-    private SearchRequest buildSearchRequest(String indexName) {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.size(1).query(new MatchAllQueryBuilder());
-        // client;
-        return new SearchRequest(new String[] { indexName }, searchSourceBuilder);
     }
 
     private GetMappingsRequest buildGetMappingRequest(String indexName) {
@@ -565,7 +568,33 @@ public class PPLTool implements WithModelTool {
 
     }
 
-    private String constructTableInfo(SearchHit[] searchHits, Map<String, Object> allFields) throws PrivilegedActionException {
+    /**
+     * Converts a PPL jdbc result into a field-name -> value map representing one sample document.
+     * The jdbc result keeps column names in "schema" and values in "datarows" (aligned by position),
+     * e.g. schema=[{name:price},{name:category}] and datarows=[[29.99,"dresses"]]. This recombines
+     * them into {price: 29.99, category: "dresses"} so it can feed the existing sample-extraction logic.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractSampleFromPPLResult(Map<String, Object> pplResult) {
+        Map<String, Object> sampleSource = new HashMap<>();
+        // PPLExecuteHelper already validates that "datarows" is present and is a List before invoking
+        // this parser, so we can cast directly here.
+        List<Map<String, Object>> schema = (List<Map<String, Object>>) pplResult.get("schema");
+        List<List<Object>> datarows = (List<List<Object>>) pplResult.get("datarows");
+        if (datarows.isEmpty()) {
+            return sampleSource;
+        }
+        List<Object> firstRow = datarows.get(0);
+        for (int i = 0; i < schema.size() && i < firstRow.size(); i++) {
+            Object nameObj = schema.get(i).get("name");
+            if (nameObj != null) {
+                sampleSource.put(nameObj.toString(), firstRow.get(i));
+            }
+        }
+        return sampleSource;
+    }
+
+    private String constructTableInfo(Map<String, Object> sampleSource, Map<String, Object> allFields) throws PrivilegedActionException {
         Map<String, String> fieldsToType = new HashMap<>();
         ToolHelper.extractFieldNamesTypes(allFields, fieldsToType, "", false);
 
@@ -573,9 +602,7 @@ public class PPLTool implements WithModelTool {
         List<String> sortedKeys = new ArrayList<>(fieldsToType.keySet());
         Collections.sort(sortedKeys);
 
-        if (searchHits.length > 0) {
-            SearchHit hit = searchHits[0];
-            Map<String, Object> sampleSource = hit.getSourceAsMap();
+        if (sampleSource != null && !sampleSource.isEmpty()) {
             Map<String, String> fieldsToSample = new HashMap<>();
             for (String key : fieldsToType.keySet()) {
                 fieldsToSample.put(key, "");
