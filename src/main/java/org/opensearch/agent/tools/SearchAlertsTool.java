@@ -5,6 +5,7 @@
 
 package org.opensearch.agent.tools;
 
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.List;
@@ -34,7 +35,65 @@ import lombok.extern.log4j.Log4j2;
 public class SearchAlertsTool implements Tool {
     public static final String TYPE = "SearchAlertsTool";
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool that finds alerts. It takes 12 optional argument named sortOrder which defines the order of the results (options are asc or desc, and default is asc), and sortString which defines how to sort the results (default is monitor_name.keyword), and size which defines the size of the request to be returned (default is 20), and startIndex which defines the paginated index to start from (default is 0), and searchString which defines the search string to use for searching a specific alert (default is an empty String), and severityLevel which defines the severity level to filter for as an integer (default is ALL), and alertState which defines the alert state to filter for (options are ALL, ACTIVE, ERROR, COMPLETED, or ACKNOWLEDGED, default is ALL), and monitorId which defines the associated monitor ID to filter for, and alertIndex which defines the alert index to search from (default is null), and monitorIds which defines the list of monitor IDs to filter for, and workflowIds which defines the list of workflow IDs to filter for（default is null), and alertIds which defines the list of alert IDs to filter for (default is null). The tool returns 2 values: a list of alerts (each containining the alert id, version, schema version, monitor ID, workflow ID, workflow name, monitor name, monitor version, monitor user, trigger ID, trigger name, finding IDs, related doc IDs, state, start time in epoch milliseconds, end time in epoch milliseconds, last notification time in epoch milliseconds, acknowledged time in epoch milliseconds, error message, error history, severity, action execution results, aggregation result bucket, execution ID, associated alert IDs), and the total number of alerts.";
+        "This is a tool that finds alerts. It takes 12 optional arguments named 'sortOrder which defines the order of the results (options are 'asc' or 'desc', and default is 'asc'), and 'sortString' which defines how to sort the results (default is 'monitor_name.keyword'), and 'size' which defines the size of the request to be returned (default is 20), and 'startIndex' which defines the paginated index to start from (default is 0), and 'searchString' which defines the search string to use for searching a specific alert (default is an empty String), and 'severityLevel' which defines the severity level to filter for as an integer (default is 'ALL'), and 'alertState' which defines the alert state to filter for (options are 'ALL', 'ACTIVE', 'ERROR', 'COMPLETED', or 'ACKNOWLEDGED', default is 'ALL'), and 'monitorId' which defines the associated monitor ID to filter for, and 'alertIndex' which defines the alert index to search from (default is null), and 'monitorIds' which defines the list of monitor IDs to filter for, and 'workflowIds' which defines the list of workflow IDs to filter for (default is null), and 'alertIds' which defines the list of alert IDs to filter for (default is null). The tool returns 2 values: a list of alerts (each containining the alert id, version, schema version, monitor ID, workflow ID, workflow name, monitor name, monitor version, monitor user, trigger ID, trigger name, finding IDs, related doc IDs, state, start time in epoch milliseconds, end time in epoch milliseconds, last notification time in epoch milliseconds, acknowledged time in epoch milliseconds, error message, error history, severity, action execution results, aggregation result bucket, execution ID, associated alert IDs), and the total number of alerts.";
+
+    public static final String DEFAULT_INPUT_SCHEMA = """
+    {
+        "type": "object",
+        "properties": {
+            "alertIds": {
+                "type": "array",
+                "description": "The ID of the alert to search for."
+            },
+            "alertIndex": {
+                "type": "string",
+                "description": "Name of the alert index to search from (default is null)"
+            },
+            "monitorId": {
+                "type": "string",
+                "description": "The name of the monitor by which to filter the alerts."
+            },
+            "monitorIds": {
+                "type": "array",
+                "description": "A list of monitor names by which to filter the alers."
+            },
+            "workflowIds": {
+                "type": "array",
+                "description": "A list of workflow IDs by which to filter the alerts."
+            },
+            "alertState": {
+                "type": "string",
+                "description": "The alert state by which to filter the alerts. Valid values are 'ALL', 'ACTIVE', 'ERROR', 'COMPLETED', and 'ACKNOWLEDGED'. Default is 'ALL'."
+            },
+            "severityLevel": {
+                "type": "string",
+                "description": "The severity level by which to filter the alerts. Valid values are 'ALL', '1', '2', and '3'. Default is 'ALL'."
+            },
+            "searchString": {
+                "type": "string",
+                "description": "The search string to use for searching for a specific alert."
+            },
+            "sortOrder": {
+                "type": "string",
+                "description": "The sort order of the results. Valid values are 'asc' (ascending) and 'desc' (descending). Default is 'asc'."
+            },
+            "sortString": {
+                "type": "string",
+                "description": "Specifies the monitor field by which to sort the results. Default is 'monitor_name.keyword'."
+            },
+            "size": {
+                "type": "integer",
+                "description": "The number of results to return. Default is 20."
+            },
+            "startIndex": {
+                "type": "integer",
+                "description": "The paginated index of the alert to start from. Default is 0."
+            }
+        },
+        "required": [],
+        "additionalProperties": false
+    }""";
+    public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
 
     @Setter
     @Getter
@@ -58,6 +117,7 @@ public class SearchAlertsTool implements Tool {
 
     public SearchAlertsTool(Client client) {
         this.client = client;
+        this.attributes = DEFAULT_ATTRIBUTES;
 
         // probably keep this overridden output parser. need to ensure the output matches what's expected
         outputParser = new Parser<>() {
@@ -193,6 +253,11 @@ public class SearchAlertsTool implements Tool {
         @Override
         public String getDefaultVersion() {
             return null;
+        }
+
+        @Override
+        public Map<String, Object> getDefaultAttributes() {
+            return DEFAULT_ATTRIBUTES;
         }
     }
 
