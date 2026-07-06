@@ -35,7 +35,7 @@ import lombok.extern.log4j.Log4j2;
 public class SearchAlertsTool implements Tool {
     public static final String TYPE = "SearchAlertsTool";
     private static final String DEFAULT_DESCRIPTION =
-        "This is a tool that finds alerts. The tool returns 2 values: a list of alerts (each containining the alert id, version, schema version, monitor ID, workflow ID, workflow name, monitor name, monitor version, monitor user, trigger ID, trigger name, finding IDs, related doc IDs, state, start time in epoch milliseconds, end time in epoch milliseconds, last notification time in epoch milliseconds, acknowledged time in epoch milliseconds, error message, error history, severity, action execution results, aggregation result bucket, execution ID, associated alert IDs), and the total number of alerts.";
+        "This is a tool that finds alerts. The tool returns 2 values: a list of alerts (each containing the alert id, version, schema version, monitor ID, workflow ID, workflow name, monitor name, monitor version, monitor user, trigger ID, trigger name, finding IDs, related doc IDs, state, start time in epoch milliseconds, end time in epoch milliseconds, last notification time in epoch milliseconds, acknowledged time in epoch milliseconds, error message, error history, severity, action execution results, aggregation result bucket, execution ID, associated alert IDs), and the total number of alerts.";
 
     public static final String DEFAULT_INPUT_SCHEMA = """
     {
