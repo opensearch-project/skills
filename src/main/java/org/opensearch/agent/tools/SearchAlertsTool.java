@@ -47,7 +47,7 @@ public class SearchAlertsTool implements Tool {
             },
             "alertIndex": {
                 "type": "string",
-                "description": "Name of the alert index to search from (default is null)"
+                "description": "The name of the alert index to search from (default is null)"
             },
             "monitorId": {
                 "type": "string",
