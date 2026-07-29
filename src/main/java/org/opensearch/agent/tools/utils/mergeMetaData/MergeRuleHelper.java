@@ -23,6 +23,9 @@ public class MergeRuleHelper {
     }
 
     public static void merge(Map<String, Object> source, Map<String, Object> target) {
+        if (source == null || source.isEmpty()) {
+            return;
+        }
         for (Map.Entry<String, Object> entry : source.entrySet()) {
             String key = entry.getKey();
             Map<String, Object> sourceValue = (Map<String, Object>) entry.getValue();
