@@ -346,7 +346,9 @@ public class PPLTool implements WithModelTool {
                 Map<String, Object> finalMappings = new HashMap<>();
                 for (MappingMetadata mappingMetadata : mappings.values()) {
                     Map<String, Object> mappingSource = (Map<String, Object>) mappingMetadata.getSourceAsMap().get("properties");
-                    MergeRuleHelper.merge(mappingSource, finalMappings);
+                    if (mappingSource != null && !mappingSource.isEmpty()) {
+                        MergeRuleHelper.merge(mappingSource, finalMappings);
+                    }
                 }
                 // Fetch one sample document via PPL instead of a DSL match_all search.
                 String samplePPL = "source=" + firstIndexName + " | head 1";

@@ -668,6 +668,40 @@ public class PPLToolTests {
             );
     }
 
+    @Test
+    public void testTool_nullMappingProperties_doesNotThrowNPE() {
+        // Simulate an index that exists but has no "properties" in its mapping (returns null).
+        // This was the root cause of the NPE in MergeRuleHelper.merge() when
+        // mappingMetadata.getSourceAsMap().get("properties") returns null.
+        Map<String, Object> emptyMapping = new HashMap<>();
+        // No "properties" key at all — get("properties") returns null
+        when(mappingMetadata.getSourceAsMap()).thenReturn(emptyMapping);
+
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { fail("Should not throw NPE when mapping has no properties: " + e.getMessage()); }));
+    }
+
+    @Test
+    public void testTool_emptyMappingProperties_doesNotThrowNPE() {
+        // Simulate an index where "properties" exists but is an empty map.
+        Map<String, Object> mappingWithEmptyProperties = new HashMap<>();
+        mappingWithEmptyProperties.put("properties", new HashMap<>());
+        when(mappingMetadata.getSourceAsMap()).thenReturn(mappingWithEmptyProperties);
+
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId", "prompt", "contextPrompt"));
+
+        tool.run(ImmutableMap.of("index", "demo", "question", "demo"), ActionListener.<String>wrap(executePPLResult -> {
+            Map<String, String> returnResults = gson.fromJson(executePPLResult, Map.class);
+            assertEquals("ppl result", returnResults.get("executionResult"));
+            assertEquals("source=demo| head 1", returnResults.get("ppl"));
+        }, e -> { fail("Should not throw NPE when mapping properties is empty: " + e.getMessage()); }));
+    }
+
     private void createMappings() {
         indexMappings = new HashMap<>();
         indexMappings
