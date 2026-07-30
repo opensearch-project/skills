@@ -31,6 +31,7 @@ buildscript {
 
     repositories {
         mavenLocal()
+        maven { url "https://ci.opensearch.org/m2/" }
         maven { url "https://ci.opensearch.org/maven2/" }
         mavenCentral()
         maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
@@ -55,6 +56,7 @@ lombok {
 
 repositories {
     mavenLocal()
+    maven { url "https://ci.opensearch.org/m2/" }
     maven { url "https://ci.opensearch.org/maven2/" }
     mavenCentral()
     maven { url "https://plugins.gradle.org/m2/" }
