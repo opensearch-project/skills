@@ -209,10 +209,8 @@ public class SearchAlertsToolTests {
     @Test
     public void testDefaultInputSchemaIsValidJson() {
         Gson gson = new Gson();
-        Map<String, Object> schema = gson.fromJson(
-            SearchAlertsTool.DEFAULT_INPUT_SCHEMA,
-            new TypeToken<Map<String, Object>>() {}.getType()
-        );
+        Map<String, Object> schema = gson.fromJson(SearchAlertsTool.DEFAULT_INPUT_SCHEMA, new TypeToken<Map<String, Object>>() {
+        }.getType());
         assertNotNull("DEFAULT_INPUT_SCHEMA must parse to a non-null map", schema);
         assertEquals("object", schema.get("type"));
     }
@@ -220,28 +218,27 @@ public class SearchAlertsToolTests {
     @Test
     public void testDefaultInputSchemaContainsAllProperties() {
         Gson gson = new Gson();
-        Map<String, Object> schema = gson.fromJson(
-            SearchAlertsTool.DEFAULT_INPUT_SCHEMA,
-            new TypeToken<Map<String, Object>>() {}.getType()
-        );
+        Map<String, Object> schema = gson.fromJson(SearchAlertsTool.DEFAULT_INPUT_SCHEMA, new TypeToken<Map<String, Object>>() {
+        }.getType());
         @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
         assertNotNull(properties);
 
-        Set<String> expectedProperties = Set.of(
-            "alertIds",
-            "alertIndex",
-            "monitorId",
-            "monitorIds",
-            "workflowIds",
-            "alertState",
-            "severityLevel",
-            "searchString",
-            "sortOrder",
-            "sortString",
-            "size",
-            "startIndex"
-        );
+        Set<String> expectedProperties = Set
+            .of(
+                "alertIds",
+                "alertIndex",
+                "monitorId",
+                "monitorIds",
+                "workflowIds",
+                "alertState",
+                "severityLevel",
+                "searchString",
+                "sortOrder",
+                "sortString",
+                "size",
+                "startIndex"
+            );
         assertEquals("Schema must define exactly 12 properties", 12, properties.size());
         for (String key : expectedProperties) {
             assertTrue("Schema must contain property: " + key, properties.containsKey(key));
@@ -251,10 +248,8 @@ public class SearchAlertsToolTests {
     @Test
     public void testDefaultInputSchemaPropertyTypes() {
         Gson gson = new Gson();
-        Map<String, Object> schema = gson.fromJson(
-            SearchAlertsTool.DEFAULT_INPUT_SCHEMA,
-            new TypeToken<Map<String, Object>>() {}.getType()
-        );
+        Map<String, Object> schema = gson.fromJson(SearchAlertsTool.DEFAULT_INPUT_SCHEMA, new TypeToken<Map<String, Object>>() {
+        }.getType());
         @SuppressWarnings("unchecked")
         Map<String, Map<String, Object>> properties = (Map<String, Map<String, Object>>) schema.get("properties");
 
@@ -277,10 +272,8 @@ public class SearchAlertsToolTests {
     @Test
     public void testDefaultInputSchemaRequiredIsEmpty() {
         Gson gson = new Gson();
-        Map<String, Object> schema = gson.fromJson(
-            SearchAlertsTool.DEFAULT_INPUT_SCHEMA,
-            new TypeToken<Map<String, Object>>() {}.getType()
-        );
+        Map<String, Object> schema = gson.fromJson(SearchAlertsTool.DEFAULT_INPUT_SCHEMA, new TypeToken<Map<String, Object>>() {
+        }.getType());
         @SuppressWarnings("unchecked")
         List<Object> required = (List<Object>) schema.get("required");
         assertNotNull(required);
@@ -290,10 +283,8 @@ public class SearchAlertsToolTests {
     @Test
     public void testDefaultInputSchemaAdditionalPropertiesFalse() {
         Gson gson = new Gson();
-        Map<String, Object> schema = gson.fromJson(
-            SearchAlertsTool.DEFAULT_INPUT_SCHEMA,
-            new TypeToken<Map<String, Object>>() {}.getType()
-        );
+        Map<String, Object> schema = gson.fromJson(SearchAlertsTool.DEFAULT_INPUT_SCHEMA, new TypeToken<Map<String, Object>>() {
+        }.getType());
         assertEquals(Boolean.FALSE, schema.get("additionalProperties"));
     }
 

@@ -37,62 +37,63 @@ public class SearchAlertsTool implements Tool {
     private static final String DEFAULT_DESCRIPTION =
         "This is a tool that finds alerts. The tool returns 2 values: a list of alerts (each containing the alert id, version, schema version, monitor ID, workflow ID, workflow name, monitor name, monitor version, monitor user, trigger ID, trigger name, finding IDs, related doc IDs, state, start time in epoch milliseconds, end time in epoch milliseconds, last notification time in epoch milliseconds, acknowledged time in epoch milliseconds, error message, error history, severity, action execution results, aggregation result bucket, execution ID, associated alert IDs), and the total number of alerts.";
 
-    public static final String DEFAULT_INPUT_SCHEMA = """
-    {
-        "type": "object",
-        "properties": {
-            "alertIds": {
-                "type": "array",
-                "description": "The ID of the alert to search for."
-            },
-            "alertIndex": {
-                "type": "string",
-                "description": "The name of the alert index to search from (default is null)"
-            },
-            "monitorId": {
-                "type": "string",
-                "description": "The ID of the monitor by which to filter the alerts."
-            },
-            "monitorIds": {
-                "type": "array",
-                "description": "A list of monitor IDs by which to filter the alerts."
-            },
-            "workflowIds": {
-                "type": "array",
-                "description": "A list of workflow IDs by which to filter the alerts."
-            },
-            "alertState": {
-                "type": "string",
-                "description": "The alert state by which to filter the alerts. Valid values are 'ALL', 'ACTIVE', 'ERROR', 'COMPLETED', and 'ACKNOWLEDGED'. Default is 'ALL'."
-            },
-            "severityLevel": {
-                "type": "string",
-                "description": "The severity level by which to filter the alerts. Valid values are 'ALL', '1', '2', and '3'. Default is 'ALL'."
-            },
-            "searchString": {
-                "type": "string",
-                "description": "The search string to use for searching for a specific alert."
-            },
-            "sortOrder": {
-                "type": "string",
-                "description": "The sort order of the results. Valid values are 'asc' (ascending) and 'desc' (descending). Default is 'asc'."
-            },
-            "sortString": {
-                "type": "string",
-                "description": "Specifies the monitor field by which to sort the results. Default is 'monitor_name.keyword'."
-            },
-            "size": {
-                "type": "integer",
-                "description": "The number of results to return. Default is 20."
-            },
-            "startIndex": {
-                "type": "integer",
-                "description": "The paginated index of the alert to start from. Default is 0."
-            }
-        },
-        "required": [],
-        "additionalProperties": false
-    }""";
+    public static final String DEFAULT_INPUT_SCHEMA =
+        """
+            {
+                "type": "object",
+                "properties": {
+                    "alertIds": {
+                        "type": "array",
+                        "description": "The ID of the alert to search for."
+                    },
+                    "alertIndex": {
+                        "type": "string",
+                        "description": "The name of the alert index to search from (default is null)"
+                    },
+                    "monitorId": {
+                        "type": "string",
+                        "description": "The ID of the monitor by which to filter the alerts."
+                    },
+                    "monitorIds": {
+                        "type": "array",
+                        "description": "A list of monitor IDs by which to filter the alerts."
+                    },
+                    "workflowIds": {
+                        "type": "array",
+                        "description": "A list of workflow IDs by which to filter the alerts."
+                    },
+                    "alertState": {
+                        "type": "string",
+                        "description": "The alert state by which to filter the alerts. Valid values are 'ALL', 'ACTIVE', 'ERROR', 'COMPLETED', and 'ACKNOWLEDGED'. Default is 'ALL'."
+                    },
+                    "severityLevel": {
+                        "type": "string",
+                        "description": "The severity level by which to filter the alerts. Valid values are 'ALL', '1', '2', and '3'. Default is 'ALL'."
+                    },
+                    "searchString": {
+                        "type": "string",
+                        "description": "The search string to use for searching for a specific alert."
+                    },
+                    "sortOrder": {
+                        "type": "string",
+                        "description": "The sort order of the results. Valid values are 'asc' (ascending) and 'desc' (descending). Default is 'asc'."
+                    },
+                    "sortString": {
+                        "type": "string",
+                        "description": "Specifies the monitor field by which to sort the results. Default is 'monitor_name.keyword'."
+                    },
+                    "size": {
+                        "type": "integer",
+                        "description": "The number of results to return. Default is 20."
+                    },
+                    "startIndex": {
+                        "type": "integer",
+                        "description": "The paginated index of the alert to start from. Default is 0."
+                    }
+                },
+                "required": [],
+                "additionalProperties": false
+            }""";
     public static final Map<String, Object> DEFAULT_ATTRIBUTES = Map.of(TOOL_INPUT_SCHEMA_FIELD, DEFAULT_INPUT_SCHEMA);
 
     @Setter
