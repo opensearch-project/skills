@@ -63,6 +63,7 @@ public abstract class BaseAgentToolsIT extends OpenSearchSecureRestTestCase {
         // default threshold for native circuit breaker is 90, it may be not enough on test runner machine
         updateClusterSettings("plugins.ml_commons.native_memory_threshold", 100);
         updateClusterSettings("plugins.ml_commons.jvm_heap_memory_threshold", 100);
+        updateClusterSettings("plugins.ml_commons.disk_free_space_threshold", 0);
         updateClusterSettings("plugins.ml_commons.allow_registering_model_via_url", true);
         updateClusterSettings("plugins.ml_commons.agent_framework_enabled", true);
         updateClusterSettings("plugins.ml_commons.connector.private_ip_enabled", true);
