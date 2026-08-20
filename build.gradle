@@ -253,8 +253,12 @@ task addSparkJar(type: Copy) {
         delete file("${jarBContents}/org/apache/spark/unused")
         delete file("${jarBContents}/org/sparkproject/jetty/http")
         delete file("${jarBContents}/org/sparkproject/jetty/server")
+        delete file("${jarBContents}/org/sparkproject/jetty/security")
+        delete file("${jarBContents}/org/sparkproject/jetty/client")
         delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-http")
         delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-server")
+        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-security")
+        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-client")
         // Re-compress jar B
         ant.zip(destfile: jarB, baseDir: jarBContents)
 
