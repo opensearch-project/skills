@@ -38,12 +38,16 @@ buildscript {
 
     dependencies {
         classpath "${opensearch_group}.gradle:build-tools:${opensearch_version}"
+        // Spotless 8.10.x requires a Java 17+ runtime to resolve its plugin. Only put it on the
+        // buildscript classpath on Java 17+ so the Java 11 CI matrix doesn't fail resolving it.
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
+            classpath "com.diffplug.spotless:spotless-plugin-gradle:8.10.1"
+        }
     }
 }
 
 plugins {
     id 'java-library'
-    id 'com.diffplug.spotless' version '8.10.1'
     id "io.freefair.lombok" version "8.10.2"
     id "de.undercouch.download" version "5.6.0"
 }
@@ -309,8 +313,12 @@ jacocoTestReport {
 // Gradle invocations (test, assemble) don't provision the formatter at configuration time.
 def runningSpotlessTask = gradle.startParameter.taskNames.any { it.toLowerCase(Locale.ROOT).contains('spotless') }
 
-spotless {
-    if (JavaVersion.current() >= JavaVersion.VERSION_17) {
+// Spotless 8.10.x requires a Java 17+ runtime to even resolve/apply its Gradle plugin. Only apply
+// it on Java 17+ so non-spotless invocations on older JDKs (e.g. the Java 11 CI matrix) don't fail
+// at configuration time. Formatting still runs on the Java 17+ jobs, so enforcement is unchanged.
+if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
+    apply plugin: 'com.diffplug.spotless'
+    spotless {
         // Spotless configuration for Java files
         java {
             removeUnusedImports()
@@ -324,9 +332,9 @@ spotless {
                 eclipse('4.29').withP2Mirrors(Map.of("https://download.eclipse.org/", "https://ci.opensearch.org/")).configFile rootProject.file('.eclipseformat.xml')
             }
         }
-    } else {
-        logger.lifecycle("Spotless plugin requires Java 17 or higher. Skipping Spotless tasks.")
     }
+} else {
+    logger.lifecycle("Spotless plugin requires Java 17 or higher. Skipping Spotless tasks.")
 }
 
 compileJava {
