@@ -16,6 +16,7 @@ jobs:
   build-linux:
     needs: Get-CI-Image-Tag
     strategy:
+      fail-fast: false
       matrix:
         java: [11, 17, 21]
     name: Build and Test skills plugin on Linux
@@ -52,6 +53,7 @@ jobs:
 
   build-MacOS:
     strategy:
+      fail-fast: false
       matrix:
         java: [11, 17, 21]
 
@@ -77,6 +79,7 @@ jobs:
 
   build-windows:
     strategy:
+      fail-fast: false
       matrix:
         java: [11, 17, 21]
     name: Build and Test skills plugin on Windows
