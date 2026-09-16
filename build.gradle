@@ -169,6 +169,9 @@ dependencies {
     implementation("org.json4s:json4s-ast_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-core_2.13:3.7.0-M11")
     implementation("org.json4s:json4s-jackson_2.13:3.7.0-M11")
+    // OpenSearch core migrated to Jackson 3 (tools.jackson.core) and no longer provides
+    // Jackson 2.x jackson-core transitively, but Spark and jackson-module-scala still need it
+    implementation "com.fasterxml.jackson.core:jackson-core:${versions.jackson}"
     implementation "com.fasterxml.jackson.module:jackson-module-scala_3:${versions.jackson}"
     implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
