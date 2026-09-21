@@ -206,7 +206,7 @@ dependencies {
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '5.2.0'
     testImplementation("net.bytebuddy:byte-buddy:1.18.8")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.18.8")
-    testImplementation("tools.jackson.core:jackson-databind:3.1.3")
+    testImplementation("tools.jackson.core:jackson-databind:${versions.jackson3_databind}")
     // Jackson 2.x jackson-core is provided by the opensearch-ml plugin at runtime (bundling it
     // here causes jar hell on plugin install), but unit tests need it on the classpath for
     // Spark PPL error handling since OpenSearch core moved to Jackson 3
