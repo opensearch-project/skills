@@ -255,10 +255,16 @@ task addSparkJar(type: Copy) {
         }
         // Remove the unwanted directory from jar B
         delete file("${jarBContents}/org/apache/spark/unused")
-        delete file("${jarBContents}/org/sparkproject/jetty/http")
-        delete file("${jarBContents}/org/sparkproject/jetty/server")
-        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-http")
-        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty/jetty-server")
+        // Remove the shaded Jetty (9.4.58) embedded in spark-core along with its Maven
+        // metadata. Spark is used only as a PPL parsing library here and never touches
+        // Jetty, so stripping the whole tree avoids CVEs (e.g. CVE-2026-10050) being
+        // flagged against the plugin. The previous per-package deletes only covered
+        // http/server and left the remaining packages (client, io, security, util, ...)
+        // and the org.eclipse.jetty Maven metadata the scanner reads.
+        delete file("${jarBContents}/org/sparkproject/jetty")
+        delete file("${jarBContents}/META-INF/maven/org.eclipse.jetty")
+        // Drop the now-dangling ServiceLoader entry that registers the deleted Jetty classes.
+        delete file("${jarBContents}/META-INF/services/org.eclipse.jetty.http.HttpFieldPreEncoder")
         // Re-compress jar B
         ant.zip(destfile: jarB, baseDir: jarBContents)
 
