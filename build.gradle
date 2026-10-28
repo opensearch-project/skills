@@ -172,7 +172,7 @@ dependencies {
     implementation "com.fasterxml.jackson.module:jackson-module-scala_3:${versions.jackson}"
     implementation group: 'org.scala-lang', name: 'scala3-library_3', version: '3.7.0-RC1-bin-20250119-bd699fc-NIGHTLY'
     implementation("com.thoughtworks.paranamer:paranamer:2.8")
-    implementation("org.jsoup:jsoup:1.23.1")
+    implementation("org.jsoup:jsoup:1.23.2")
 
     // Plugin dependencies
     compileOnly group: 'org.opensearch', name:'opensearch-ml-common', version: "${opensearch_build}"
