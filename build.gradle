@@ -159,7 +159,7 @@ dependencies {
     compileOnly(group: 'software.amazon.awssdk', name: 'sdk-core', version: "${versions.aws}")
 
     spark 'org.apache.spark:spark-sql-api_2.13:3.5.8'
-    spark ('org.apache.spark:spark-core_2.13:3.5.8') {
+    spark ('org.apache.spark:spark-core_2.13:3.5.9') {
         exclude group: 'org.eclipse.jetty', module: 'jetty-server'
     }
     spark group: 'org.apache.spark', name: 'spark-common-utils_2.13', version: '3.5.8'
