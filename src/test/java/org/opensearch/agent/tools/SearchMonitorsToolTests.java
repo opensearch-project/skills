@@ -92,6 +92,7 @@ public class SearchMonitorsToolTests {
             false,
             "",
             Collections.emptyMap(),
+            null,
             null
         );
     }
