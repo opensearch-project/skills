@@ -14,12 +14,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.agent.tools.utils.CommonConstants.COMMON_MODEL_ID_FIELD;
 import static org.opensearch.ml.common.CommonValue.ML_CONNECTOR_INDEX;
+import static org.opensearch.ml.common.CommonValue.TOOL_INPUT_SCHEMA_FIELD;
 import static org.opensearch.ml.common.utils.StringUtils.gson;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hamcrest.MatcherAssert;
 import org.junit.Before;
@@ -725,6 +727,40 @@ public class PPLToolTests {
         pplReturns = Collections.singletonMap("response", "source=demo| head 1");
         modelTensor = new ModelTensor("tensor", new Number[0], new long[0], MLResultDataType.STRING, null, null, pplReturns);
 
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testDefaultAttributes() {
+        Map<String, Object> schema = gson.fromJson((String) PPLTool.DEFAULT_ATTRIBUTES.get(TOOL_INPUT_SCHEMA_FIELD), Map.class);
+        assertEquals("object", schema.get("type"));
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertEquals(Set.of("question", "index"), properties.keySet());
+        assertEquals("string", ((Map<String, Object>) properties.get("question")).get("type"));
+        assertEquals("string", ((Map<String, Object>) properties.get("index")).get("type"));
+        assertEquals(Set.of("question", "index"), Set.copyOf((List<String>) schema.get("required")));
+        assertEquals(Boolean.FALSE, schema.get("additionalProperties"));
+        assertEquals(false, PPLTool.DEFAULT_ATTRIBUTES.get(PPLTool.STRICT_FIELD));
+        assertEquals(PPLTool.DEFAULT_ATTRIBUTES, PPLTool.Factory.getInstance().getDefaultAttributes());
+    }
+
+    @Test
+    public void testToolHasDefaultAttributes() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId"));
+        assertEquals(PPLTool.DEFAULT_ATTRIBUTES, tool.getAttributes());
+    }
+
+    @Test
+    public void testToolAttributesCanBeOverridden() {
+        PPLTool tool = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId"));
+        // Agents merge the tool spec's attributes into the tool's own map.
+        tool.getAttributes().put(TOOL_INPUT_SCHEMA_FIELD, "{\"type\":\"object\"}");
+        assertEquals("{\"type\":\"object\"}", tool.getAttributes().get(TOOL_INPUT_SCHEMA_FIELD));
+        assertEquals(false, tool.getAttributes().get(PPLTool.STRICT_FIELD));
+        assertNotEquals(PPLTool.DEFAULT_ATTRIBUTES.get(TOOL_INPUT_SCHEMA_FIELD), tool.getAttributes().get(TOOL_INPUT_SCHEMA_FIELD));
+        // A new tool still gets the defaults.
+        PPLTool other = PPLTool.Factory.getInstance().create(ImmutableMap.of("model_id", "modelId"));
+        assertEquals(PPLTool.DEFAULT_ATTRIBUTES, other.getAttributes());
     }
 
     private void initMLTensors(){
